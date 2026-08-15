@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.2
+
+### Fixed
+
+- **Titles announced the work instead of reporting it.** `buildTitle` took the
+  reply's opening sentence, which mid-task is a transition rather than an
+  outcome — "Now the use command and the top-level handler:", "Right — let me
+  do that properly". Measured on a real database, half of all titles read like
+  that. Since the title is the whole payload of a search result and of the
+  block injected above each prompt, a turn whose body held the answer was
+  unreachable. Titles now skip announcing sentences and take the first that
+  carries a claim
+
+### Changed
+
+- The memory instructions written at install now ask the agent to search
+  **before re-deriving** something the project already knows — grepping or
+  reading git history to reconstruct a past decision — not only before saying
+  it lacks context, which never fires when it silently reconstructs instead
+
+### Upgrading
+
+Existing titles are rewritten by re-ingesting, per project:
+
+```bash
+cd <project> && claude-db flush
+```
+
+Embeddings are recomputed as part of that; no separate `reembed` is needed.
+
 ## 0.2.1
 
 ### Fixed
