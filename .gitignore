@@ -3,7 +3,6 @@ dist/
 
 # Internal benchmarking notes, not part of the public repo
 SCALING.md
-RELEASING.md
 *.log
 .env
 .env.local
