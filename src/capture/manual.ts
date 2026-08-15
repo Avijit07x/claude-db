@@ -2,6 +2,7 @@ import type { RecallContext } from '../context.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { embedObservations } from './flush.js';
 import { currentAuthor, observationId } from './identity.js';
+import { redact } from './turn-extractor.js';
 
 export interface RememberInput {
   project: string;
@@ -28,7 +29,11 @@ export async function remember(
 ): Promise<Observation> {
   const createdAt = Date.now();
   const author = currentAuthor();
-  const title = firstLine(input.text);
+  // Dictated memory is redacted exactly like captured memory. This is the
+  // likelier of the two paths to carry a credential: "remember the staging DSN
+  // is ..." is a natural thing to say to something whose job is remembering.
+  const text = redact(input.text);
+  const title = firstLine(text);
 
   const observation: Observation = {
     id: observationId('manual', createdAt, input.text),
@@ -36,7 +41,7 @@ export async function remember(
     project: input.project,
     kind: input.kind ?? 'preference',
     title,
-    body: input.text,
+    body: text,
     files: input.files ?? [],
     tags: ['manual'],
     createdAt,

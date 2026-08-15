@@ -189,10 +189,15 @@ const PRIVATE_BLOCK = /<private>[\s\S]*?<\/private>/gi;
 const PRIVATE_KEY =
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g;
 
-function redact(text: string): string {
+export function redact(text: string): string {
   return text
     .replace(PRIVATE_BLOCK, '[redacted]')
     .replace(PRIVATE_KEY, '[redacted-private-key]')
+    // Credentials inside a URL: postgres://, mongodb+srv://, https://. A
+    // connection string is the likeliest secret to be pasted into a tool whose
+    // whole job is remembering what you pasted. The host survives, so the
+    // memory stays useful.
+    .replace(/\/\/[^\s:/@]+:[^\s@]+@/g, '//[redacted]@')
     .replace(/\b(sk-[A-Za-z0-9_-]{16,})\b/g, '[redacted-key]')
     .replace(/\b(gh[pousr]_[A-Za-z0-9]{16,})\b/g, '[redacted-token]')
     .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[redacted-key]')
