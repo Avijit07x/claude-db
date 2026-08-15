@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { flushSession } from '../capture/index.js';
+import { clearCursor, flushSession } from '../capture/index.js';
 import { createContext } from '../context.js';
 import { readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
@@ -32,6 +32,8 @@ await runHook(async () => {
       endedAt: Date.now(),
       ...(result.summary ? { summary: result.summary } : {}),
     });
+
+    clearCursor(sessionId);
   } finally {
     await ctx.close();
   }

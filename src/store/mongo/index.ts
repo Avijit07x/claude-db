@@ -1,10 +1,13 @@
 import type { Collection, Db, Doc, MongoClient } from './driver.js';
 import { importMongo } from './driver.js';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
+import { isWholeScope } from '../adapter.js';
 import type {
+  ListFilter,
   Observation,
   ObservationIndexEntry,
   ObservationKind,
+  RemoveFilter,
   SearchQuery,
   Session,
   TimelineQuery,
@@ -31,6 +34,8 @@ interface ObservationDoc extends Doc {
   tags: string[];
   createdAt: number;
   embedding?: number[];
+  embedder?: string;
+  author?: string;
 }
 
 /**
@@ -147,13 +152,44 @@ export class MongoStore implements MemoryStore {
     return docs.map(toObservation);
   }
 
-  async clear(project?: string): Promise<number> {
-    const filter: Doc = project ? { project } : {};
-    const docs = await this.observations.find(filter, { projection: { _id: 1 } }).toArray();
+  async remove(filter: RemoveFilter): Promise<number> {
+    if (filter.ids?.length === 0) return 0;
 
-    await this.observations.deleteMany(filter);
-    await this.sessions.deleteMany(filter);
-    return docs.length;
+    const query: Record<string, unknown> = {};
+    if (filter.project) query['project'] = filter.project;
+    if (filter.kind) query['kind'] = filter.kind;
+    if (filter.before !== undefined) query['createdAt'] = { $lt: filter.before };
+
+    if (filter.ids) {
+      const { exact, prefixes } = partitionIds(filter.ids);
+      const alternatives: Record<string, unknown>[] = [];
+      if (exact.length > 0) alternatives.push({ _id: { $in: exact } });
+      for (const prefix of prefixes) {
+        alternatives.push({ _id: { $regex: `^${escapeRegex(prefix)}` } });
+      }
+      query['$or'] = alternatives;
+    }
+
+    const count = await this.observations.countDocuments(query as Doc);
+    await this.observations.deleteMany(query as Doc);
+    if (isWholeScope(filter)) {
+      await this.sessions.deleteMany(filter.project ? { project: filter.project } : {});
+    }
+    return count;
+  }
+
+  async list(filter: ListFilter): Promise<Observation[]> {
+    const query: Record<string, unknown> = {};
+    if (filter.project) query['project'] = filter.project;
+    if (filter.kind) query['kind'] = filter.kind;
+    if (filter.after !== undefined) query['createdAt'] = { $gt: filter.after };
+
+    const docs = await this.observations
+      .find(query as Doc)
+      .sort({ createdAt: 1 })
+      .limit(filter.limit ?? 1000)
+      .toArray();
+    return docs.map(toObservation);
   }
 
   async listProjects(): Promise<ProjectSummary[]> {
@@ -222,7 +258,13 @@ export class MongoStore implements MemoryStore {
     // which in practice narrows to a single project.
     const docs = await this.observations
       .find(
-        { embedding: { $exists: true }, ...this.scopeFilter(query) },
+        {
+          embedding: { $exists: true },
+          ...(query.embedder
+            ? { $or: [{ embedder: query.embedder }, { embedder: { $exists: false } }] }
+            : {}),
+          ...this.scopeFilter(query),
+        },
         { projection: { kind: 1, title: 1, project: 1, createdAt: 1, embedding: 1 } },
       )
       .sort({ createdAt: -1 })
@@ -318,6 +360,8 @@ function toDoc(obs: Observation): ObservationDoc {
     createdAt: obs.createdAt,
   };
   if (obs.embedding) doc.embedding = obs.embedding;
+  if (obs.embedder) doc.embedder = obs.embedder;
+  if (obs.author) doc.author = obs.author;
   return doc;
 }
 
@@ -334,6 +378,8 @@ function toObservation(doc: ObservationDoc): Observation {
     createdAt: doc.createdAt,
   };
   if (doc.embedding) obs.embedding = doc.embedding;
+  if (doc.embedder) obs.embedder = doc.embedder;
+  if (doc.author) obs.author = doc.author;
   return obs;
 }
 

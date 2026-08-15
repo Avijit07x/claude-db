@@ -64,7 +64,10 @@ export class SearchService {
       const [embedding] = await embedder.embed([query.text]);
       if (!embedding || embedding.length === 0) return [];
 
-      const candidates = await this.store.searchVector(embedding, query);
+      const candidates = await this.store.searchVector(embedding, {
+        ...query,
+        embedder: embedder.id,
+      });
 
       // Nearest-neighbour search always returns its top k, however poor the
       // match. Without a floor, an unrelated prompt still yields results, and

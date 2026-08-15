@@ -1,5 +1,6 @@
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
+PRAGMA recursive_triggers = ON;
 
 CREATE TABLE IF NOT EXISTS sessions (
   id         TEXT PRIMARY KEY,
@@ -16,8 +17,6 @@ CREATE TABLE IF NOT EXISTS observations (
   id         TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
   project    TEXT NOT NULL,
-  -- Single opaque token identifying the project, indexed inside FTS so that
-  -- scoping happens during the match rather than as a post-filter join.
   scope      TEXT NOT NULL DEFAULT '',
   kind       TEXT NOT NULL,
   title      TEXT NOT NULL,
@@ -25,7 +24,9 @@ CREATE TABLE IF NOT EXISTS observations (
   files      TEXT NOT NULL DEFAULT '[]',
   tags       TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER NOT NULL,
-  embedding  BLOB
+  embedding  BLOB,
+  embedder   TEXT,
+  author     TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_obs_project_time

@@ -1,6 +1,8 @@
 import type {
+  ListFilter,
   Observation,
   ObservationIndexEntry,
+  RemoveFilter,
   SearchQuery,
   Session,
   TimelineQuery,
@@ -37,13 +39,22 @@ export interface MemoryStore {
   getObservations(ids: string[]): Promise<Observation[]>;
 
   /**
-   * Deletes memory, scoped to one project or everything when omitted.
-   * Returns the number of observations removed.
+   * Deletes memory matching a filter, returning how many observations went.
    *
-   * Belongs on the adapter rather than being handled by deleting a file,
-   * because on a shared Postgres or Mongo there is no file to delete.
+   * One method rather than three because `reset`, `prune` and `forget` differ
+   * only in how they narrow. Belongs on the adapter rather than being handled
+   * by deleting a file, because on a shared Postgres or Mongo there is none.
+   *
+   * Sessions are removed only for a whole-project or whole-database wipe; a
+   * pruned or forgotten observation leaves its session intact.
    */
-  clear(project?: string): Promise<number>;
+  remove(filter: RemoveFilter): Promise<number>;
+
+  /**
+   * Bulk read, oldest first, for export, re-embedding and statistics. Paged by
+   * `after` + `limit` so a large database is never held in memory at once.
+   */
+  list(filter: ListFilter): Promise<Observation[]>;
 
   /** Every project with memory in this database, most recently active first. */
   listProjects(): Promise<ProjectSummary[]>;
@@ -54,6 +65,17 @@ export interface MemoryStore {
   searchVector(vector: number[], query: SearchQuery): Promise<ObservationIndexEntry[]>;
 
   timeline(query: TimelineQuery): Promise<ObservationIndexEntry[]>;
+}
+
+/**
+ * True when a filter names a whole project, or the whole database.
+ *
+ * Sessions follow their observations only in that case: pruning by date or
+ * forgetting one row must leave the session record alone, or the recap at
+ * SessionStart loses sessions whose work is still there.
+ */
+export function isWholeScope(filter: RemoveFilter): boolean {
+  return !filter.ids && !filter.kind && filter.before === undefined;
 }
 
 export interface StoreFactory {
