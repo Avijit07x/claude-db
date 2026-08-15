@@ -44,6 +44,17 @@ import type {
  * is not permitted (common on locked-down managed instances) the store still
  * works, minus semantic recall, which the search service handles gracefully.
  */
+/**
+ * Title outranks tags, tags outrank body — the same ordering FTS5 gets from its
+ * column weights. Tags were missing here entirely, so an observation tagged
+ * with the repository it touched was findable on SQLite and Mongo but not on
+ * Postgres.
+ */
+const TSV_EXPRESSION = `
+  setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+  setweight(to_tsvector('english', coalesce(tags::text, '')), 'B') ||
+  setweight(to_tsvector('english', coalesce(body, '')), 'C')`;
+
 export class PostgresStore implements MemoryStore {
   readonly kind = 'postgres';
 
@@ -87,10 +98,7 @@ export class PostgresStore implements MemoryStore {
         created_at BIGINT NOT NULL,
         embedder   TEXT,
         author     TEXT,
-        tsv        TSVECTOR GENERATED ALWAYS AS (
-          setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
-          setweight(to_tsvector('english', coalesce(body,  '')), 'B')
-        ) STORED
+        tsv        TSVECTOR GENERATED ALWAYS AS (${TSV_EXPRESSION}) STORED
       );
       CREATE INDEX IF NOT EXISTS idx_obs_tsv ON observations USING GIN(tsv);
       CREATE INDEX IF NOT EXISTS idx_obs_project_time
@@ -100,7 +108,33 @@ export class PostgresStore implements MemoryStore {
       ALTER TABLE observations ADD COLUMN IF NOT EXISTS author   TEXT;
     `);
 
+    await this.ensureTagsIndexed();
     if (this.vectorEnabled) this.vectorDims = await this.readVectorDims();
+  }
+
+  /**
+   * CREATE TABLE IF NOT EXISTS leaves an existing generated column alone, so a
+   * database created before tags were indexed keeps the old expression. Rebuild
+   * it once; dropping the column takes its index with it.
+   */
+  private async ensureTagsIndexed(): Promise<void> {
+    const res = await this.pool.query(
+      `SELECT pg_get_expr(d.adbin, d.adrelid) AS expr
+       FROM pg_attrdef d
+       JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+       WHERE d.adrelid = 'observations'::regclass AND a.attname = 'tsv'`,
+    );
+    const expr = String(res.rows[0]?.['expr'] ?? '');
+    if (expr.length === 0 || expr.includes('tags')) return;
+
+    await this.pool.query('ALTER TABLE observations DROP COLUMN tsv');
+    await this.pool.query(
+      `ALTER TABLE observations
+         ADD COLUMN tsv TSVECTOR GENERATED ALWAYS AS (${TSV_EXPRESSION}) STORED`,
+    );
+    await this.pool.query(
+      'CREATE INDEX IF NOT EXISTS idx_obs_tsv ON observations USING GIN(tsv)',
+    );
   }
 
   private async readVectorDims(): Promise<number | null> {
@@ -354,15 +388,23 @@ export class PostgresStore implements MemoryStore {
   }
 
   async searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]> {
-    const conditions = ['tsv @@ plainto_tsquery($1)'];
+    const conditions = ['tsv @@ q.tsq'];
     const values: unknown[] = [query.text];
     this.appendScope(query, conditions, values);
     values.push(query.limit);
 
+    // plainto_tsquery ANDs every term, so a natural-language prompt only
+    // matches a row containing all of it — which for a real prompt is nothing
+    // at all, and injection would silently never fire. Flipping the operator on
+    // its output keeps Postgres's own parsing, stemming and stopword removal
+    // while giving the forgiving recall the other two adapters have; ts_rank
+    // then sorts out what actually mattered.
     const res = await this.pool.query(
-      `SELECT id, kind, title, project, created_at,
-              ts_rank(tsv, plainto_tsquery($1)) AS score
-       FROM observations
+      `WITH q AS (
+         SELECT replace(plainto_tsquery('english', $1)::text, '&', '|')::tsquery AS tsq
+       )
+       SELECT id, kind, title, project, created_at, ts_rank(tsv, q.tsq) AS score
+       FROM observations, q
        WHERE ${conditions.join(' AND ')}
        ORDER BY score DESC
        LIMIT $${values.length}`,
