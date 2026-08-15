@@ -30,14 +30,17 @@ export const ConfigSchema = z.object({
     .default({ provider: 'auto', maxScanCandidates: 25000, timeoutMs: 3000 }),
 
   /**
-   * `auto` installs a newer compatible release in a detached process once a
-   * day; `notify` only mentions it at session start; `off` never asks.
+   * `notify` mentions a newer release at session start; `auto` also installs
+   * it; `off` never asks.
    *
-   * Auto is the default because this tool fails silently on purpose — hooks
-   * swallow their errors so they can never break a session — so someone left
-   * on a broken release gets no error, just memory that never fills up.
+   * Notify is the default. Installing on someone's behalf means executing code
+   * they did not choose, in a process holding their whole memory database, and
+   * it turns a single bad publish into silent execution everywhere. The nudge
+   * is what actually matters here: this tool fails silently by design — hooks
+   * swallow their errors so they can never break a session — so a user left on
+   * a broken release sees no error, just memory that never fills up.
    */
-  updates: z.enum(['auto', 'notify', 'off']).default('auto'),
+  updates: z.enum(['auto', 'notify', 'off']).default('notify'),
 
   capture: z
     .object({
