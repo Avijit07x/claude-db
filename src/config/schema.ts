@@ -18,8 +18,16 @@ export const ConfigSchema = z.object({
        * vector index (pgvector, Atlas) ignore this.
        */
       maxScanCandidates: z.number().int().positive().default(25000),
+      /**
+       * How long to wait for the embedding model before giving up for this
+       * one invocation and falling back to keyword-only search. The model is
+       * fetched and loaded lazily inside a hook that runs on the critical path
+       * of a prompt, so an unbounded wait is a hung prompt. 0 disables the
+       * limit, which is what `doctor` uses to warm the model deliberately.
+       */
+      timeoutMs: z.number().int().nonnegative().default(3000),
     })
-    .default({ provider: 'auto', maxScanCandidates: 25000 }),
+    .default({ provider: 'auto', maxScanCandidates: 25000, timeoutMs: 3000 }),
 
   capture: z
     .object({

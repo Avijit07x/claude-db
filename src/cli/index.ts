@@ -1,12 +1,26 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, rmSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { flushSession, resetCursor } from '../capture/index.js';
+import {
+  embedObservations,
+  flushSession,
+  remember,
+  resetCursor,
+  transcriptsFor,
+} from '../capture/index.js';
 import { createContext } from '../context.js';
+import type { RecallContext } from '../context.js';
+import type { Observation, ObservationKind } from '../types.js';
 import { CONFIG_DIR, CONFIG_PATH, loadConfig, saveConfig } from '../config/index.js';
-import { assertStableLocation, install, mcpPathFor, settingsPathFor, uninstall } from './install.js';
+import {
+  assertStableLocation,
+  install,
+  instructionsPathFor,
+  mcpPathFor,
+  settingsPathFor,
+  uninstall,
+} from './install.js';
 import type { Scope } from './install.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
@@ -15,6 +29,10 @@ import { toShortId } from '../util/shortid.js';
 silenceSqliteWarning();
 
 const DIST_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+// Declared above the command switch below, which runs before the rest of this
+// module's bindings initialise.
+const BATCH = 500;
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -35,7 +53,28 @@ switch (command) {
     await cmdDoctor();
     break;
   case 'search':
-    await cmdSearch(args.join(' '));
+    await cmdSearch(args);
+    break;
+  case 'remember':
+    await cmdRemember(args);
+    break;
+  case 'forget':
+    await cmdForget(args);
+    break;
+  case 'export':
+    await cmdExport(args);
+    break;
+  case 'import':
+    await cmdImport(args[0]);
+    break;
+  case 'prune':
+    await cmdPrune(args);
+    break;
+  case 'reembed':
+    await cmdReembed();
+    break;
+  case 'stats':
+    await cmdStats();
     break;
   case 'flush':
     await cmdFlush();
@@ -45,6 +84,9 @@ switch (command) {
     break;
   case 'projects':
     await cmdProjects();
+    break;
+  case 'merge':
+    await cmdMerge(args);
     break;
   default:
     usage();
@@ -77,6 +119,97 @@ async function cmdProjects(): Promise<void> {
 }
 
 /**
+ * Re-keys memory recorded under an old project path onto this one.
+ *
+ * Memory used to be keyed on the exact directory the agent was launched in, so
+ * anyone who worked from `repo/frontend` accumulated a second, disjoint memory.
+ * Keying on the repository root fixes that going forward but strands whatever
+ * is already under the old path, and nothing about it is visible: the memory
+ * simply does not appear.
+ *
+ * Re-inserting rather than issuing an UPDATE is deliberate. Observation ids are
+ * content-derived and independent of the project, so writing the same rows with
+ * a new project overwrites in place, and every derived field that depends on the
+ * project — the FTS scope token above all — is recomputed on the way through.
+ */
+async function cmdMerge(argv: (string | undefined)[]): Promise<void> {
+  const into = resolveProject(undefined);
+  const confirmed = argv.includes('--yes') || argv.includes('-y');
+  const given = argv.find((arg) => typeof arg === 'string' && !arg.startsWith('-'));
+
+  const ctx = await createContext();
+  try {
+    if (!given) {
+      await listShards(ctx, into);
+      return;
+    }
+
+    // Resolved but deliberately not run through resolveProject: that maps a
+    // subdirectory to the repository root, which is the very key being merged
+    // *into*, so the source would resolve to the destination and match nothing.
+    const from = resolve(given);
+    if (from === into) {
+      console.error('Source and destination are the same project.');
+      process.exit(1);
+    }
+
+    let moved = 0;
+    const total = await eachObservation(ctx, { project: from }, async (batch) => {
+      if (!confirmed) return;
+      await ctx.store.insertObservations(batch.map((obs) => ({ ...obs, project: into })));
+      moved += batch.length;
+    });
+
+    if (total === 0) {
+      console.error(`No memory stored under ${from}.`);
+      console.error('Run `claude-db projects` to see the exact paths in this database.');
+      process.exit(1);
+    }
+
+    if (!confirmed) {
+      console.log(`This would move ${total} observation(s):`);
+      console.log(`  from ${from}`);
+      console.log(`  into ${into}`);
+      console.log('\nNothing was moved. Re-run with --yes to confirm.');
+      return;
+    }
+
+    // Sessions carry the recap injected at SessionStart, so they follow their
+    // observations. Only summarised ones are worth moving; the rest go with
+    // the cleanup below.
+    for (const session of await ctx.store.recentSessions(from, 1000)) {
+      await ctx.store.upsertSession({ ...session, project: into });
+    }
+    const swept = await ctx.store.remove({ project: from });
+
+    console.log(`Moved ${moved} observation(s) into ${into}.`);
+    if (swept > 0) console.log(`Cleaned up ${swept} leftover row(s) under the old path.`);
+  } finally {
+    await ctx.close();
+  }
+}
+
+/** Projects in this database that sit underneath the current one. */
+async function listShards(ctx: RecallContext, into: string): Promise<void> {
+  const shards = (await ctx.store.listProjects()).filter(
+    (entry) => entry.project !== into && entry.project.startsWith(`${into}/`),
+  );
+
+  if (shards.length === 0) {
+    console.log(`No memory is stored under a subdirectory of ${into}.`);
+    console.log('Nothing to merge.');
+    return;
+  }
+
+  console.log(`Memory recorded under subdirectories of ${into}:\n`);
+  for (const shard of shards) {
+    console.log(`  ${String(shard.observations).padStart(5)}  ${shard.project}`);
+  }
+  console.log('\nMerge one in with:');
+  console.log(`  claude-db merge ${shards[0]?.project} --yes`);
+}
+
+/**
  * Deletes stored memory. Scoped to this project with `--project`, otherwise
  * everything in the configured database.
  *
@@ -102,7 +235,7 @@ async function cmdReset(argv: (string | undefined)[]): Promise<void> {
       return;
     }
 
-    const deleted = await ctx.store.clear(scoped ? project : undefined);
+    const deleted = await ctx.store.remove(scoped ? { project } : {});
     console.log(`Deleted ${deleted} observation(s) from ${target}.`);
     if (!scoped) {
       clearLocalState();
@@ -131,13 +264,10 @@ function clearLocalState(): void {
  */
 async function cmdFlush(): Promise<void> {
   const project = resolveProject(undefined);
-  const dir = transcriptDirFor(project);
+  const transcripts = transcriptsFor(project);
 
-  let files: string[];
-  try {
-    files = readdirSync(dir).filter((name) => name.endsWith('.jsonl'));
-  } catch {
-    console.error(`No transcripts found at ${dir}`);
+  if (transcripts.length === 0) {
+    console.error(`No transcripts found for ${project}`);
     process.exit(1);
   }
 
@@ -145,11 +275,11 @@ async function cmdFlush(): Promise<void> {
   let total = 0;
 
   try {
-    for (const file of files) {
-      const sessionId = file.replace(/\.jsonl$/, '');
+    for (const path of transcripts) {
+      const sessionId = basename(path, '.jsonl');
       // Ignore any stored cursor: a manual flush is asking for a full re-read.
       resetCursor(sessionId);
-      const result = await flushSession(ctx, sessionId, project, join(dir, file));
+      const result = await flushSession(ctx, sessionId, project, path);
       if (result.observations > 0) {
         console.log(`${sessionId.slice(0, 8)}  ${String(result.observations).padStart(4)} observations`);
         total += result.observations;
@@ -159,7 +289,7 @@ async function cmdFlush(): Promise<void> {
     await ctx.close();
   }
 
-  console.log(`\n${total} observations from ${files.length} transcript(s).`);
+  console.log(`\n${total} observations from ${transcripts.length} transcript(s).`);
 }
 
 /** `--project` limits the install to the current repo; default is machine-wide. */
@@ -183,6 +313,7 @@ async function cmdInstall(scope: Scope): Promise<void> {
 
   console.log(`Scope    : ${scope === 'project' ? `this project only (${project})` : 'all projects on this machine'}`);
   console.log(`Settings : ${settingsPath}`);
+  console.log(`Guidance : ${instructionsPathFor(scope, project)}`);
   console.log(`Config   : ${CONFIG_PATH}`);
   console.log(`Database : ${ctx.config.database}`);
   console.log('\nRestart Claude Code to activate.');
@@ -269,8 +400,8 @@ async function cmdStatus(): Promise<void> {
       console.log('Run this from the project you want to track:');
       console.log('  claude-db install --project');
     } else if (sessions.length === 0) {
-      console.log('\nInstalled, but nothing recorded yet. Memory is written when a');
-      console.log('session ENDS. Work in this project, close the session, then re-check.');
+      console.log('\nInstalled, but nothing recorded yet. Memory is written as you');
+      console.log('work, on every prompt, and only for turns that changed something.');
       console.log('If you installed just now, restart Claude Code first.');
     }
   } finally {
@@ -281,11 +412,6 @@ async function cmdStatus(): Promise<void> {
 /** True when a settings file contains one of our hook commands. */
 function isInstalled(settingsPath: string): boolean {
   return fileMentions(settingsPath, resolve(DIST_DIR, 'hooks', 'session-end.js'));
-}
-
-/** Claude Code stores transcripts under a dash-encoded absolute path. */
-function transcriptDirFor(project: string): string {
-  return join(homedir(), '.claude', 'projects', project.replace(/[/.]/g, '-'));
 }
 
 function fileMentions(path: string, needle: string): boolean {
@@ -314,7 +440,12 @@ async function cmdUse(uri: string | undefined): Promise<void> {
 }
 
 async function cmdDoctor(): Promise<void> {
-  const ctx = await createContext();
+  // No embedder timeout here: doctor is where you want to wait for a first
+  // model download, so that the hooks afterwards find it cached.
+  const base = loadConfig();
+  const ctx = await createContext({
+    embeddings: { ...base.embeddings, timeoutMs: 0 },
+  });
   const reachable = await ctx.store.ping();
 
   // Report measured capability, not configured intent. Printing "384d" for an
@@ -349,25 +480,290 @@ async function probeEmbedder(embedder: {
   }
 }
 
-async function cmdSearch(query: string): Promise<void> {
+async function cmdSearch(argv: (string | undefined)[]): Promise<void> {
+  const all = argv.includes('--all');
+  const query = argv.filter((arg) => arg !== '--all').join(' ');
+
   if (!query.trim()) {
-    console.error('Usage: claude-db search <query>');
+    console.error('Usage: claude-db search [--all] <query>');
     process.exit(1);
   }
   const ctx = await createContext();
   const results = await ctx.search.search({
     text: query,
-    project: resolveProject(undefined),
+    // Scoping is right for injection, but "where did I solve this before" is
+    // inherently cross-project, and only the CLI can ask that question.
+    ...(all ? {} : { project: resolveProject(undefined) }),
     limit: 10,
   });
   // Same short-id format the MCP tools emit, so ids copied from either place
   // work in the other.
   for (const entry of results) {
     const date = new Date(entry.createdAt).toISOString().slice(0, 10);
-    console.log(`${toShortId(entry.id)}  ${entry.kind.padEnd(10)} ${date}  ${entry.title}`);
+    const where = all ? `  ${basename(entry.project)}` : '';
+    console.log(
+      `${toShortId(entry.id)}  ${entry.kind.padEnd(10)} ${date}${where}  ${entry.title}`,
+    );
   }
   if (results.length === 0) console.log('No matching observations.');
   await ctx.close();
+}
+
+async function cmdRemember(argv: (string | undefined)[]): Promise<void> {
+  const kindFlag = argv.indexOf('--kind');
+  const kind = kindFlag >= 0 ? argv[kindFlag + 1] : undefined;
+  const text = (
+    kindFlag >= 0
+      ? argv.filter((_, index) => index !== kindFlag && index !== kindFlag + 1)
+      : argv
+  )
+    .join(' ')
+    .trim();
+
+  if (!text) {
+    console.error('Usage: claude-db remember [--kind <kind>] <text>');
+    process.exit(1);
+  }
+
+  const ctx = await createContext();
+  try {
+    const observation = await remember(ctx, {
+      project: resolveProject(undefined),
+      text,
+      ...(kind ? { kind: kind as ObservationKind } : {}),
+    });
+    console.log(`Remembered ${toShortId(observation.id)} [${observation.kind}] ${observation.title}`);
+  } finally {
+    await ctx.close();
+  }
+}
+
+async function cmdForget(argv: (string | undefined)[]): Promise<void> {
+  const ids = argv.filter((arg): arg is string => typeof arg === 'string' && arg.length > 0);
+  if (ids.length === 0) {
+    console.error('Usage: claude-db forget <id> [id...]');
+    process.exit(1);
+  }
+
+  const ctx = await createContext();
+  try {
+    // Shown before deleting: a short id is a prefix match, and the only way to
+    // be sure it means what you think is to read the titles back.
+    const doomed = await ctx.store.getObservations(ids);
+    for (const obs of doomed) {
+      console.log(`  ${toShortId(obs.id)} [${obs.kind}] ${obs.title}`);
+    }
+    const deleted = await ctx.store.remove({ ids });
+    console.log(deleted > 0 ? `Forgot ${deleted} observation(s).` : 'No match.');
+  } finally {
+    await ctx.close();
+  }
+}
+
+/** Pages rather than loading everything: a shared database can be large. */
+async function eachObservation(
+  ctx: RecallContext,
+  filter: { project?: string },
+  visit: (batch: Observation[]) => Promise<void> | void,
+): Promise<number> {
+  let after = 0;
+  let total = 0;
+
+  for (;;) {
+    const batch = await ctx.store.list({ ...filter, after, limit: BATCH });
+    if (batch.length === 0) return total;
+
+    await visit(batch);
+    total += batch.length;
+
+    const last = batch[batch.length - 1];
+    if (!last) return total;
+    // createdAt is not unique, so a batch that lands entirely on one timestamp
+    // would loop forever. Nudging past it drops at most a co-timestamped tail.
+    after = last.createdAt === after ? after + 1 : last.createdAt;
+    if (batch.length < BATCH) return total;
+  }
+}
+
+async function cmdExport(argv: (string | undefined)[]): Promise<void> {
+  const all = argv.includes('--all');
+  const ctx = await createContext();
+
+  try {
+    const count = await eachObservation(
+      ctx,
+      all ? {} : { project: resolveProject(undefined) },
+      (batch) => {
+        for (const obs of batch) process.stdout.write(`${JSON.stringify(obs)}\n`);
+      },
+    );
+    process.stderr.write(`${count} observation(s) exported.\n`);
+  } finally {
+    await ctx.close();
+  }
+}
+
+async function cmdImport(path: string | undefined): Promise<void> {
+  if (!path) {
+    console.error('Usage: claude-db import <file.jsonl>');
+    process.exit(1);
+  }
+
+  const lines = readFileSync(path, 'utf8').split('\n').filter((line) => line.trim().length > 0);
+  const ctx = await createContext();
+  let imported = 0;
+
+  try {
+    for (let i = 0; i < lines.length; i += BATCH) {
+      const batch = lines
+        .slice(i, i + BATCH)
+        .map((line) => JSON.parse(line) as Observation)
+        .filter((obs) => typeof obs.id === 'string' && typeof obs.project === 'string');
+      await ctx.store.insertObservations(batch);
+      imported += batch.length;
+    }
+  } finally {
+    await ctx.close();
+  }
+
+  // Ids are content-derived, so re-importing the same file is a no-op rather
+  // than a second copy of every memory.
+  console.log(`Imported ${imported} observation(s).`);
+}
+
+async function cmdPrune(argv: (string | undefined)[]): Promise<void> {
+  const days = Number(valueOf(argv, '--older-than') ?? NaN);
+  const kind = valueOf(argv, '--kind') as ObservationKind | undefined;
+  const confirmed = argv.includes('--yes') || argv.includes('-y');
+  const all = argv.includes('--all');
+
+  if (!Number.isFinite(days) || days <= 0) {
+    console.error('Usage: claude-db prune --older-than <days> [--kind <kind>] [--all] --yes');
+    process.exit(1);
+  }
+
+  const before = Date.now() - days * 86_400_000;
+  const filter = {
+    before,
+    ...(all ? {} : { project: resolveProject(undefined) }),
+    ...(kind ? { kind } : {}),
+  };
+
+  const ctx = await createContext();
+  try {
+    if (!confirmed) {
+      // Counted by paging rather than one unbounded query, and against the
+      // same predicate the delete uses, so the dry run cannot disagree with it.
+      let matching = 0;
+      await eachObservation(ctx, all ? {} : { project: resolveProject(undefined) }, (batch) => {
+        for (const obs of batch) {
+          if (obs.createdAt < before && (!kind || obs.kind === kind)) matching += 1;
+        }
+      });
+      console.log(
+        `This would delete ${matching} observation(s) older than ${days} day(s)` +
+          `${kind ? ` of kind ${kind}` : ''}.`,
+      );
+      console.log('\nNothing was deleted. Re-run with --yes to confirm.');
+      return;
+    }
+    const deleted = await ctx.store.remove(filter);
+    console.log(`Pruned ${deleted} observation(s).`);
+  } finally {
+    await ctx.close();
+  }
+}
+
+/**
+ * Re-embeds everything with the currently configured model.
+ *
+ * Installing @xenova/transformers changes the embedding space from 256d to
+ * 384d, and `cosine` refuses to compare across widths, so without this an
+ * upgrade makes existing memory *less* searchable rather than more.
+ */
+async function cmdReembed(): Promise<void> {
+  const base = loadConfig();
+  const ctx = await createContext({ embeddings: { ...base.embeddings, timeoutMs: 0 } });
+
+  try {
+    const embedder = await ctx.embedder();
+    if (embedder.dimensions === 0) {
+      console.error('No embedder available; nothing to do.');
+      process.exit(1);
+    }
+
+    let updated = 0;
+    let skipped = 0;
+    const scanned = await eachObservation(ctx, {}, async (batch) => {
+      const stale = batch.filter((obs) => obs.embedder !== embedder.id);
+      skipped += batch.length - stale.length;
+      if (stale.length === 0) return;
+
+      await embedObservations(ctx, stale);
+      await ctx.store.insertObservations(stale);
+      updated += stale.length;
+      process.stderr.write(`\r${updated} re-embedded...`);
+    });
+
+    process.stderr.write('\r');
+    console.log(
+      `Scanned ${scanned}, re-embedded ${updated} with ${embedder.id}` +
+        `${skipped > 0 ? `, ${skipped} already current` : ''}.`,
+    );
+  } finally {
+    await ctx.close();
+  }
+}
+
+async function cmdStats(): Promise<void> {
+  const project = resolveProject(undefined);
+  const ctx = await createContext();
+
+  try {
+    const kinds = new Map<string, number>();
+    const tags = new Map<string, number>();
+    let embedded = 0;
+    let earliest = Number.POSITIVE_INFINITY;
+    let latest = 0;
+
+    const total = await eachObservation(ctx, { project }, (batch) => {
+      for (const obs of batch) {
+        kinds.set(obs.kind, (kinds.get(obs.kind) ?? 0) + 1);
+        for (const tag of obs.tags) tags.set(tag, (tags.get(tag) ?? 0) + 1);
+        if (obs.embedding && obs.embedding.length > 0) embedded += 1;
+        earliest = Math.min(earliest, obs.createdAt);
+        latest = Math.max(latest, obs.createdAt);
+      }
+    });
+
+    if (total === 0) {
+      console.log(`No memory stored for ${project}.`);
+      return;
+    }
+
+    const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+    console.log(`project     : ${project}`);
+    console.log(`observations: ${total}`);
+    console.log(`range       : ${day(earliest)} to ${day(latest)}`);
+    console.log(`embedded    : ${embedded} of ${total}`);
+    console.log('\nby kind');
+    for (const [kind, n] of [...kinds].sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${String(n).padStart(5)}  ${kind}`);
+    }
+    if (tags.size > 0) {
+      console.log('\nby area');
+      for (const [tag, n] of [...tags].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
+        console.log(`  ${String(n).padStart(5)}  ${tag}`);
+      }
+    }
+  } finally {
+    await ctx.close();
+  }
+}
+
+function valueOf(argv: (string | undefined)[], flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  return index >= 0 ? argv[index + 1] : undefined;
 }
 
 function usage(): void {
@@ -378,9 +774,17 @@ function usage(): void {
   status                      Is it wired up, and has it recorded anything
   doctor                      Show resolved config and test connectivity
   use <connection-string>     Point memory at any database and verify it
-  search <query>              Search memory for the current project
+  search [--all] <query>      Search memory, this project or every project
+  remember [--kind k] <text>  Record something outright, e.g. a house rule
+  forget <id> [id...]         Delete specific observations by id
   projects                    List every project with memory in this database
+  merge [<old-path>] [--yes]  Move memory from an old project path onto this one
+  stats                       What this project's memory is made of
   flush                       Re-ingest every transcript for this project
+  export [--all] > out.jsonl  Dump memory as JSONL, for backup or migration
+  import <file.jsonl>         Load a dump back in (safe to repeat)
+  reembed                     Re-embed everything with the current model
+  prune --older-than <days>   Delete old memory (dry run without --yes)
   reset [--project] --yes     Delete stored memory (dry run without --yes)
 
   --project  scope to the current repo via .claude/settings.local.json

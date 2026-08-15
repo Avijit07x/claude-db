@@ -42,3 +42,51 @@ jobs:
           npm install -g ./claude-db-*.tgz
           claude-db doctor
           cdb --help || true
+
+  # The job above only ever exercised SQLite, which is how two Postgres bugs
+  # shipped. The smoke suite takes a connection string, so this is the same
+  # checks against the other two backends.
+  adapters:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Install the optional drivers
+        run: npm install --no-save pg mongodb
+
+      - name: Postgres
+        run: node scripts/smoke.mjs "postgres://postgres:postgres@localhost:5432/postgres"
+
+      - name: MongoDB
+        run: node scripts/smoke.mjs "mongodb://localhost:27017/claude_db_ci"
