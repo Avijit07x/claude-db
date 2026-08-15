@@ -29,6 +29,16 @@ export const ConfigSchema = z.object({
     })
     .default({ provider: 'auto', maxScanCandidates: 25000, timeoutMs: 3000 }),
 
+  /**
+   * `auto` installs a newer compatible release in a detached process once a
+   * day; `notify` only mentions it at session start; `off` never asks.
+   *
+   * Auto is the default because this tool fails silently on purpose — hooks
+   * swallow their errors so they can never break a session — so someone left
+   * on a broken release gets no error, just memory that never fills up.
+   */
+  updates: z.enum(['auto', 'notify', 'off']).default('auto'),
+
   capture: z
     .object({
       /** Tools whose invocations are worth remembering. */

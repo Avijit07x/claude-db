@@ -23,6 +23,7 @@ import {
 } from './install.js';
 import type { Scope } from './install.js';
 import { resolveProject } from '../util/project.js';
+import { checkForUpdate, packageVersion } from '../update.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 import { toShortId } from '../util/shortid.js';
 
@@ -86,6 +87,9 @@ switch (command) {
     break;
   case 'stats':
     await cmdStats();
+    break;
+  case 'update':
+    await cmdUpdate(args);
     break;
   case 'flush':
     await cmdFlush();
@@ -497,6 +501,7 @@ async function cmdDoctor(): Promise<void> {
   const embedder = await ctx.embedder();
   const vectors = await probeEmbedder(embedder);
 
+  console.log(`version  : ${packageVersion()}`);
   console.log(`database : ${ctx.config.database}`);
   console.log(`adapter  : ${ctx.store.kind}`);
   console.log(`reachable: ${reachable ? 'yes' : 'no'}`);
@@ -805,6 +810,25 @@ async function cmdStats(): Promise<void> {
   }
 }
 
+/**
+ * Also the entry point the SessionEnd hook spawns detached, with --quiet.
+ */
+async function cmdUpdate(argv: (string | undefined)[]): Promise<void> {
+  const quiet = argv.includes('--quiet');
+  const config = loadConfig();
+  // An explicit `claude-db update` means now, whatever the config says about
+  // the background behaviour.
+  const mode = quiet ? config.updates : 'auto';
+
+  const result = await checkForUpdate(mode);
+  if (quiet) return;
+
+  if (result.installed) console.log(`Updated ${result.current} -> ${result.latest}.`);
+  else if (result.latest && result.latest !== result.current) {
+    console.log(`${result.latest} is available (running ${result.current}): ${result.reason}`);
+  } else console.log(`Up to date (${result.current}).`);
+}
+
 function valueOf(argv: (string | undefined)[], flag: string): string | undefined {
   const index = argv.indexOf(flag);
   return index >= 0 ? argv[index + 1] : undefined;
@@ -827,6 +851,7 @@ function usage(): void {
   flush                       Re-ingest every transcript for this project
   export [--all] > out.jsonl  Dump memory as JSONL, for backup or migration
   import <file.jsonl>         Load a dump back in (safe to repeat)
+  update                      Install a newer compatible release now
   reembed                     Re-embed everything with the current model
   prune --older-than <days>   Delete old memory (dry run without --yes)
   reset [--project] --yes     Delete stored memory (dry run without --yes)

@@ -1,5 +1,9 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { clearCursor, flushSession } from '../capture/index.js';
+import { isDue, readState } from '../update.js';
 import { createContext } from '../context.js';
 import { readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
@@ -34,6 +38,18 @@ await runHook(async () => {
     });
 
     clearCursor(sessionId);
+
+    // At session end rather than session start: `npm install -g` replaces the
+    // files these hooks import, and this is the moment least likely to have a
+    // hook running. Detached and unref'd, so the session never waits on the
+    // network or on npm.
+    if (ctx.config.updates !== 'off' && isDue(readState())) {
+      const cli = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'cli', 'index.js');
+      spawn(process.execPath, [cli, 'update', '--quiet'], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+    }
   } finally {
     await ctx.close();
   }
