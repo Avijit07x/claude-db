@@ -83,12 +83,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lal671525/claude-db.git"
+    "url": "git+https://github.com/Avijit07x/claude-db.git"
   },
   "bugs": {
-    "url": "https://github.com/lal671525/claude-db/issues"
+    "url": "https://github.com/Avijit07x/claude-db/issues"
   },
-  "homepage": "https://github.com/lal671525/claude-db#readme",
+  "homepage": "https://github.com/Avijit07x/claude-db#readme",
   "author": "Avijit Dey",
   "publishConfig": {
     "access": "public"
