@@ -71,7 +71,7 @@ Ran: Test run: pnpm test
 
 ## Commands
 
-Nine. `cdb` is a shorter alias for all of them.
+`cdb` is a shorter alias for all of them.
 
 | Command | What it does |
 | --- | --- |
@@ -79,10 +79,18 @@ Nine. `cdb` is a shorter alias for all of them.
 | `claude-db uninstall [--project]` | Remove them, keeping your memory |
 | `claude-db status` | Is it wired up, has it recorded anything |
 | `claude-db doctor` | Resolved config and database connectivity |
-| `claude-db search <query>` | Search this project's memory |
+| `claude-db search [--all] <query>` | Search this project's memory, or every project |
+| `claude-db remember <text>` | Record a rule outright, e.g. "always use pnpm here" |
+| `claude-db forget <id>` | Delete specific observations by id |
+| `claude-db stats` | What this project's memory is made of |
 | `claude-db projects` | Every project with memory stored |
+| `claude-db merge [<path>]` | Move memory from an old project path onto this one |
 | `claude-db use <url>` | Switch database and verify it |
 | `claude-db flush` | Re-ingest every transcript for this project |
+| `claude-db export [--all]` | Dump memory as JSONL, for backup or migration |
+| `claude-db import <file>` | Load a dump back in; safe to repeat |
+| `claude-db reembed` | Re-embed everything with the current model |
+| `claude-db prune --older-than <days>` | Delete old memory (dry run without `--yes`) |
 | `claude-db reset [--project] --yes` | Delete memory (dry run without `--yes`) |
 
 `--project` scopes to one repo instead of every project on the machine. It

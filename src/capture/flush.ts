@@ -1,8 +1,8 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { CONFIG_DIR } from '../config/index.js';
-import type { Config } from '../config/index.js';
 import type { RecallContext } from '../context.js';
+import type { Observation, ObservationKind } from '../types.js';
 import { readTranscript, transcriptPathFor } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
 
@@ -45,10 +45,11 @@ export async function flushSession(
     return { observations: 0, summary: null };
   }
 
-  await embedAll(ctx, observations);
+  await embedObservations(ctx, observations);
   await ctx.store.insertObservations(observations);
 
-  const summary = summarize(observations);
+  const previous = await ctx.store.getSession(sessionId);
+  const summary = summarize(observations, previous?.summary);
   await ctx.store.upsertSession({
     id: sessionId,
     project,
@@ -64,9 +65,9 @@ export async function flushSession(
  * Embeddings are an enhancement, never a precondition. A missing model must
  * cost semantic recall, not the memory itself.
  */
-async function embedAll(
+export async function embedObservations(
   ctx: RecallContext,
-  observations: { title: string; body: string; embedding?: number[] }[],
+  observations: Observation[],
 ): Promise<void> {
   try {
     const embedder = await ctx.embedder();
@@ -77,7 +78,12 @@ async function embedAll(
     );
     observations.forEach((obs, index) => {
       const vector = vectors[index];
-      if (vector && vector.length > 0) obs.embedding = vector;
+      if (vector && vector.length > 0) {
+        obs.embedding = vector;
+        // Stamped so search can refuse to compare across embedding spaces and
+        // `reembed` can tell which rows are already current.
+        obs.embedder = embedder.id;
+      }
     });
   } catch (error) {
     process.stderr.write(
@@ -87,11 +93,37 @@ async function embedAll(
   }
 }
 
-/** Recap built from what was accomplished, not from file counts. */
-function summarize(observations: { title: string }[]): string {
-  const titles = observations.slice(-3).map((obs) => obs.title);
-  const extra = observations.length - titles.length;
-  return `${titles.join(' | ')}${extra > 0 ? ` (+${extra} earlier)` : ''}`;
+/** Least forgettable first. What a session is *for* is usually a decision. */
+const KIND_RANK: Record<ObservationKind, number> = {
+  decision: 0,
+  deadend: 1,
+  preference: 2,
+  bugfix: 3,
+  pattern: 4,
+  context: 5,
+};
+
+/**
+ * Recap of the session so far, and the only thing SessionStart injects.
+ *
+ * Taking the last three titles of the current flush was close to useless once
+ * capture became incremental: a flush usually carries a single turn, so the
+ * recap of an entire day's session was whatever happened to be typed last.
+ * Carrying the previous summary forward makes it cover the session, and
+ * ranking by kind keeps a decision over the build command that followed it.
+ *
+ * ponytail: first three win, so a decision made late in a long session does
+ * not displace an earlier one. Rank the session's stored observations instead
+ * if that turns out to matter.
+ */
+export function summarize(observations: Observation[], previous?: string): string {
+  const kept = previous ? previous.split(' | ').filter(Boolean) : [];
+
+  for (const obs of [...observations].sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind])) {
+    if (kept.length >= 3) break;
+    if (!kept.includes(obs.title)) kept.push(obs.title);
+  }
+  return kept.join(' | ');
 }
 
 /**
@@ -126,4 +158,9 @@ function writeCursor(sessionId: string, offset: number): void {
 
 export function resetCursor(sessionId: string): void {
   writeCursor(sessionId, 0);
+}
+
+/** The session is over; its offset is scratch state nothing will read again. */
+export function clearCursor(sessionId: string): void {
+  rmSync(cursorPath(sessionId), { force: true });
 }

@@ -11,10 +11,20 @@ export function unpackVector(buffer: Buffer): number[] {
   );
 }
 
-/** Assumes both inputs are L2-normalized, which the embedder guarantees. */
+/**
+ * Assumes both inputs are L2-normalized, which the embedder guarantees.
+ *
+ * Different widths are different embedding spaces, and a database accumulates
+ * both the moment `provider: auto` upgrades from the 256d builtin to 384d
+ * MiniLM. Scoring zero drops those below the relevance floor instead of
+ * comparing a prefix and returning a meaningless number.
+ *
+ * ponytail: width stands in for model identity; store an embedder id per row
+ * if two same-size models ever coexist.
+ */
 export function cosine(a: number[], b: number[]): number {
-  const len = Math.min(a.length, b.length);
+  if (a.length !== b.length) return 0;
   let dot = 0;
-  for (let i = 0; i < len; i += 1) dot += (a[i] ?? 0) * (b[i] ?? 0);
+  for (let i = 0; i < a.length; i += 1) dot += (a[i] ?? 0) * (b[i] ?? 0);
   return dot;
 }

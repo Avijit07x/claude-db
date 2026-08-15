@@ -1,7 +1,11 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { remember } from '../capture/index.js';
 import { createContext } from '../context.js';
 import type { Observation, ObservationIndexEntry } from '../types.js';
 import { toShortId } from '../util/shortid.js';
@@ -14,15 +18,28 @@ const KINDS = [
   'decision', 'pattern', 'bugfix', 'context', 'deadend', 'preference',
 ] as const;
 
+function packageVersion(): string {
+  try {
+    const path = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
+    return (JSON.parse(readFileSync(path, 'utf8')) as { version?: string }).version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 /**
- * Exposes memory as three tools that mirror the progressive disclosure layers.
- * Tool descriptions spell out the intended order, because the saving only
- * materializes if the agent filters at `search` before calling
+ * Three read tools mirroring the progressive disclosure layers, plus two that
+ * write. Tool descriptions spell out the intended order, because the saving
+ * only materializes if the agent filters at `search` before calling
  * `get_observations`.
+ *
+ * `remember` exists because capture is inferred from transcripts, and a rule
+ * is not an event: "we always use pnpm here" produces no edit and no command,
+ * so the one thing most worth keeping is the one thing never recorded.
  */
 const ctx = await createContext();
 
-const server = new McpServer({ name: 'claude-db', version: '0.1.0' });
+const server = new McpServer({ name: 'claude-db', version: packageVersion() });
 
 server.tool(
   'search',
@@ -31,7 +48,10 @@ server.tool(
     'for only the ids that look relevant.',
   {
     query: z.string().describe('Natural language description of what you need'),
-    project: z.string().optional().describe('Absolute project path; defaults to cwd'),
+    project: z
+      .string()
+      .optional()
+      .describe('Absolute project path; defaults to cwd. Pass "*" to search every project'),
     kind: z.enum(KINDS).optional(),
     limit: z.number().int().min(1).max(50).default(10),
   },
@@ -39,10 +59,51 @@ server.tool(
     const entries = await ctx.search.search({
       text: query,
       limit,
-      project: resolveProject(project),
+      ...(project === '*' ? {} : { project: resolveProject(project) }),
       ...(kind ? { kind } : {}),
     });
     return { content: [{ type: 'text', text: renderIndex(entries) }] };
+  },
+);
+
+server.tool(
+  'remember',
+  'Record something the user stated outright that no transcript would capture: ' +
+    'a standing rule, preference or constraint ("always use pnpm here"). Use this ' +
+    'when the user says to remember something, not for work you just did — that ' +
+    'is captured automatically.',
+  {
+    text: z.string().describe('What to remember, in full. First line becomes the title'),
+    kind: z.enum(KINDS).default('preference'),
+    project: z.string().optional().describe('Absolute project path; defaults to cwd'),
+  },
+  async ({ text, kind, project }) => {
+    const observation = await remember(ctx, {
+      project: resolveProject(project),
+      text,
+      kind,
+    });
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Remembered ${toShortId(observation.id)} [${observation.kind}] ${observation.title}`,
+        },
+      ],
+    };
+  },
+);
+
+server.tool(
+  'forget',
+  'Delete observations by id, for memory that is wrong or obsolete. Ids come ' +
+    'from search. This cannot be undone, so confirm with the user first.',
+  { ids: z.array(z.string()).min(1).max(25) },
+  async ({ ids }) => {
+    const deleted = await ctx.store.remove({ ids });
+    return {
+      content: [{ type: 'text', text: `Forgot ${deleted} observation(s).` }],
+    };
   },
 );
 
@@ -93,6 +154,7 @@ function renderFull(obs: Observation): string {
     `id: ${toShortId(obs.id)}`,
     `kind: ${obs.kind}`,
     `when: ${date}`,
+    obs.author ? `who: ${obs.author}` : null,
     obs.files.length > 0 ? `files: ${obs.files.join(', ')}` : null,
     '',
     obs.title,
