@@ -1,10 +1,15 @@
 name: Publish
 
-# Publishing is triggered by creating a GitHub Release, not by pushing to main.
-# That keeps releases deliberate: a merge cannot accidentally ship a version.
+# Pushing a version tag publishes. A plain push to main never does, so a merge
+# cannot accidentally ship.
+#
+# Deliberately not triggered by `release: published` as well. With both, the
+# usual flow (push a tag, then draft a Release from it) fires the job twice and
+# the second run fails on the "already on npm" guard, which looks like a broken
+# pipeline rather than the safety net doing its job.
 on:
-  release:
-    types: [published]
+  push:
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -29,14 +34,14 @@ jobs:
       - run: npm ci
 
       - name: Refuse to publish if the tag and package.json disagree
-        if: github.event_name == 'release'
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           PKG="$(node -p "require('./package.json').version")"
           if [ "$TAG" != "$PKG" ]; then
-            echo "::error::Release tag is v$TAG but package.json says $PKG."
-            echo "Bump package.json and retag, or the published version will not"
-            echo "match the release notes people are reading."
+            echo "::error::Tag is v$TAG but package.json says $PKG."
+            echo "This usually means the tag points at a commit from before the"
+            echo "version bump. Retag with: git tag -f v$PKG && git push -f --tags"
             exit 1
           fi
           echo "version $PKG matches tag $GITHUB_REF_NAME"
