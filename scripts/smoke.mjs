@@ -7,9 +7,13 @@ import { randomUUID } from 'node:crypto';
 import { createStore } from '../dist/store/index.js';
 import { SearchService } from '../dist/search/index.js';
 import { NoopEmbedder } from '../dist/embed/index.js';
+import { remember } from '../dist/capture/index.js';
 
+// Pass a connection string to run the identical checks against Postgres or
+// MongoDB; with no argument it uses a throwaway SQLite file.
 const dir = mkdtempSync(join(tmpdir(), 'recall-smoke-'));
-const dbPath = join(dir, 'memory.db');
+const uri = process.argv[2] ?? join(dir, 'memory.db');
+const expected = /^mongodb/.test(uri) ? 'mongodb' : /^postgres/.test(uri) ? 'postgres' : 'sqlite';
 const project = '/tmp/demo-project';
 let failures = 0;
 
@@ -19,10 +23,11 @@ function check(label, condition, detail = '') {
   console.log(`${status}  ${label}${detail ? `  (${detail})` : ''}`);
 }
 
-const store = await createStore(dbPath);
+const store = await createStore(uri);
 await store.init();
+await store.remove({ project });
 
-check('adapter resolved from bare path', store.kind === 'sqlite', store.kind);
+check('adapter resolved from the connection string', store.kind === expected, store.kind);
 check('ping', await store.ping());
 
 const now = Date.now();
@@ -104,12 +109,106 @@ const fullChars = (await search.getObservations(hits.map((h) => h.id)))
 check('index is materially cheaper than bodies', indexChars < fullChars,
   `${indexChars} vs ${fullChars} chars`);
 
+// re-ingest: the flush cursor re-reads the open turn on every prompt, so the
+// same id is written repeatedly as its content grows.
+const revised = {
+  id: randomUUID(), sessionId, project, kind: 'context',
+  files: [], tags: [], createdAt: now,
+};
+await store.insertObservations([
+  { ...revised, title: 'Zerplix cache warmer drafted', body: 'first pass' },
+]);
+await store.insertObservations([
+  { ...revised, title: 'Quorbit cache warmer finished', body: 'second pass' },
+]);
+
+if (expected === 'sqlite') {
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(uri);
+  const orphans = raw
+    .prepare(`SELECT count(*) AS n FROM observations_fts WHERE observations_fts MATCH '"zerplix"'`)
+    .get().n;
+  raw.close();
+  check('re-ingest leaves no orphan rows in the fts index', orphans === 0,
+    `${orphans} orphan posting(s)`);
+}
+
+const current = await search.search({ text: 'quorbit', project, limit: 5 });
+check('re-ingest keeps the newest version searchable',
+  current.length === 1 && current[0].title.includes('Quorbit'),
+  current.map((h) => h.title).join(' | '));
+
+const reread = await store.getObservations([revised.id]);
+check('re-ingest updates in place rather than duplicating',
+  reread.length === 1 && reread[0].body === 'second pass', reread[0]?.body);
+
+// --- remember, forget, prune, list ------------------------------------------
+const ctx = { store, embedder: async () => new NoopEmbedder() };
+
+const noted = await remember(ctx, {
+  project,
+  text: 'Always use pnpm in this repo\nnpm lockfiles cause needless churn',
+});
+check('remember records a standing rule', noted.kind === 'preference', noted.kind);
+check('remember titles from the first line',
+  noted.title === 'Always use pnpm in this repo', noted.title);
+const recalled = await search.search({ text: 'pnpm lockfiles churn', project, limit: 5 });
+check('a remembered note is searchable like any other',
+  recalled.some((hit) => hit.id === noted.id), `${recalled.length} hits`);
+
+// The guard that matters most here: forget with nothing resolvable must not
+// be read as "no filter", which is how reset asks to delete everything.
+check('an empty id list deletes nothing', (await store.remove({ ids: [] })) === 0);
+
+const forgotten = await store.remove({ ids: [noted.id.slice(0, 13)] });
+check('forget deletes by the short id search returns', forgotten === 1, String(forgotten));
+check('the forgotten observation is gone',
+  (await store.getObservations([noted.id])).length === 0);
+
+const stamped = {
+  id: randomUUID(), sessionId, project, kind: 'context',
+  title: 'Stamped row', body: 'provenance check', files: [], tags: [],
+  createdAt: now, embedding: [1, 0, 0], embedder: 'test-model', author: 'alex',
+};
+await store.insertObservations([stamped]);
+const [back] = await store.getObservations([stamped.id]);
+check('author and embedder round-trip', back.author === 'alex' && back.embedder === 'test-model',
+  `${back.author} / ${back.embedder}`);
+
+const foreign = await store.searchVector([1, 0, 0], { text: '', project, limit: 5, embedder: 'other-model' });
+check('vector search skips rows from a different embedder',
+  !foreign.some((entry) => entry.id === stamped.id));
+const own = await store.searchVector([1, 0, 0], { text: '', project, limit: 5, embedder: 'test-model' });
+check('vector search keeps rows from the current embedder',
+  own.some((entry) => entry.id === stamped.id));
+
+const ancient = {
+  id: randomUUID(), sessionId, project, kind: 'context',
+  title: 'Ancient scaffolding', body: 'x', files: [], tags: [],
+  createdAt: now - 400 * 86_400_000,
+};
+await store.insertObservations([ancient]);
+const before = await store.list({ project, limit: 100 });
+const pruned = await store.remove({ project, before: now - 200 * 86_400_000 });
+check('prune deletes only what is past the cutoff', pruned === 1, String(pruned));
+check('prune leaves everything newer alone',
+  (await store.list({ project, limit: 100 })).length === before.length - 1);
+
+const page = await store.list({ project, limit: 2 });
+check('list pages oldest first',
+  page.length === 2 && page[0].createdAt <= page[1].createdAt);
+const nextPage = await store.list({ project, after: page[1].createdAt, limit: 2 });
+check('list pages forward from a cursor',
+  nextPage.every((obs) => obs.createdAt > page[1].createdAt));
+
 // sessions
 const recent = await store.recentSessions(project, 5);
 check('session summary round-trips', recent.length === 1 && !!recent[0].summary);
+check('forgetting and pruning left the session record alone', recent.length === 1);
 
+await store.remove({ project });
 await store.close();
 rmSync(dir, { recursive: true, force: true });
 
-console.log(failures === 0 ? '\nAll smoke checks passed.' : `\n${failures} check(s) failed.`);
+console.log(failures === 0 ? `\nAll smoke checks passed on ${expected}.` : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

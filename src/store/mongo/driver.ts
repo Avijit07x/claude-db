@@ -19,6 +19,7 @@ export interface FindCursor<T> {
 
 export interface Collection<T> {
   createIndex(spec: Doc, options?: Doc): Promise<string>;
+  countDocuments(filter: Doc): Promise<number>;
   findOne(filter: Doc, options?: Doc): Promise<T | null>;
   find(filter: Doc, options?: Doc): FindCursor<T>;
   updateOne(filter: Doc, update: Doc, options?: Doc): Promise<unknown>;

@@ -27,9 +27,11 @@ export class BuiltinEmbedder implements Embedder {
 
   private vectorize(text: string): number[] {
     const vector = new Array<number>(DIMENSIONS).fill(0);
+    // Any script: ASCII-only shredded accented Latin and gave CJK a zero
+    // vector. CJK arrives as one long token, where the trigrams do the work.
     const words = text
       .toLowerCase()
-      .split(/[^a-z0-9]+/i)
+      .split(/[^\p{L}\p{N}]+/u)
       .filter((word) => word.length > 1);
 
     for (const word of words) {

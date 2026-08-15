@@ -1,6 +1,7 @@
-import { closeSync, fstatSync, openSync, readSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, readdirSync, readSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { resolveProject } from '../util/project.js';
 
 /** One exchange: what was asked, what was reasoned, what was done. */
 export interface Turn {
@@ -196,4 +197,70 @@ function isSyntheticPrompt(text: string): boolean {
 export function transcriptPathFor(project: string, sessionId: string): string {
   const slug = project.replace(/[/.]/g, '-');
   return join(homedir(), '.claude', 'projects', slug, `${sessionId}.jsonl`);
+}
+
+/**
+ * Every transcript belonging to a project, including sessions started from one
+ * of its subdirectories.
+ *
+ * Claude Code files transcripts under the directory the agent was launched in,
+ * while memory is keyed on the repository root, and those differ the moment
+ * anyone runs the agent from `repo/frontend`. Candidate directories are found
+ * by prefix and then confirmed by the `cwd` each transcript records: the slug
+ * maps both `/` and `.` to `-`, so it cannot tell `~/app` from `~/app-extra`,
+ * and without the second step a flush would ingest a neighbour's history.
+ */
+export function transcriptsFor(project: string): string[] {
+  const root = join(homedir(), '.claude', 'projects');
+  const slug = project.replace(/[/.]/g, '-');
+
+  let candidates: string[];
+  try {
+    candidates = readdirSync(root).filter(
+      (name) => name === slug || name.startsWith(`${slug}-`),
+    );
+  } catch {
+    return [];
+  }
+
+  const transcripts: string[] = [];
+  for (const dir of candidates) {
+    let files: string[];
+    try {
+      files = readdirSync(join(root, dir)).filter((name) => name.endsWith('.jsonl'));
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      const path = join(root, dir, file);
+      const cwd = transcriptCwd(path);
+      if (cwd === null || resolveProject(cwd) === project) transcripts.push(path);
+    }
+  }
+  return transcripts.sort();
+}
+
+/** First cwd recorded in a transcript, without reading a 90MB file. */
+function transcriptCwd(path: string): string | null {
+  let fd: number;
+  try {
+    fd = openSync(path, 'r');
+  } catch {
+    return null;
+  }
+  try {
+    const buffer = Buffer.allocUnsafe(65_536);
+    const read = readSync(fd, buffer, 0, buffer.length, 0);
+    for (const line of buffer.subarray(0, read).toString('utf8').split('\n')) {
+      try {
+        const cwd = (JSON.parse(line) as { cwd?: string }).cwd;
+        if (typeof cwd === 'string' && cwd.length > 0) return cwd;
+      } catch {
+        // Entry without a cwd, or the torn last line of the window.
+      }
+    }
+    return null;
+  } finally {
+    closeSync(fd);
+  }
 }

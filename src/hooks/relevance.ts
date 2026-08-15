@@ -16,8 +16,15 @@ const TRIVIAL = new Set([
 const NOISE = new Set([
   'the', 'and', 'for', 'this', 'that', 'with', 'you', 'can', 'please', 'now',
   'what', 'why', 'how', 'when', 'where', 'are', 'was', 'were', 'have', 'has',
-  'not', '但', 'let', 'make', 'get', 'add', 'use', 'need', 'want', 'should',
+  'not', 'let', 'make', 'get', 'add', 'use', 'need', 'want', 'should',
 ]);
+
+/**
+ * Scripts written without spaces. "修复登录接口的超时问题" is one token, so the
+ * two-content-word bar has to be counted in characters instead.
+ */
+const DENSE_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
 
 /**
  * Decides whether a prompt is worth a memory lookup at all.
@@ -28,11 +35,13 @@ const NOISE = new Set([
  */
 export function isSearchable(prompt: string): boolean {
   const normalized = prompt.trim().toLowerCase();
-  if (normalized.length < 8) return false;
   if (TRIVIAL.has(normalized.replace(/[.!?]+$/, ''))) return false;
 
+  if ((normalized.match(DENSE_SCRIPT)?.length ?? 0) >= 4) return true;
+  if (normalized.length < 8) return false;
+
   const content = normalized
-    .split(/[^a-z0-9_]+/i)
+    .split(/[^\p{L}\p{N}_]+/u)
     .filter((word) => word.length > 2 && !NOISE.has(word));
 
   return content.length >= 2;

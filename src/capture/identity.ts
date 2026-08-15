@@ -1,4 +1,18 @@
 import { createHash } from 'node:crypto';
+import { userInfo } from 'node:os';
+
+/**
+ * Who recorded an observation. Meaningless on a personal SQLite file and the
+ * whole point on a shared Postgres, where "decided X" is far weaker than
+ * "alex decided X". Captured now because it cannot be backfilled later.
+ */
+export function currentAuthor(): string | undefined {
+  try {
+    return userInfo().username || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Derives a stable id for an observation from its content.

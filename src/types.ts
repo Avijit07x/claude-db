@@ -36,6 +36,10 @@ export interface Observation {
   createdAt: number;
   /** Present only when an embedder is configured. */
   embedding?: number[];
+  /** Which embedder produced `embedding`. Absent on rows written before 0.2. */
+  embedder?: string;
+  /** Whose machine recorded this. Only interesting on a shared database. */
+  author?: string;
 }
 
 /** Compact projection returned by search. Deliberately excludes `body`. */
@@ -57,6 +61,32 @@ export interface SearchQuery {
   limit: number;
   /** Ceiling for brute-force vector scans. Ignored by indexed backends. */
   maxScanCandidates?: number;
+  /**
+   * Restricts vector search to rows embedded by this model, plus rows that
+   * predate the column. Vectors from different models are not comparable.
+   */
+  embedder?: string;
+}
+
+/**
+ * What to delete. Every field narrows, and an empty filter means everything,
+ * which is what `reset` asks for. An explicitly empty `ids` array deletes
+ * nothing: `forget` with no resolvable id must not wipe the database.
+ */
+export interface RemoveFilter {
+  ids?: string[];
+  project?: string;
+  kind?: ObservationKind;
+  /** Deletes observations recorded strictly before this timestamp. */
+  before?: number;
+}
+
+/** Bulk read, ordered oldest first so `after` can page through a large table. */
+export interface ListFilter {
+  project?: string;
+  kind?: ObservationKind;
+  after?: number;
+  limit?: number;
 }
 
 export interface TimelineQuery {

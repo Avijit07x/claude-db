@@ -1,10 +1,26 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createContext } from '../context.js';
 import { emitContext, readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
+
+const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'mcp', 'server.js');
+
+function mcpRegistered(project: string): boolean {
+  return [join(project, '.mcp.json'), join(homedir(), '.claude.json')].some((path) => {
+    try {
+      return readFileSync(path, 'utf8').includes(SERVER);
+    } catch {
+      return false;
+    }
+  });
+}
 
 /**
  * SessionStart: prime the agent with what past sessions concluded.
@@ -27,7 +43,7 @@ await runHook(async () => {
     if (sessions.length === 0) {
       emitContext(
         '<project-memory>none yet for this project; ' +
-          'it is recorded when a session ends</project-memory>\n',
+          'it is recorded as you work</project-memory>\n',
       );
       return;
     }
@@ -44,10 +60,14 @@ await runHook(async () => {
     }
 
     lines.push('</project-memory>');
-    lines.push(
-      'Search this project\'s full history with the memory MCP tools before ' +
-        'asking the user to re-explain prior decisions.',
-    );
+    // Only advertise the tools when they are actually registered; pointing the
+    // agent at an MCP server that was never installed just wastes a turn.
+    if (mcpRegistered(project)) {
+      lines.push(
+        'Search this project\'s full history with the memory MCP tools before ' +
+          'asking the user to re-explain prior decisions.',
+      );
+    }
 
     emitContext(`${lines.join('\n')}\n`);
   } finally {

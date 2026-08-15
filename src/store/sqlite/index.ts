@@ -3,10 +3,13 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
+import { isWholeScope } from '../adapter.js';
 import type {
+  ListFilter,
   Observation,
   ObservationIndexEntry,
   ObservationKind,
+  RemoveFilter,
   SearchQuery,
   Session,
   TimelineQuery,
@@ -41,6 +44,29 @@ export class SqliteStore implements MemoryStore {
 
   async init(): Promise<void> {
     this.db.exec(readFileSync(resolve(HERE, 'schema.sql'), 'utf8'));
+
+    const row = this.db.prepare('PRAGMA user_version').get() as
+      | { user_version?: number }
+      | undefined;
+    const version = Number(row?.['user_version'] ?? 0);
+
+    // Databases written before recursive_triggers was set carry orphaned FTS
+    // rows for every re-ingested observation. One rebuild clears them.
+    if (version < 1) {
+      this.db.exec(`INSERT INTO observations_fts(observations_fts) VALUES('rebuild');`);
+    }
+    // CREATE TABLE IF NOT EXISTS leaves an existing table alone, so columns
+    // added after the fact have to be applied here.
+    if (version < 2) {
+      for (const column of ['embedder TEXT', 'author TEXT']) {
+        try {
+          this.db.exec(`ALTER TABLE observations ADD COLUMN ${column}`);
+        } catch {
+          // Already present, which is the normal case on a fresh database.
+        }
+      }
+    }
+    if (version < 2) this.db.exec('PRAGMA user_version = 2');
   }
 
   async close(): Promise<void> {
@@ -57,6 +83,7 @@ export class SqliteStore implements MemoryStore {
         `INSERT INTO sessions (id, project, started_at, ended_at, summary)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
+           project  = excluded.project,
            ended_at = COALESCE(excluded.ended_at, sessions.ended_at),
            summary  = COALESCE(excluded.summary,  sessions.summary)`,
       )
@@ -92,8 +119,9 @@ export class SqliteStore implements MemoryStore {
 
     const stmt = this.db.prepare(
       `INSERT OR REPLACE INTO observations
-        (id, session_id, project, scope, kind, title, body, files, tags, created_at, embedding)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, session_id, project, scope, kind, title, body, files, tags,
+         created_at, embedding, embedder, author)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     this.db.exec('BEGIN');
@@ -111,6 +139,8 @@ export class SqliteStore implements MemoryStore {
           JSON.stringify(obs.tags),
           obs.createdAt,
           obs.embedding ? packVector(obs.embedding) : null,
+          obs.embedder ?? null,
+          obs.author ?? null,
         );
       }
       this.db.exec('COMMIT');
@@ -144,9 +174,11 @@ export class SqliteStore implements MemoryStore {
     return rows.map(toObservation);
   }
 
-  async clear(project?: string): Promise<number> {
-    const where = project ? 'WHERE project = ?' : '';
-    const params = project ? [project] : [];
+  async remove(filter: RemoveFilter): Promise<number> {
+    if (filter.ids?.length === 0) return 0;
+
+    const { where, params } = removeWhere(filter);
+    const wipe = isWholeScope(filter);
 
     const count = this.db
       .prepare(`SELECT COUNT(*) AS n FROM observations ${where}`)
@@ -157,15 +189,50 @@ export class SqliteStore implements MemoryStore {
       // The FTS mirror is kept in sync by triggers, so deleting rows here is
       // enough; dropping it manually would desynchronise the two.
       this.db.prepare(`DELETE FROM observations ${where}`).run(...(params as never[]));
-      this.db.prepare(`DELETE FROM sessions ${where}`).run(...(params as never[]));
+      if (wipe) {
+        const scope = filter.project ? 'WHERE project = ?' : '';
+        this.db
+          .prepare(`DELETE FROM sessions ${scope}`)
+          .run(...((filter.project ? [filter.project] : []) as never[]));
+      }
       this.db.exec('COMMIT');
     } catch (error) {
       this.db.exec('ROLLBACK');
       throw error;
     }
 
-    this.db.exec('VACUUM');
+    // Only worth the rewrite when a whole scope went; forgetting one row does
+    // not justify rebuilding the file.
+    if (wipe) this.db.exec('VACUUM');
     return count?.n ?? 0;
+  }
+
+  async list(filter: ListFilter): Promise<Observation[]> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (filter.project) {
+      conditions.push('project = ?');
+      params.push(filter.project);
+    }
+    if (filter.kind) {
+      conditions.push('kind = ?');
+      params.push(filter.kind);
+    }
+    if (filter.after !== undefined) {
+      conditions.push('created_at > ?');
+      params.push(filter.after);
+    }
+    params.push(filter.limit ?? 1000);
+
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM observations
+         ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}
+         ORDER BY created_at ASC LIMIT ?`,
+      )
+      .all(...(params as never[])) as Row[];
+    return rows.map(toObservation);
   }
 
   async listProjects(): Promise<ProjectSummary[]> {
@@ -234,6 +301,13 @@ export class SqliteStore implements MemoryStore {
     const params: unknown[] = [];
     appendScope(query, conditions, params, '');
 
+    // NULL means the row predates the column, and the width check in cosine()
+    // still guards it. Anything else is a different embedding space.
+    if (query.embedder) {
+      conditions.push('(embedder = ? OR embedder IS NULL)');
+      params.push(query.embedder);
+    }
+
     // Newest-first with a hard cap. The scan is linear in rows returned, so
     // this is what keeps p95 flat as history grows: recent memory stays
     // semantically searchable and older memory remains reachable by keyword.
@@ -296,6 +370,42 @@ export class SqliteStore implements MemoryStore {
   }
 }
 
+function removeWhere(filter: RemoveFilter): { where: string; params: unknown[] } {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (filter.ids) {
+    const { exact, prefixes } = partitionIds(filter.ids);
+    const alternatives: string[] = [];
+    if (exact.length > 0) {
+      alternatives.push(`id IN (${exact.map(() => '?').join(',')})`);
+      params.push(...exact);
+    }
+    for (const prefix of prefixes) {
+      alternatives.push('id GLOB ?');
+      params.push(`${prefix}*`);
+    }
+    conditions.push(`(${alternatives.join(' OR ')})`);
+  }
+  if (filter.project) {
+    conditions.push('project = ?');
+    params.push(filter.project);
+  }
+  if (filter.kind) {
+    conditions.push('kind = ?');
+    params.push(filter.kind);
+  }
+  if (filter.before !== undefined) {
+    conditions.push('created_at < ?');
+    params.push(filter.before);
+  }
+
+  return {
+    where: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '',
+    params,
+  };
+}
+
 function appendScope(
   query: SearchQuery,
   conditions: string[],
@@ -340,9 +450,12 @@ function toFilePath(uri: string): string {
  * query entirely rather than issue one that matches everything.
  */
 function toMatchExpression(text: string, project?: string): string | null {
+  // ponytail: unicode61 keeps a run of Han characters as one token, so CJK
+  // matches phrases but not substrings. Vector recall covers the gap; swap in
+  // an ICU or bigram tokenizer if that stops being enough.
   const tokens = text
     .toLowerCase()
-    .split(/[^a-z0-9_]+/i)
+    .split(/[^\p{L}\p{N}_]+/u)
     .filter((token) => token.length > 1);
 
   const scope = project ? `scope:${scopeToken(project)}` : null;
@@ -383,6 +496,8 @@ function toObservation(row: Row): Observation {
     createdAt: Number(row['created_at']),
   };
   if (row['embedding']) obs.embedding = unpackVector(toBuffer(row['embedding']));
+  if (row['embedder'] != null) obs.embedder = row['embedder'] as string;
+  if (row['author'] != null) obs.author = row['author'] as string;
   return obs;
 }
 

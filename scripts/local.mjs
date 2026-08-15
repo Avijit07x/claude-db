@@ -33,6 +33,9 @@ const near = cos(reconnect, reconnecting);
 const far = cos(reconnect, unrelated);
 check('morphological variants score close', near > far * 3, `${near.toFixed(3)} vs ${far.toFixed(3)}`);
 
+const [cjk] = await b.embed(['修复登录接口的超时问题']);
+check('non-latin text produces a real vector', cjk.some((v) => v !== 0));
+
 // --- end to end, default sqlite, no url --------------------------------------
 const dir = mkdtempSync(join(tmpdir(), 'recall-local-'));
 const store = await createStore(join(dir, 'memory.db'));

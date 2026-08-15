@@ -1,7 +1,7 @@
 import type { Config } from '../config/index.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { classifyCommand } from './command.js';
-import { observationId } from './identity.js';
+import { currentAuthor, observationId } from './identity.js';
 import type { Turn } from './transcript.js';
 
 /**
@@ -63,15 +63,19 @@ function buildObservation(
     ),
   );
 
+  const author = currentAuthor();
+
   return {
     id: observationId(sessionId, turn.timestamp, turn.prompt),
     sessionId,
     project,
-    kind: classifyTurn(turn, commands.length > 0),
-    title: buildTitle(turn, files),
+    ...(author ? { author } : {}),
+    kind: classifyTurn(turn),
+    // Redacted like the body: the title is injected above every future prompt.
+    title: redact(buildTitle(turn, files)),
     body,
     files,
-    tags: [],
+    tags: topLevelDirs(files, project),
     createdAt: turn.timestamp,
   };
 }
@@ -115,9 +119,39 @@ function headline(sentence: string): string {
   return `${clause.slice(0, word > 30 ? word : TITLE_MAX)}...`;
 }
 
-function classifyTurn(turn: Turn, hasCommands: boolean): ObservationKind {
+/**
+ * The first path segment under the project root, which is the repository name
+ * when the project directory holds several repos, and the top-level source
+ * folder when it is one repo. Tags carry real weight in every backend's index,
+ * so this is what makes a pooled memory filterable by where the work happened.
+ */
+function topLevelDirs(files: string[], project: string): string[] {
+  const prefix = project.endsWith('/') ? project : `${project}/`;
+  const tags = new Set<string>();
+
+  for (const file of files) {
+    if (!file.startsWith(prefix)) continue;
+    const parts = file.slice(prefix.length).split('/');
+    // Two or more parts means the first is a directory, not a root-level file.
+    if (parts.length > 1 && parts[0]) tags.add(parts[0]);
+  }
+  return [...tags].slice(0, 3);
+}
+
+function classifyTurn(turn: Turn): ObservationKind {
   const text = `${turn.prompt} ${turn.reasoning}`.toLowerCase();
 
+  // Read from the prompt alone, and only where the phrasing is a standing
+  // instruction. "the build always fails" is a bugfix, not a house rule, so
+  // always/never have to be followed by something imperative to count.
+  if (
+    /\b(from now on|going forward|remember to|prefer)\b/.test(turn.prompt.toLowerCase()) ||
+    /\b(always|never)\s+(use|run|do|add|write|call|put|name|commit|push|import|install)\b/.test(
+      turn.prompt.toLowerCase(),
+    )
+  ) {
+    return 'preference';
+  }
   if (/\b(instead of|rather than|chose|decided|because|why we|trade-?off)\b/.test(text)) {
     return 'decision';
   }
@@ -125,8 +159,7 @@ function classifyTurn(turn: Turn, hasCommands: boolean): ObservationKind {
     return 'deadend';
   }
   if (/\b(fix(ed)?|bug|broken|regression|error|crash)\b/.test(text)) return 'bugfix';
-  if (turn.files.length > 0) return 'pattern';
-  return hasCommands ? 'context' : 'context';
+  return turn.files.length > 0 ? 'pattern' : 'context';
 }
 
 function firstSentence(text: string): string {
@@ -153,12 +186,18 @@ function isExcluded(file: string, patterns: string[]): boolean {
 }
 
 const PRIVATE_BLOCK = /<private>[\s\S]*?<\/private>/gi;
+const PRIVATE_KEY =
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g;
 
 function redact(text: string): string {
   return text
     .replace(PRIVATE_BLOCK, '[redacted]')
+    .replace(PRIVATE_KEY, '[redacted-private-key]')
     .replace(/\b(sk-[A-Za-z0-9_-]{16,})\b/g, '[redacted-key]')
     .replace(/\b(gh[pousr]_[A-Za-z0-9]{16,})\b/g, '[redacted-token]')
+    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[redacted-key]')
+    .replace(/\bxox[baprs]-[A-Za-z0-9-]{10,}/g, '[redacted-token]')
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '[redacted-jwt]')
     .replace(/(?<=(password|secret|token|api[_-]?key)"?\s*[:=]\s*)"[^"]+"/gi, '"[redacted]"');
 }
 
