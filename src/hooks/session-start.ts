@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createContext } from '../context.js';
 import { emitContext, readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
+import { updateNotice } from '../update.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
@@ -68,6 +69,10 @@ await runHook(async () => {
           'asking the user to re-explain prior decisions.',
       );
     }
+
+    // Read from a local file the detached updater wrote; never a live check.
+    const notice = ctx.config.updates === 'off' ? null : updateNotice();
+    if (notice) lines.push(notice);
 
     emitContext(`${lines.join('\n')}\n`);
   } finally {
