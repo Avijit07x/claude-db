@@ -83,6 +83,13 @@ check('layer 1 surfaces both websocket records',
 check('layer 1 excludes unrelated records',
   !topics.some((t) => t.includes('virtualized')));
 
+// Tags carry the repository or top-level directory an observation touched, so
+// they have to be searchable on every backend. "performance" is in tags only,
+// in no title and no body.
+const byTag = await search.search({ text: 'performance', project, limit: 5 });
+check('tags are searchable, not just titles and bodies', byTag.length === 2,
+  `${byTag.length} hits`);
+
 // filters
 const onlyDeadends = await search.search({ text: 'redux', project, kind: 'deadend', limit: 5 });
 check('kind filter works',
