@@ -13,7 +13,14 @@ import { createContext } from '../context.js';
 import type { RecallContext } from '../context.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { CONFIG_DIR, CONFIG_PATH, loadConfig, saveConfig } from '../config/index.js';
-import { assertStableLocation, install, mcpPathFor, settingsPathFor, uninstall } from './install.js';
+import {
+  assertStableLocation,
+  install,
+  instructionsPathFor,
+  mcpPathFor,
+  settingsPathFor,
+  uninstall,
+} from './install.js';
 import type { Scope } from './install.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
@@ -306,6 +313,7 @@ async function cmdInstall(scope: Scope): Promise<void> {
 
   console.log(`Scope    : ${scope === 'project' ? `this project only (${project})` : 'all projects on this machine'}`);
   console.log(`Settings : ${settingsPath}`);
+  console.log(`Guidance : ${instructionsPathFor(scope, project)}`);
   console.log(`Config   : ${CONFIG_PATH}`);
   console.log(`Database : ${ctx.config.database}`);
   console.log('\nRestart Claude Code to activate.');
