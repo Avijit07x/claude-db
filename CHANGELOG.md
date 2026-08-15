@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1
+
+### Fixed
+
+- **`use` saved the connection string before testing it**, so a typo or a
+  retired host was written to the config permanently. Every hook then pointed
+  at a database that was not there, and because hooks swallow their errors,
+  memory silently stopped recording. It now connects and pings first, keeping
+  the previous database otherwise; `--force` saves unverified
+- Errors from a database driver printed a raw stack trace instead of a message
+- Credentials in a connection string (`user:password@host`) were not redacted,
+  and were stored verbatim in memory
+- `remember` applied no redaction at all — dictated memory was stored raw
+
 ## 0.2.0
 
 Memory becomes writable, is keyed on the repository rather than the directory
