@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.2.0
+
+Memory becomes writable, is keyed on the repository rather than the directory
+you happened to launch from, and behaves the same on all three backends.
+
+### Fixed
+
+- **SQLite orphaned an FTS row on every re-ingest.** `INSERT OR REPLACE` skips
+  the delete triggers that maintain the mirror unless `recursive_triggers` is
+  on. Existing databases repair themselves once, guarded by `user_version`
+- **Postgres stored nothing on a default install.** The embedding column was
+  hardcoded to 384 dimensions while the built-in embedder produces 256, so
+  every insert failed and rolled the batch back. The column is now sized to the
+  vectors actually written
+- **Postgres discarded corrections**, using `ON CONFLICT DO NOTHING` where the
+  other adapters overwrite, pinning every observation to its first, partial
+  capture
+- **Postgres keyword search was narrower than the rest.** `plainto_tsquery`
+  ANDs every term, so a natural-language prompt matched nothing and per-prompt
+  injection never fired. Tags were not indexed there at all
+- Vectors of different widths were compared and scored a meaningless number;
+  they now score zero and fall below the relevance floor
+- Observation titles were never redacted, though they are injected above every
+  prompt
+- Non-Latin prompts recalled nothing: three ASCII-only tokenisers, one of which
+  gave CJK text a zero vector
+- `uninstall` left the MCP server registered when it was the only one
+- `upsertSession` never updated `project` on SQLite or Postgres
+
+### Added
+
+- `remember` and `forget`, as MCP tools and CLI verbs. Capture is inferred from
+  events, and a rule is not an event, so a standing preference was the one
+  thing that could never be recorded
+- `export`, `import`, `prune`, `reembed`, `stats` and `merge`
+- `search --all`, and `project: "*"` over MCP, for cross-project recall
+- `author` and `embedder` recorded per observation
+- Install writes standing memory instructions to `CLAUDE.local.md`, so recall
+  is a default rather than something to ask for each session
+
+### Changed
+
+- Memory is keyed on the repository root, so working from a subdirectory no
+  longer starts a second, invisible memory. `$HOME` is refused, so a dotfiles
+  repo cannot collapse every project into one
+- Session summaries carry across flushes and rank by kind
+- Observations are tagged with the repository or top-level directory they
+  touched
+- The embedder is bounded by `embeddings.timeoutMs`, so a first model download
+  cannot hang a prompt
+- Redaction covers private keys, AWS keys, Slack tokens and JWTs
+- A global install registers through `claude mcp add -s user` instead of
+  rewriting `~/.claude.json`, and every settings write is atomic
+- `MemoryStore.clear()` is replaced by `remove(filter)`, alongside a new paged
+  `list(filter)`
+
+### Notes
+
+Postgres and MongoDB are now covered by CI rather than by argument. The suite
+is 138 checks.
+
 ## 0.1.0
 
 First release.
