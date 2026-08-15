@@ -97,6 +97,26 @@ const notARule = observationsFromTurns(
 check('"always" in a complaint is not a preference', notARule[0].kind !== 'preference',
   notARule[0].kind);
 
+// Titles are the whole payload of a search result. Measured on a real database,
+// about half were transitions like these, so nothing ever surfaced the body.
+const narrated = observationsFromTurns([turn({
+  reasoning: 'Now the use command and the top-level handler:\nThe config was saved before the connection was verified, so a bad host bricked memory.',
+})], 's1', '/p', config);
+check('a title skips the sentence that only announces the work',
+  narrated[0].title.startsWith('The config was saved'), narrated[0].title);
+
+const chatty = observationsFromTurns([turn({
+  reasoning: "Good question, and the answer is specific.\nFTS5 keeps a run of Han characters as a single token.",
+})], 's1', '/p', config);
+check('and skips conversational filler',
+  chatty[0].title.startsWith('FTS5 keeps'), chatty[0].title);
+
+const allNarration = observationsFromTurns([turn({
+  reasoning: 'Now doing the thing:\nLet me start with that.',
+})], 's1', '/p', config);
+check('falls back to the opening when every sentence announces',
+  allNarration[0].title.length > 0, allNarration[0].title);
+
 const excluded = observationsFromTurns([turn({ files: ['/p/.env'] })], 's1', '/p', config);
 check('excluded paths are never stored', excluded.length === 0);
 
