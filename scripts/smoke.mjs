@@ -157,6 +157,17 @@ const noted = await remember(ctx, {
   text: 'Always use pnpm in this repo\nnpm lockfiles cause needless churn',
 });
 check('remember records a standing rule', noted.kind === 'preference', noted.kind);
+
+// Dictated memory goes through the same redaction as captured memory; it used
+// to be stored raw, on the path most likely to carry a credential.
+const dictated = await remember(ctx, {
+  project,
+  text: 'The staging database is postgres://admin:hunter2secret@db.internal:5432/app',
+});
+check('remember redacts credentials it is handed',
+  !dictated.body.includes('hunter2secret') && !dictated.title.includes('hunter2secret'),
+  dictated.title);
+await store.remove({ ids: [dictated.id] });
 check('remember titles from the first line',
   noted.title === 'Always use pnpm in this repo', noted.title);
 const recalled = await search.search({ text: 'pnpm lockfiles churn', project, limit: 5 });

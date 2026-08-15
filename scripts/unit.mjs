@@ -69,6 +69,15 @@ check('aws keys are redacted', !secrets[0].body.includes('AKIAIOSFODNN7EXAMPLE')
 check('slack tokens are redacted', !secrets[0].body.includes('xoxb-1234567890'));
 check('jwts are redacted', !secrets[0].body.includes('eyJhbGciOiJIUzI1NiJ9'));
 
+// The likeliest secret to reach a tool that remembers what you type.
+const dsn = observationsFromTurns([turn({
+  prompt: 'cdb use "mongodb+srv://avnadmin:hunter2secret@ecommerce.mongodb.net/db"',
+})], 's1', '/p', config);
+check('credentials in a connection string are redacted',
+  !dsn[0].body.includes('hunter2secret'), dsn[0].body.split('\n')[0]);
+check('the host survives redaction so the memory stays useful',
+  dsn[0].body.includes('ecommerce.mongodb.net'));
+
 const tagged = observationsFromTurns(
   [turn({ files: ['/p/sellergeni-backend/src/api.ts', '/p/sellergeni-frontend/app.tsx', '/p/README.md'] })],
   's1', '/p', config);

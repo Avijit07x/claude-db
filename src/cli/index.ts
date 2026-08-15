@@ -36,6 +36,17 @@ const BATCH = 500;
 
 const [command, ...args] = process.argv.slice(2);
 
+// Every command runs inside this. A driver that cannot reach its database
+// rejects deep inside an adapter, and with nothing catching it the CLI printed
+// a twenty-line Node stack trace at the user instead of saying what went wrong.
+try {
+  await run();
+} catch (error) {
+  console.error(`claude-db: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+
+async function run(): Promise<void> {
 switch (command) {
   case 'install':
     await cmdInstall(scopeFrom(args));
@@ -47,7 +58,7 @@ switch (command) {
     await cmdStatus();
     break;
   case 'use':
-    await cmdUse(args[0]);
+    await cmdUse(args);
     break;
   case 'doctor':
     await cmdDoctor();
@@ -90,6 +101,7 @@ switch (command) {
     break;
   default:
     usage();
+}
 }
 
 /** Shows how memory is partitioned, and which partition you are currently in. */
@@ -422,21 +434,53 @@ function fileMentions(path: string, needle: string): boolean {
   }
 }
 
-async function cmdUse(uri: string | undefined): Promise<void> {
+/**
+ * Points memory at a database, but only once it answers.
+ *
+ * Saving first and connecting second is how this used to work, and a typo or a
+ * decommissioned host left the config pointing at nothing. The command crashed,
+ * and so did every hook after it — so the damage surfaced on some later prompt,
+ * far from the cause, as memory quietly recording nothing at all.
+ */
+async function cmdUse(argv: (string | undefined)[]): Promise<void> {
+  const force = argv.includes('--force');
+  const uri = argv.find((arg) => typeof arg === 'string' && !arg.startsWith('-'));
+
   if (!uri) {
-    console.error('Usage: claude-db use <connection-string>');
+    console.error('Usage: claude-db use [--force] <connection-string>');
     process.exit(1);
   }
+
+  let kind = '';
+  try {
+    const ctx = await createContext({ database: uri });
+    try {
+      if (!(await ctx.store.ping())) throw new Error('connected, but it did not answer a ping');
+      kind = ctx.store.kind;
+    } finally {
+      await ctx.close();
+    }
+  } catch (error) {
+    console.error(`Could not reach that database: ${describe(error)}`);
+    if (!force) {
+      console.error('\nNothing was changed; memory still uses the previous database.');
+      console.error('Re-run with --force to save it anyway.');
+      process.exit(1);
+    }
+  }
+
   const config = loadConfig();
   config.database = uri;
   saveConfig(config);
+  console.log(kind ? `Connected. Using ${kind}.` : 'Saved, unverified.');
+}
 
-  // Fail loudly here rather than silently at the next SessionStart.
-  const ctx = await createContext({ database: uri });
-  const ok = await ctx.store.ping();
-  await ctx.close();
-
-  console.log(ok ? `Connected. Using ${ctx.store.kind}.` : 'Saved, but ping failed.');
+function describe(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  // A bare ENOTFOUND says nothing about what to do next.
+  return /ENOTFOUND|EAI_AGAIN/.test(message)
+    ? `${message}\n(that host does not resolve — check the name, or whether the service still exists)`
+    : message;
 }
 
 async function cmdDoctor(): Promise<void> {
@@ -773,7 +817,7 @@ function usage(): void {
   uninstall [--project]       Remove them again, leaving memory intact
   status                      Is it wired up, and has it recorded anything
   doctor                      Show resolved config and test connectivity
-  use <connection-string>     Point memory at any database and verify it
+  use [--force] <url>         Point memory at a database, once it answers
   search [--all] <query>      Search memory, this project or every project
   remember [--kind k] <text>  Record something outright, e.g. a house rule
   forget <id> [id...]         Delete specific observations by id
