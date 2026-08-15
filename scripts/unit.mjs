@@ -135,7 +135,7 @@ check('turns that changed nothing are dropped', chatter.length === 0);
 // --- install / uninstall ------------------------------------------------------
 {
   const { install, uninstall } = await import('../dist/cli/install.js');
-  const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
+  const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
 
@@ -151,8 +151,18 @@ check('turns that changed nothing are dropped', chatter.length === 0);
     }
   };
 
+  writeFileSync(join(repo, 'CLAUDE.local.md'), '# Notes\n\nSomething the user wrote.\n');
+
   install(dist, 'project', repo);
   install(dist, 'project', repo);
+
+  // Hook output is context; a memory file is a standing instruction. Without
+  // this the agent has to be told to search its own memory every session.
+  const guidance = readFileSync(join(repo, 'CLAUDE.local.md'), 'utf8');
+  check('install writes standing memory instructions', guidance.includes('`search`'));
+  check('installing twice does not duplicate them',
+    guidance.split('claude-db:start').length - 1 === 1);
+  check('the user\'s own notes are left alone', guidance.includes('Something the user wrote.'));
 
   const settings = read('.claude/settings.local.json');
   check('install registers every hook exactly once',
@@ -166,6 +176,11 @@ check('turns that changed nothing are dropped', chatter.length === 0);
   check('uninstall removes the mcp server even when it was the only one',
     !read('.mcp.json').mcpServers, JSON.stringify(read('.mcp.json')));
   check('uninstall removes the hooks', !read('.claude/settings.local.json').hooks);
+
+  const afterRemoval = readFileSync(join(repo, 'CLAUDE.local.md'), 'utf8');
+  check('uninstall takes back only its own instructions',
+    !afterRemoval.includes('claude-db:start') && afterRemoval.includes('Something the user wrote.'),
+    afterRemoval.trim());
 
   rmSync(repo, { recursive: true, force: true });
 }

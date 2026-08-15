@@ -46,6 +46,13 @@ you send a prompt
 Both steps are hooks, so they always run. Nothing depends on Claude deciding to
 look something up.
 
+Install also writes a short standing instruction into `CLAUDE.local.md` (or
+`~/.claude/CLAUDE.md` for a machine-wide install), telling Claude to search
+memory before asking you to re-explain something. Hook output is context the
+agent may or may not act on; a memory file is a rule for the whole session,
+which is what makes recall the default rather than something you have to ask
+for. `claude-db uninstall` takes the block back out.
+
 **What gets saved.** One observation per turn, and only if that turn edited a
 file or ran a real command. Questions, `grep`, and "ok" are skipped. A busy day
 produces 10 to 20 rows, not hundreds.

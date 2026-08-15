@@ -25,6 +25,79 @@ export function settingsPathFor(scope: Scope, project: string): string {
 }
 
 /**
+ * Where standing instructions go.
+ *
+ * Hook output is injected as conversation context, which the agent reads as
+ * information about the current turn. It is not a rule, so "you could search
+ * memory" competes with everything else in the transcript and loses. A memory
+ * file is part of the system prompt and governs the whole session, which is
+ * the only reliable way to make recall a default rather than a suggestion.
+ *
+ * Project scope writes CLAUDE.local.md rather than CLAUDE.md: it is personal
+ * and uncommitted, matching settings.local.json, so installing memory for
+ * yourself never tells a teammate's agent to call a server they do not have.
+ */
+export function instructionsPathFor(scope: Scope, project: string): string {
+  return scope === 'project'
+    ? join(project, 'CLAUDE.local.md')
+    : join(homedir(), '.claude', 'CLAUDE.md');
+}
+
+const BLOCK_START = '<!-- claude-db:start -->';
+const BLOCK_END = '<!-- claude-db:end -->';
+
+const INSTRUCTIONS = [
+  BLOCK_START,
+  '## Project memory',
+  '',
+  'This project has persistent memory of past sessions, served by the `memory`',
+  'MCP server. Session summaries are injected at startup and the best matching',
+  'observation is injected above each prompt, but that is only ever a slice.',
+  '',
+  'Before saying you lack context on this codebase, or asking the user to',
+  're-explain a past decision, a failed approach, or why something is the way',
+  'it is: call `search` first, then `get_observations` for the ids worth',
+  'reading. Treat asking the user as the fallback, not the first move.',
+  '',
+  'When the user states a standing rule or preference, record it with',
+  '`remember` so it survives this session.',
+  BLOCK_END,
+].join('\n');
+
+/** Adds or refreshes our block, leaving everything else in the file intact. */
+function writeInstructions(path: string): void {
+  const rest = withoutBlock(readText(path)).trimEnd();
+  const body = rest.length > 0 ? `${rest}\n\n${INSTRUCTIONS}\n` : `${INSTRUCTIONS}\n`;
+  writeAtomic(path, body);
+}
+
+function removeInstructions(path: string): void {
+  const existing = readText(path);
+  if (!existing.includes(BLOCK_START)) return;
+
+  const rest = withoutBlock(existing).trim();
+  // A file that held nothing but our block was ours to create, so take it with
+  // us rather than leaving an empty CLAUDE.md behind.
+  if (rest.length === 0) rmSync(path, { force: true });
+  else writeAtomic(path, `${rest}\n`);
+}
+
+function withoutBlock(text: string): string {
+  const start = text.indexOf(BLOCK_START);
+  const end = text.indexOf(BLOCK_END);
+  if (start === -1 || end === -1 || end < start) return text;
+  return `${text.slice(0, start)}${text.slice(end + BLOCK_END.length)}`.replace(/\n{3,}/g, '\n\n');
+}
+
+function readText(path: string): string {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+/**
  * MCP servers live in a different file from hooks.
  *
  * Claude Code reads project-scoped MCP servers from `.mcp.json` at the repo
@@ -107,6 +180,7 @@ export function install(distDir: string, scope: Scope, project: string): string 
   writeJson(path, settings);
 
   const server = resolve(distDir, 'mcp', 'server.js');
+  writeInstructions(instructionsPathFor(scope, project));
 
   // A global install lands in ~/.claude.json, which holds all of Claude Code's
   // own state. Let its CLI own that file rather than round-tripping megabytes
@@ -169,6 +243,8 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
   else delete settings['hooks'];
   writeJson(path, settings);
 
+  removeInstructions(instructionsPathFor(scope, project));
+
   // Symmetric with install: if the CLI put it there, the CLI takes it out.
   if (scope === 'global' && claudeMcp(['mcp', 'remove', 'memory', '-s', 'user'])) {
     return path;
@@ -209,10 +285,14 @@ function readJson(path: string): Record<string, unknown> {
  * rename is atomic, so the file is either the old one or the new one.
  */
 function writeJson(path: string, value: unknown): void {
+  writeAtomic(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function writeAtomic(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true });
   const temp = `${path}.${process.pid}.tmp`;
   try {
-    writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    writeFileSync(temp, content, 'utf8');
     renameSync(temp, path);
   } catch (error) {
     rmSync(temp, { force: true });
