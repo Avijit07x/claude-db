@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.3
+
+### Added
+
+- **Update notifications.** A newer release is reported once a day at session
+  start. The check runs detached at session end and writes a local file the next
+  session reads, so neither the network nor npm is ever on the prompt path
+- `updates: notify | auto | off`. Notify is the default — installing on
+  someone's behalf means executing code they did not choose, in a process
+  holding their whole memory database. `auto` is available for anyone who wants
+  it, and stops at the caret boundary: 0.2.x takes 0.2.z but not 0.3.0, since a
+  release outside that range may migrate the database on first connection
+- `claude-db update` to check and install on demand
+- `doctor` reports the running version, which nothing did before
+
 ## 0.2.2
 
 ### Fixed
