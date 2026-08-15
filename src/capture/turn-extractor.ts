@@ -81,21 +81,55 @@ function buildObservation(
 }
 
 /**
- * Prefers the agent's own opening sentence over the raw prompt.
+ * Sentences that announce work rather than report it.
+ *
+ * The original rule took the reply's opening sentence, assuming it stated the
+ * outcome. Mid-task it almost never does: it says "Now the use command and the
+ * top-level handler:" or "Right — let me do that properly". Measured on a real
+ * database, about half of all titles were transitions like these, which is fatal
+ * because the title is the whole payload of a search result and of the injected
+ * block — the body may hold the answer, but nothing ever surfaces it.
+ */
+const ANNOUNCEMENT =
+  /^(now|next|then|first|right|ok|okay|good question|great|sure|perfect|let me|let's|i'?ll|here'?s|two|three|four|before|starting|continuing)\b/i;
+
+function announces(sentence: string): boolean {
+  return sentence.endsWith(':') || ANNOUNCEMENT.test(sentence);
+}
+
+/**
+ * Prefers the first sentence of the reply that reports something.
  *
  * The prompt states a request ("can you create one icon"); the reply states
  * what actually happened ("Built mouse-scroll-icon.tsx, first of the Huge
  * Tier 1 Gestures batch"). The second is what someone searching their history
- * is looking for, and it is written in the vocabulary of the codebase.
+ * is looking for, and it is written in the vocabulary of the codebase — but
+ * only once the throat-clearing in front of it is skipped.
  */
 function buildTitle(turn: Turn, files: string[]): string {
-  const sentence = firstSentence(stripMarkdown(turn.reasoning));
-  if (sentence && sentence.length >= 15) return headline(sentence);
+  const prose = stripMarkdown(turn.reasoning);
+
+  // Bounded: past the first few sentences a reply has moved on to detail that
+  // no longer summarises the turn.
+  for (const sentence of sentences(prose).slice(0, 6)) {
+    if (sentence.length >= 15 && !announces(sentence)) return headline(sentence);
+  }
+
+  const opening = firstSentence(prose);
+  if (opening && opening.length >= 15) return headline(opening);
 
   const prompt = firstSentence(turn.prompt);
   if (prompt) return headline(prompt);
 
   return files.length > 0 ? `Changed ${shortPath(files[0] ?? '')}` : 'Session work';
+}
+
+/** Split on sentence enders followed by space, so "0.2.1" stays intact. */
+function sentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0);
 }
 
 const TITLE_MAX = 80;
