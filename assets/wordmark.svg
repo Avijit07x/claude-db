@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 104" width="470" height="104" role="img" aria-label="claude-db">
+  <title>claude-db</title>
+
+  <!-- The mark keeps its own terracotta tile, so it reads identically on
+       GitHub's light and dark themes without a <picture> swap. -->
+  <g transform="translate(6,10)">
+    <rect width="84" height="84" rx="19" fill="#D97757"/>
+    <g transform="translate(42,42) scale(0.328)" fill="none" stroke="#FFFFFF"
+       stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="0" cy="-44" rx="58" ry="22"/>
+      <path d="M-58 -44 V44 A58 22 0 0 0 58 44 V-44"/>
+      <path d="M-58 0 A58 22 0 0 0 58 0"/>
+    </g>
+  </g>
+
+  <!-- Mid-tone neutral, legible on both themes. -->
+  <text x="106" y="68"
+        font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="46" font-weight="600" letter-spacing="-1.4"
+        fill="#8A867E">claude<tspan fill="#D97757">-db</tspan></text>
+</svg>

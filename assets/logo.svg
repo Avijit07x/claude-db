@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="claude-db">
+  <title>claude-db</title>
+
+  <rect width="256" height="256" rx="58" fill="#D97757"/>
+
+  <!--
+    Outlined cylinder. Stroke width is set at 14 rather than the 7 the shape
+    would take at half scale: below roughly 5% of the tile the lines thin out
+    and start to disappear at favicon size.
+  -->
+  <g transform="translate(128,128)" fill="none" stroke="#FFFFFF"
+     stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="0" cy="-44" rx="58" ry="22"/>
+    <path d="M-58 -44 V44 A58 22 0 0 0 58 44 V-44"/>
+    <path d="M-58 0 A58 22 0 0 0 58 0"/>
+  </g>
+</svg>

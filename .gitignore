@@ -1,0 +1,18 @@
+node_modules/
+dist/
+
+# Internal benchmarking notes, not part of the public repo
+SCALING.md
+RELEASING.md
+*.log
+.env
+.env.local
+.claude-memory/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.DS_Store
+
+# npm pack output
+*.tgz
