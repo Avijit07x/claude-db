@@ -1,0 +1,96 @@
+{
+  "name": "claude-db",
+  "version": "0.1.0",
+  "description": "Persistent memory for Claude Code and other AI coding agents. Captures why decisions were made, not just which files changed. Bring your own database: SQLite, MongoDB or Postgres. No cloud, no subscription.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "claude-db": "./dist/cli/index.js",
+    "cdb": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./store": "./dist/store/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "dev": "tsc -w -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node scripts/unit.mjs && node scripts/local.mjs && node scripts/filter.mjs && node scripts/transcript.mjs && node scripts/inject.mjs && node scripts/smoke.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "unit": "node scripts/unit.mjs",
+    "local": "node scripts/local.mjs",
+    "try": "node scripts/try.mjs",
+    "bench": "node scripts/bench.mjs",
+    "postinstall": "node -e \"const v=process.versions.node.split('.').map(Number); if(v[0]<22||(v[0]===22&&v[1]<5)){console.error('\\n  claude-db needs Node >= 22.5 (node:sqlite is builtin from there). You have '+process.versions.node+'.\\n');process.exit(1)}\"",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "claude-code-plugin",
+    "claude-code-hooks",
+    "memory",
+    "ai-memory",
+    "agent-memory",
+    "long-term-memory",
+    "persistent-memory",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "rag",
+    "embeddings",
+    "vector-search",
+    "semantic-search",
+    "sqlite",
+    "mongodb",
+    "postgres",
+    "pgvector"
+  ],
+  "peerDependenciesMeta": {
+    "@xenova/transformers": {
+      "optional": true
+    },
+    "mongodb": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
+  },
+  "peerDependencies": {
+    "@xenova/transformers": "^2.17.2",
+    "mongodb": "^7.5.0",
+    "pg": "^8.23.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lal671525/claude-db.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lal671525/claude-db/issues"
+  },
+  "homepage": "https://github.com/lal671525/claude-db#readme",
+  "author": "Kishan Lal Rai",
+  "publishConfig": {
+    "access": "public"
+  }
+}

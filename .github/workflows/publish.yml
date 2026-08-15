@@ -1,0 +1,67 @@
+name: Publish
+
+# Publishing is triggered by creating a GitHub Release, not by pushing to main.
+# That keeps releases deliberate: a merge cannot accidentally ship a version.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      # Required for npm provenance: npm verifies the package was built by this
+      # workflow from this commit, and shows a "Provenance" badge on the listing.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Refuse to publish if the tag and package.json disagree
+        if: github.event_name == 'release'
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Release tag is v$TAG but package.json says $PKG."
+            echo "Bump package.json and retag, or the published version will not"
+            echo "match the release notes people are reading."
+            exit 1
+          fi
+          echo "version $PKG matches tag $GITHUB_REF_NAME"
+
+      - name: Refuse to republish an existing version
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          NAME="$(node -p "require('./package.json').name")"
+          if npm view "$NAME@$PKG" version >/dev/null 2>&1; then
+            echo "::error::$NAME@$PKG is already on npm. Versions are immutable."
+            exit 1
+          fi
+          echo "$NAME@$PKG is unpublished, proceeding"
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Publish to npm
+        # --provenance ties the tarball to this commit and workflow.
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

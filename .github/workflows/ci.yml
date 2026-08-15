@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.5 is the floor the package declares; 24 is the current line.
+        # macOS is included deliberately: the symlink handling in resolveProject
+        # only misbehaves there, where /tmp is a link to /private/tmp.
+        os: [ubuntu-latest, macos-latest]
+        node: ['22.x', '24.x']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Verify the packed tarball is installable
+        run: |
+          npm pack
+          npm install -g ./claude-db-*.tgz
+          claude-db doctor
+          cdb --help || true
