@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 
 export interface UsageMatch {
   file: string; // relative to the repo root
@@ -36,8 +37,24 @@ const MAX_BUFFER = 16 * 1024 * 1024;
  * nothing to invalidate.
  */
 export function findUsages(input: FindUsagesInput): UsagesResult {
-  const root = repoRootFor(input.path);
+  // realpath'd up front: git's own --show-toplevel always resolves symlinks
+  // (on macOS, tmpdir()'s /var/folders/... is itself a symlink to
+  // /private/var/folders/...), so comparing an un-resolved `start` against it
+  // below would produce a bogus, always-".."-prefixed relative path and
+  // silently disable scoping rather than apply it.
+  const start = realpathSync(resolve(input.path ?? process.cwd()));
+  const root = repoRootFor(start);
   const args = buildArgs(input);
+
+  // An explicit path narrows the search to that subtree; omitting it searches
+  // the whole repository. Defaulting to cwd's subtree would silently hide a
+  // usage that lives elsewhere in the repo — exactly the case this tool
+  // exists to catch — so only a caller who deliberately asked to narrow gets
+  // narrowed. git accepts a file or a directory here equally.
+  if (input.path) {
+    const scope = relative(root, start);
+    if (scope && !scope.startsWith('..')) args.push('--', scope);
+  }
 
   let raw: string;
   try {
@@ -76,8 +93,7 @@ export function findUsages(input: FindUsagesInput): UsagesResult {
  * this in sync with whatever repo git itself would act on (worktrees,
  * submodules, symlinks included) without a second implementation of the walk.
  */
-function repoRootFor(path: string | undefined): string {
-  const start = resolve(path ?? process.cwd());
+function repoRootFor(start: string): string {
   try {
     return execFileSync('git', ['-C', start, 'rev-parse', '--show-toplevel'], {
       encoding: 'utf8',

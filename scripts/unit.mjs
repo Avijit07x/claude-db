@@ -434,6 +434,26 @@ check('turns that changed nothing are dropped', chatter.length === 0);
     !found.matches.some((m) => m.text.includes('useAuthenticated') && m.file === 'src/other.ts'));
   check('gitignored files are not searched', !found.matches.some((m) => m.file === 'src/ignored.ts'));
 
+  // path only located which repo to search in, never scoped the grep itself —
+  // a bug found by using the tool: asking it to search only src/usages/ for a
+  // symbol used nowhere in that folder still returned matches from all over
+  // the repo, because no pathspec was ever passed to git.
+  writeFileSync(join(repo, 'top.ts'), 'useAuth()\n');
+  git('add', '-A');
+  git('commit', '-qm', 'add a root-level usage');
+
+  const scoped = findUsages({
+    symbol: 'useAuth', path: join(repo, 'src'), regex: false, context: 0, limit: 100,
+  });
+  check('an explicit path narrows the search to that subtree',
+    scoped.matches.every((m) => m.file.startsWith('src/')), scoped.matches.map((m) => m.file));
+  check('a match outside the given path is excluded',
+    !scoped.matches.some((m) => m.file === 'top.ts'));
+
+  const unscoped = findUsages({ symbol: 'useAuth', path: repo, regex: false, context: 0, limit: 100 });
+  check('omitting a narrower path still searches the whole repo',
+    unscoped.matches.some((m) => m.file === 'top.ts'));
+
   // Uncommitted edit to a tracked file.
   writeFileSync(join(repo, 'src', 'auth.ts'),
     'export function useAuth() {\n  return 1\n}\nexport const useAuthAgain = () => useAuth()\n');

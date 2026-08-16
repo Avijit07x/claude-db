@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.1
+
+### Fixed
+
+- **`find_usages`'s `path` param only chose which repository to search, and**
+  **never actually scoped the search** — described as "directory to search
+  from," but no pathspec was ever passed to `git grep`, so a lookup scoped to
+  one folder still searched the whole repository. Caught by using the tool: a
+  search for `resolveProject` scoped to `src/usages/` (which does not use it)
+  still returned 41 matches from across the repo. An explicit `path` now
+  narrows the search for real; omitting it still searches the whole
+  repository, since a blast-radius check that silently narrowed by default
+  could hide a real usage and give false confidence nothing else depends on it
+- The fix itself had the same bug this project keeps tripping on: comparing
+  `mkdtempSync`'s temp path against `git rev-parse --show-toplevel`'s result
+  failed on macOS, where `/var/folders/...` is a symlink to
+  `/private/var/folders/...` — the exact class of mismatch `resolveProject()`
+  already guards against with `realpathSync`. Applied the same fix here
+
+### Changed
+
+- The standing instruction written at install sharpens the `find_usages`
+  boundary: it is the default for any symbol/identifier lookup, not only
+  before editing a shared name; grep still wins for plain text, log files,
+  comments, strings, and scoping with grep flags this tool does not expose
+
 ## 0.4.0
 
 Claude has had no better option than raw Bash `grep` for "what uses X" or "if
