@@ -10,6 +10,7 @@ import { createContext } from '../context.js';
 import { toShortId } from '../util/shortid.js';
 import { renderFull, renderIndex } from './render.js';
 import { resolveProject } from '../util/project.js';
+import { findUsages, formatUsages } from '../usages/index.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
@@ -167,6 +168,49 @@ server.tool(
         { type: 'text', text: observations.map((obs) => renderFull(obs, chars)).join('\n\n---\n\n') },
       ],
     };
+  },
+);
+
+server.tool(
+  'find_usages',
+  'Find real usages of a symbol or component name via `git grep` — a live read ' +
+    'of the current source, not a stored index, so it is never stale. Returns ' +
+    'file:line and the matching line, with a best-effort [definition?] marker on ' +
+    'lines that look like a declaration. Use this before editing or removing a ' +
+    'shared or exported name, or to answer "what uses this" (structure). Use ' +
+    '`search` instead for "why is this the way it is" (history).',
+  {
+    symbol: z.string().min(1).max(200).describe('Exact name to search for, e.g. "useAuth" or "CartButton"'),
+    path: z
+      .string()
+      .optional()
+      .describe(
+        'Directory inside the repo to search from; defaults to cwd. Must be inside ' +
+          'a git working tree. Different from the memory tools’ project param, which ' +
+          'can point at a folder pooling several repos rather than being one itself',
+      ),
+    regex: z
+      .boolean()
+      .default(false)
+      .describe('Treat symbol as an extended regular expression instead of a literal name'),
+    context: z
+      .number()
+      .int()
+      .min(0)
+      .max(10)
+      .default(0)
+      .describe('Lines of surrounding context before/after each match'),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(500)
+      .default(100)
+      .describe('Cap on matching lines returned; the result says how many more exist'),
+  },
+  async ({ symbol, path, regex, context, limit }) => {
+    const result = findUsages({ symbol, regex, context, limit, ...(path ? { path } : {}) });
+    return { content: [{ type: 'text', text: formatUsages(result) }] };
   },
 );
 

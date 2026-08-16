@@ -227,6 +227,24 @@ check('turns that changed nothing are dropped', chatter.length === 0);
   check('an empty result set still says so',
     renderIndex([]) === 'No matching observations.');
 
+  // Live case: the window landed on the sentence the title was taken from, so
+  // the row spent a second line saying it again — in markdown this time.
+  const echo = renderIndex([row({
+    title: 'Added as section 3 of PLAN.md, with the later sections renumbered',
+    snippet: '…ok do Added as section 3 of [PLAN.md](PLAN.md), with the later…',
+  })]);
+  check('a snippet that only restates the title is dropped',
+    echo.split('\n').length === 2, JSON.stringify(echo));
+
+  // The guard must not eat a fragment that happens to share the title's
+  // vocabulary; sharing a few words is what a relevant match looks like.
+  const overlapping = renderIndex([row({
+    title: "J1's guard was wrong — a stalled project with zero captures",
+    snippet: '…Now the CLI side of J1, J5 and J8. Now the cursor sweep in…',
+  })]);
+  check('a fragment sharing some words with the title survives',
+    overlapping.includes('the cursor sweep in'), JSON.stringify(overlapping));
+
   const full = renderFull(
     { ...row(), body: 'b'.repeat(9000), files: ['/p/a.ts'], author: 'ada' }, 2000);
   check('layer 3 bounds the body it returns', full.includes('7000 more characters'));
@@ -378,6 +396,97 @@ check('turns that changed nothing are dropped', chatter.length === 0);
     observationsFromGit(repo, 10)[0].id === seeded[0].id);
 
   rmSync(repo, { recursive: true, force: true });
+}
+
+// --- find_usages ---------------------------------------------------------------
+{
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { findUsages } = await import('../dist/usages/index.js');
+
+  const repo = mkdtempSync(join(tmpdir(), 'usages-'));
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'ada', GIT_AUTHOR_EMAIL: 'ada@example.com',
+    GIT_COMMITTER_NAME: 'ada', GIT_COMMITTER_EMAIL: 'ada@example.com',
+  };
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], { env, stdio: 'ignore' });
+
+  git('init', '-q');
+  mkdirSync(join(repo, 'src'));
+  writeFileSync(join(repo, 'src', 'auth.ts'),
+    'export function useAuth() {\n  return 1\n}\n');
+  writeFileSync(join(repo, 'src', 'header.tsx'),
+    'import { useAuth } from "./auth"\nfunction Header() {\n  const a = useAuth()\n  return a\n}\n');
+  // Word-boundary decoy: a naive substring grep would also match this.
+  writeFileSync(join(repo, 'src', 'other.ts'), 'const useAuthenticated = true\n');
+  writeFileSync(join(repo, '.gitignore'), 'ignored.ts\n');
+  writeFileSync(join(repo, 'src', 'ignored.ts'), 'useAuth()\n');
+  git('add', '-A');
+  git('commit', '-qm', 'add useAuth');
+
+  const found = findUsages({ symbol: 'useAuth', path: repo, regex: false, context: 0, limit: 100 });
+  check('finds the definition', found.matches.some((m) => m.file === 'src/auth.ts' && m.isDefinition));
+  check('finds a call site', found.matches.some((m) => m.file === 'src/header.tsx' && !m.isDefinition));
+  check('word-boundary excludes a longer identifier',
+    !found.matches.some((m) => m.text.includes('useAuthenticated') && m.file === 'src/other.ts'));
+  check('gitignored files are not searched', !found.matches.some((m) => m.file === 'src/ignored.ts'));
+
+  // Uncommitted edit to a tracked file.
+  writeFileSync(join(repo, 'src', 'auth.ts'),
+    'export function useAuth() {\n  return 1\n}\nexport const useAuthAgain = () => useAuth()\n');
+  const withEdit = findUsages({ symbol: 'useAuth', path: repo, regex: false, context: 0, limit: 100 });
+  check('uncommitted edits to tracked files are seen',
+    withEdit.matches.some((m) => m.text.includes('useAuthAgain')));
+
+  // A brand-new, never-staged file — the case this tool exists for.
+  writeFileSync(join(repo, 'src', 'new.tsx'), 'useAuth()\n');
+  const withNew = findUsages({ symbol: 'useAuth', path: repo, regex: false, context: 0, limit: 100 });
+  check('untracked files are seen (the case this tool exists for)',
+    withNew.matches.some((m) => m.file === 'src/new.tsx'));
+
+  // A regex metacharacter in the symbol must not be treated as one in literal mode.
+  writeFileSync(join(repo, 'src', 'price.ts'), 'export const price$ = 9\n');
+  const dollar = findUsages({ symbol: 'price$', path: repo, regex: false, context: 0, limit: 100 });
+  check('a $ in the symbol is treated literally, not as a regex anchor',
+    dollar.matches.some((m) => m.file === 'src/price.ts'));
+
+  // git grep exits 1 on zero matches; that must not be read as an error.
+  const none = findUsages({ symbol: 'totallyAbsentSymbolXyz', path: repo, regex: false, context: 0, limit: 100 });
+  check('zero matches is a clean empty result, not a thrown error',
+    none.matches.length === 0 && none.total === 0);
+
+  for (let i = 0; i < 5; i++) writeFileSync(join(repo, `x${i}.ts`), 'export const capped = 1\n');
+  const capped = findUsages({ symbol: 'capped', path: repo, regex: false, context: 0, limit: 2 });
+  check('limit caps the returned matches', capped.matches.length === 2);
+  check('truncation is reported with the real total', capped.truncated && capped.total === 5, capped.total);
+
+  const rx = findUsages({ symbol: '^export const price', path: repo, regex: true, context: 0, limit: 100 });
+  check('regex mode matches a real pattern', rx.matches.some((m) => m.file === 'src/price.ts'));
+
+  // A binary file containing the term must not corrupt the NUL-delimited parse.
+  writeFileSync(join(repo, 'blob.bin'), Buffer.concat([Buffer.from([0x00, 0x01, 0x02]), Buffer.from('useAuth')]));
+  const withBinary = findUsages({ symbol: 'useAuth', path: repo, regex: false, context: 0, limit: 100 });
+  check('a binary file containing the term does not corrupt the parse or crash',
+    withBinary.matches.every((m) => typeof m.line === 'number' && Number.isFinite(m.line)));
+
+  rmSync(repo, { recursive: true, force: true });
+}
+
+{
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { findUsages } = await import('../dist/usages/index.js');
+
+  const plain = mkdtempSync(join(tmpdir(), 'notrepo-'));
+  let threw = false;
+  try { findUsages({ symbol: 'x', path: plain, regex: false, context: 0, limit: 10 }); }
+  catch { threw = true; }
+  check('a plain directory that is not a git repo throws a clear error', threw);
+  rmSync(plain, { recursive: true, force: true });
 }
 
 // --- cursor sweep -------------------------------------------------------------
