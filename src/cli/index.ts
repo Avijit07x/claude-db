@@ -13,6 +13,7 @@ import {
   sweepCursors,
   transcriptsFor,
 } from '../capture/index.js';
+import { findUsages, formatUsages } from '../usages/index.js';
 import { createContext } from '../context.js';
 import type { RecallContext } from '../context.js';
 import { createStore } from '../store/index.js';
@@ -122,6 +123,9 @@ switch (command) {
   case 'seed':
     await cmdSeed(args);
     break;
+  case 'usages':
+    await cmdUsages(args);
+    break;
   case 'sync':
     await cmdSync(args);
     break;
@@ -179,6 +183,41 @@ async function cmdSeed(argv: (string | undefined)[]): Promise<void> {
   // Ids come from the commit sha, so this is safe to repeat as history grows.
   console.log(`Seeded ${observations.length} observation(s) from git history.`);
   console.log(`Oldest: ${new Date(observations[observations.length - 1]?.createdAt ?? 0).toISOString().slice(0, 10)}`);
+}
+
+/**
+ * Live `git grep`, not a database lookup — the only command with no
+ * `createContext()` call, since it touches no store and no embedder.
+ *
+ * Never a persisted index: this project has already shipped three
+ * silent-staleness bugs, and a symbol index that drifts from an edit is the
+ * same failure shape. Re-deriving the answer from the current source on every
+ * call means there is nothing to invalidate.
+ */
+async function cmdUsages(argv: (string | undefined)[]): Promise<void> {
+  const regex = argv.includes('--regex');
+  const path = valueOf(argv, '--path');
+  const context = Number(valueOf(argv, '--context') ?? 0);
+  const limit = Number(valueOf(argv, '--limit') ?? 100);
+  const symbol = withoutFlags(argv, ['--path', '--context', '--limit'])
+    .filter((arg) => arg !== '--regex')
+    .join(' ')
+    .trim();
+
+  if (!symbol) {
+    console.error('Usage: claude-db usages [--regex] [--context <n>] [--path <dir>] [--limit <n>] <symbol>');
+    process.exit(1);
+  }
+  if (!Number.isFinite(context) || context < 0) {
+    console.error('--context must be a non-negative number.');
+    process.exit(1);
+  }
+  if (!Number.isFinite(limit) || limit <= 0) {
+    console.error('--limit must be a positive number.');
+    process.exit(1);
+  }
+
+  console.log(formatUsages(findUsages({ symbol, regex, context, limit, ...(path ? { path } : {}) })));
 }
 
 /**
@@ -1225,6 +1264,8 @@ function usage(): void {
   stats                       What this project's memory is made of
   flush                       Re-ingest every transcript for this project
   seed --from-git [--limit n] Fill a cold memory from this repo's history
+  usages [--regex] <symbol>   Find real usages via git grep, current source only
+         [--context n] [--path <dir>] [--limit n]
   export [--all] > out.jsonl  Dump memory as JSONL, for backup or migration
   import <file.jsonl>         Load a dump back in (safe to repeat)
   sync <url> [--yes]          Two-way merge with another database

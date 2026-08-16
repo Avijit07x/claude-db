@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.4.0
+
+Claude has had no better option than raw Bash `grep` for "what uses X" or "if
+I change this, what breaks" — text matching with no idea whether a hit is the
+definition, a real caller, or an unrelated word.
+
+### Added
+
+- **`find_usages`**, a sixth MCP tool, plus `claude-db usages <symbol>`. Wraps
+  `git grep`, never a persisted index: this project has already shipped three
+  silent-staleness bugs, and a symbol index that drifts from an edit is the
+  same failure shape in a new place. A live grep re-derives the answer from
+  the current source on every call, so there is nothing to invalidate. Scope
+  resolution deliberately does not reuse `resolveProject()` — that can point
+  at a directory pooling several sibling repos for memory partitioning, which
+  `git grep` cannot search — and resolves its own repo root instead. No
+  usage-kind classification (import vs call vs type): the `classifyTurn`
+  `because` regression is the direct precedent for why that regex heuristic
+  goes wrong. The one exception is a best-effort `[definition?]` marker that
+  only annotates an already-shown line rather than filtering anything
+
+### Fixed
+
+- **Untracked and binary files were mishandled in the first pass of the above**
+  before it shipped: a brand-new file that hasn't been `git add`ed yet is
+  exactly the blast-radius case the tool exists for, and was invisible
+  without `--untracked`; a binary file matching the term printed a headerless
+  line that corrupted the parser without `-I`. Both caught in review, both
+  covered by their own test
+- A search-result snippet that only echoes words already in the title is now
+  dropped rather than shown, since it was paying for a line that told the
+  reader nothing new
+
 ## 0.3.0
 
 Every defect shipped so far was silent — hooks swallow their errors so a memory
