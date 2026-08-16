@@ -185,8 +185,10 @@ server.tool(
       .string()
       .optional()
       .describe(
-        'Directory inside the repo to search from; defaults to cwd. Must be inside ' +
-          'a git working tree. Different from the memory tools’ project param, which ' +
+        'A file or directory to narrow the search to; omit to search the whole ' +
+          'repository (never narrows on its own — a blast-radius check that quietly ' +
+          'skipped part of the repo would be worse than no check). Must be inside a ' +
+          'git working tree. Different from the memory tools’ project param, which ' +
           'can point at a folder pooling several repos rather than being one itself',
       ),
     regex: z
