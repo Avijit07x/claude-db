@@ -93,33 +93,98 @@ function buildObservation(
 const ANNOUNCEMENT =
   /^(now|next|then|first|right|ok|okay|good question|great|sure|perfect|let me|let's|i'?ll|here'?s|two|three|four|before|starting|continuing)\b/i;
 
+/**
+ * Narration of work in progress: "Working through the improvements now."
+ *
+ * A participle opener describes what is being done, where a title has to say
+ * what was. Listed rather than matched as a generic `\w+ing`, which would take
+ * "Nothing changed" and "Something in the cache" with it.
+ */
+const IN_PROGRESS =
+  /^(work|add|fix|runn|updat|writ|build|mak|mov|remov|check|test|switch|wir|tak|go|do|try|look|read|creat|implement|refactor|pull|push|sett)ing\b/i;
+
+/**
+ * Openers that point at something already said instead of saying it.
+ *
+ * Measured against real titles after the 0.2.2 fix: "That's the same gap we
+ * just closed" displaced "remember() stores text raw — no redaction", because
+ * the vague sentence happened to contain a past-tense verb. A back-reference
+ * carries none of the claim — whatever it refers to is the claim — so it
+ * belongs with the announcements rather than being scored against them.
+ */
+const BACKREFERENCE =
+  /^(that'?s|this is|these are|it'?s|there'?s|you'?(ve|re)|we'?(ve|re)|yes\b|no\b|exactly|correct|agreed|fair enough|both\b|either\b|same\b)/i;
+
 function announces(sentence: string): boolean {
-  return sentence.endsWith(':') || ANNOUNCEMENT.test(sentence);
+  return (
+    sentence.endsWith(':') ||
+    ANNOUNCEMENT.test(sentence) ||
+    BACKREFERENCE.test(sentence) ||
+    IN_PROGRESS.test(sentence)
+  );
 }
 
 /**
- * Prefers the first sentence of the reply that reports something.
+ * Marks of a sentence that reports an outcome rather than an intention.
+ *
+ * Skipping announcements alone still leaves the first merely-neutral sentence
+ * winning, so a reply that opens with "Working through the improvements now."
+ * stores that as its title. Scoring the opening few instead lets a later
+ * sentence carrying a filename, a version or a past-tense verb take the slot.
+ */
+const EVIDENCE = [
+  /[\w-]+\.(ts|tsx|js|jsx|mjs|json|md|sql|py|go|rs|ya?ml|sh|toml|txt|css|html|lock)\b/i,
+  /\b\w{3,}ed\b/i,
+  /\d/,
+];
+
+/** -1 announces the work, 0 says nothing in particular, 1 reports an outcome. */
+function reports(sentence: string): number {
+  if (announces(sentence)) return -1;
+  // A redaction marker is not evidence. "[redacted-key]" reads as a past-tense
+  // verb to the rule above, which would promote a pasted secret over the
+  // sentence that says what was actually done.
+  const text = sentence.replace(/\[redacted[^\]]*\]/g, '');
+  return EVIDENCE.some((test) => test.test(text)) ? 1 : 0;
+}
+
+/**
+ * Prefers the sentence of the reply that reports the most.
  *
  * The prompt states a request ("can you create one icon"); the reply states
  * what actually happened ("Built mouse-scroll-icon.tsx, first of the Huge
  * Tier 1 Gestures batch"). The second is what someone searching their history
  * is looking for, and it is written in the vocabulary of the codebase — but
  * only once the throat-clearing in front of it is skipped.
+ *
+ * Redacted before it is scored, not just before it is stored: a sentence made
+ * of a pasted key is dense with digits, and would otherwise outscore the one
+ * that says what was done.
  */
 function buildTitle(turn: Turn, files: string[]): string {
-  const prose = stripMarkdown(turn.reasoning);
+  const prose = stripMarkdown(redact(turn.reasoning));
 
   // Bounded: past the first few sentences a reply has moved on to detail that
   // no longer summarises the turn.
-  for (const sentence of sentences(prose).slice(0, 6)) {
-    if (sentence.length >= 15 && !announces(sentence)) return headline(sentence);
-  }
+  const scored = sentences(prose)
+    .slice(0, 6)
+    .filter((sentence) => sentence.length >= 15)
+    .map((sentence) => [sentence, reports(sentence)] as const);
+
+  // The first sentence that reports, not the one that reports most: a later
+  // sentence accumulates signals just by being long and specific, while the
+  // summary comes first and the detail follows it.
+  const best =
+    scored.find(([, score]) => score > 0) ?? scored.find(([, score]) => score === 0);
+  if (best) return headline(best[0]);
+
+  // Nothing in the reply reports anything, so it is all narration. The prompt
+  // is the only record of intent, and intent beats "Working through it now."
+  const prompt = firstSentence(redact(turn.prompt));
+  if (prompt) return headline(prompt);
 
   const opening = firstSentence(prose);
   if (opening && opening.length >= 15) return headline(opening);
-
-  const prompt = firstSentence(turn.prompt);
-  if (prompt) return headline(prompt);
 
   return files.length > 0 ? `Changed ${shortPath(files[0] ?? '')}` : 'Session work';
 }
@@ -159,7 +224,7 @@ function headline(sentence: string): string {
  * folder when it is one repo. Tags carry real weight in every backend's index,
  * so this is what makes a pooled memory filterable by where the work happened.
  */
-function topLevelDirs(files: string[], project: string): string[] {
+export function topLevelDirs(files: string[], project: string): string[] {
   const prefix = project.endsWith('/') ? project : `${project}/`;
   const tags = new Set<string>();
 
@@ -172,7 +237,7 @@ function topLevelDirs(files: string[], project: string): string[] {
   return [...tags].slice(0, 3);
 }
 
-function classifyTurn(turn: Turn): ObservationKind {
+export function classifyTurn(turn: Turn): ObservationKind {
   const text = `${turn.prompt} ${turn.reasoning}`.toLowerCase();
 
   // Read from the prompt alone, and only where the phrasing is a standing
@@ -186,7 +251,16 @@ function classifyTurn(turn: Turn): ObservationKind {
   ) {
     return 'preference';
   }
-  if (/\b(instead of|rather than|chose|decided|because|why we|trade-?off)\b/.test(text)) {
+  // `because` used to be in here and matched 98 of 471 stored decisions on its
+  // own, which is how every second observation became a `decision` and the
+  // filter stopped narrowing anything. It explains as readily as it decides —
+  // "the build failed because the cache key was stale" is a bugfix — so what is
+  // left names an alternative that was weighed.
+  if (
+    /\b(instead of|rather than|in favou?r of|opted for|went with|chose|decided|trade-?off|why we)\b/.test(
+      text,
+    )
+  ) {
     return 'decision';
   }
   if (/\b(didn'?t work|failed|reverted|abandoned|dead ?end|gave up|doesn'?t scale)\b/.test(text)) {
