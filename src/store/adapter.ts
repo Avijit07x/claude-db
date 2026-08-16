@@ -59,6 +59,16 @@ export interface MemoryStore {
   /** Every project with memory in this database, most recently active first. */
   listProjects(): Promise<ProjectSummary[]>;
 
+  /**
+   * Tables or collections in this database that belong to somebody else.
+   *
+   * Called by `use` before `init()` creates ours, because afterwards there is
+   * no way to tell an empty memory database from an application database we
+   * just added two tables to. One `use` in anger pointed at a live e-commerce
+   * database and nothing said a word.
+   */
+  inventory(): Promise<string[]>;
+
   /** Lexical match. Returns scores on an adapter-defined scale. */
   searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]>;
   /** Vector match. Return [] when the backend has no vector support. */
@@ -76,6 +86,16 @@ export interface MemoryStore {
  */
 export function isWholeScope(filter: RemoveFilter): boolean {
   return !filter.ids && !filter.kind && filter.before === undefined;
+}
+
+/**
+ * Ours, on any backend: the two tables, SQLite's FTS shadow tables, and the
+ * Postgres schema-version row.
+ */
+const OURS = /^(claude_db_meta|sessions|observations)(_fts(_\w+)?)?$/;
+
+export function foreignNames(names: string[]): string[] {
+  return names.filter((name) => name.length > 0 && !OURS.test(name));
 }
 
 export interface StoreFactory {

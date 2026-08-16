@@ -50,12 +50,28 @@ export interface ObservationIndexEntry {
   project: string;
   createdAt: number;
   score: number;
+  /**
+   * A line of the body around the match, so a result can be chosen without
+   * being expanded first. Produced by the keyword retriever, which is the only
+   * one with query terms to centre on; a row found by vector similarity alone
+   * has none.
+   */
+  snippet?: string;
 }
 
 export interface SearchQuery {
   text: string;
   project?: string;
   kind?: ObservationKind;
+  /**
+   * Narrows to observations touching one repository or top-level directory.
+   *
+   * A workspace that pools several repositories under one project key gets a
+   * memory covering all of them, and "the backend only" is a natural thing to
+   * ask that could not be expressed: tags were recorded and ranked, but never
+   * filtered on.
+   */
+  tag?: string;
   since?: number;
   until?: number;
   limit: number;

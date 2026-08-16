@@ -25,8 +25,9 @@ interface PgModule {
   Pool: new (config: { connectionString: string }) => Pool;
 }
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
-import { isWholeScope } from '../adapter.js';
+import { foreignNames, isWholeScope } from '../adapter.js';
 import { partitionIds } from '../../util/shortid.js';
+import { toSnippet } from '../../util/snippet.js';
 import type {
   ListFilter,
   Observation,
@@ -55,6 +56,12 @@ const TSV_EXPRESSION = `
   setweight(to_tsvector('english', coalesce(tags::text, '')), 'B') ||
   setweight(to_tsvector('english', coalesce(body, '')), 'C')`;
 
+/**
+ * Bumped whenever the DDL below changes, which makes every process re-run it
+ * once. Only ever compared for equality.
+ */
+const SCHEMA_VERSION = 1;
+
 export class PostgresStore implements MemoryStore {
   readonly kind = 'postgres';
 
@@ -72,10 +79,36 @@ export class PostgresStore implements MemoryStore {
     return new PostgresStore(pool);
   }
 
+  /**
+   * Every hook is its own process, so nothing here is ever pooled or reused:
+   * this ran in full on every single prompt. Against a managed Postgres, where
+   * one round trip measured 49ms at best and 1045ms at the median, four of them
+   * before the first real query is most of why a remote backend feels broken.
+   *
+   * The version row collapses that to one read on the steady-state path. It
+   * carries the vector state too, because otherwise proving the extension is
+   * available costs back the round trip just saved. Anything unexpected — no
+   * table, an older version, an unreadable row — falls through to the full DDL,
+   * so the worst case is exactly the behaviour this replaces.
+   */
   async init(): Promise<void> {
+    const meta = await this.readMeta();
+    if (meta?.version === SCHEMA_VERSION) {
+      this.vectorEnabled = meta.vectorEnabled;
+      this.vectorDims = meta.vectorDims;
+      return;
+    }
+
     this.vectorEnabled = await this.tryEnableVector();
 
     await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS claude_db_meta (
+        id             INT PRIMARY KEY,
+        version        INT     NOT NULL,
+        vector_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        vector_dims    INT
+      );
+
       CREATE TABLE IF NOT EXISTS sessions (
         id         TEXT PRIMARY KEY,
         project    TEXT   NOT NULL,
@@ -103,6 +136,7 @@ export class PostgresStore implements MemoryStore {
       CREATE INDEX IF NOT EXISTS idx_obs_tsv ON observations USING GIN(tsv);
       CREATE INDEX IF NOT EXISTS idx_obs_project_time
         ON observations(project, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_obs_tags ON observations USING GIN(tags);
 
       ALTER TABLE observations ADD COLUMN IF NOT EXISTS embedder TEXT;
       ALTER TABLE observations ADD COLUMN IF NOT EXISTS author   TEXT;
@@ -110,6 +144,42 @@ export class PostgresStore implements MemoryStore {
 
     await this.ensureTagsIndexed();
     if (this.vectorEnabled) this.vectorDims = await this.readVectorDims();
+    await this.writeMeta();
+  }
+
+  private async readMeta(): Promise<{
+    version: number;
+    vectorEnabled: boolean;
+    vectorDims: number | null;
+  } | null> {
+    try {
+      const res = await this.pool.query(
+        'SELECT version, vector_enabled, vector_dims FROM claude_db_meta WHERE id = 1',
+      );
+      const row = res.rows[0];
+      if (!row) return null;
+      return {
+        version: Number(row['version']),
+        vectorEnabled: row['vector_enabled'] === true,
+        vectorDims: row['vector_dims'] == null ? null : Number(row['vector_dims']),
+      };
+    } catch {
+      // No table yet, or no permission to read it. Either way the caller does
+      // the full setup, which is what happened before this existed.
+      return null;
+    }
+  }
+
+  private async writeMeta(): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO claude_db_meta (id, version, vector_enabled, vector_dims)
+       VALUES (1, $1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET
+         version        = EXCLUDED.version,
+         vector_enabled = EXCLUDED.vector_enabled,
+         vector_dims    = EXCLUDED.vector_dims`,
+      [SCHEMA_VERSION, this.vectorEnabled, this.vectorDims],
+    );
   }
 
   /**
@@ -168,7 +238,13 @@ export class PostgresStore implements MemoryStore {
         `CREATE INDEX IF NOT EXISTS idx_obs_embedding
            ON observations USING hnsw (embedding vector_cosine_ops)`,
       );
-      this.vectorDims = dims;
+      // Read back rather than assumed: another process may have created the
+      // column at a different width between this one reading the version row
+      // and reaching here, and writing 384d values into a 256d column rolls
+      // the whole batch back. One extra round trip, once, and only before the
+      // first vector this process stores.
+      this.vectorDims = await this.readVectorDims();
+      await this.writeMeta();
     }
 
     if (this.vectorDims !== dims && !this.warnedDims) {
@@ -387,6 +463,14 @@ export class PostgresStore implements MemoryStore {
     }));
   }
 
+  async inventory(): Promise<string[]> {
+    const res = await this.pool.query(
+      `SELECT tablename AS name FROM pg_tables
+       WHERE schemaname = ANY(current_schemas(false))`,
+    );
+    return foreignNames(res.rows.map((row) => String(row['name'] ?? '')));
+  }
+
   async searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]> {
     const conditions = ['tsv @@ q.tsq'];
     const values: unknown[] = [query.text];
@@ -403,7 +487,10 @@ export class PostgresStore implements MemoryStore {
       `WITH q AS (
          SELECT replace(plainto_tsquery('english', $1)::text, '&', '|')::tsquery AS tsq
        )
-       SELECT id, kind, title, project, created_at, ts_rank(tsv, q.tsq) AS score
+       SELECT id, kind, title, project, created_at,
+              ts_headline('english', body, q.tsq,
+                          'MaxFragments=1, MaxWords=18, MinWords=5') AS snippet,
+              ts_rank(tsv, q.tsq) AS score
        FROM observations, q
        WHERE ${conditions.join(' AND ')}
        ORDER BY score DESC
@@ -478,6 +565,11 @@ export class PostgresStore implements MemoryStore {
       values.push(query.kind);
       conditions.push(`kind = $${values.length}`);
     }
+    if (query.tag) {
+      // Containment rather than a text match, so `api` cannot match `api-docs`.
+      values.push(JSON.stringify([query.tag]));
+      conditions.push(`tags @> $${values.length}::jsonb`);
+    }
     if (query.since !== undefined) {
       values.push(query.since);
       conditions.push(`created_at >= $${values.length}`);
@@ -544,7 +636,7 @@ function toObservation(row: Record<string, unknown>): Observation {
 }
 
 function toIndexEntry(row: Record<string, unknown>): ObservationIndexEntry {
-  return {
+  const entry: ObservationIndexEntry = {
     id: row['id'] as string,
     kind: row['kind'] as ObservationKind,
     title: row['title'] as string,
@@ -552,4 +644,10 @@ function toIndexEntry(row: Record<string, unknown>): ObservationIndexEntry {
     createdAt: Number(row['created_at']),
     score: Number(row['score'] ?? 0),
   };
+  // ts_headline wraps matches in <b> by default. Left at the default rather
+  // than configured away, because an empty StartSel is not portable across
+  // server versions; toSnippet strips them.
+  const snippet = toSnippet(row['snippet']);
+  if (snippet) entry.snippet = snippet;
+  return entry;
 }

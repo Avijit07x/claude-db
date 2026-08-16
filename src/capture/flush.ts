@@ -1,9 +1,9 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { CONFIG_DIR } from '../config/index.js';
 import type { RecallContext } from '../context.js';
 import type { Observation, ObservationKind } from '../types.js';
-import { readTranscript, transcriptPathFor } from './transcript.js';
+import { readTranscript, sessionIdsOnDisk, transcriptPathFor } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
 
 export interface FlushResult {
@@ -29,6 +29,13 @@ export async function flushSession(
   sessionId: string,
   project: string,
   transcriptPath?: string,
+  /**
+   * Discards the stored recap instead of extending it. A manual flush re-reads
+   * the whole transcript, so the summary can be rebuilt from scratch — and
+   * after an upgrade it has to be, or the recap injected at every SessionStart
+   * keeps quoting titles the new extractor would no longer write.
+   */
+  rebuild = false,
 ): Promise<FlushResult> {
   const path = transcriptPath ?? transcriptPathFor(project, sessionId);
   const cursor = readCursor(sessionId);
@@ -48,7 +55,7 @@ export async function flushSession(
   await embedObservations(ctx, observations);
   await ctx.store.insertObservations(observations);
 
-  const previous = await ctx.store.getSession(sessionId);
+  const previous = rebuild ? null : await ctx.store.getSession(sessionId);
   const summary = summarize(observations, previous?.summary);
   await ctx.store.upsertSession({
     id: sessionId,
@@ -133,8 +140,12 @@ export function summarize(observations: Observation[], previous?: string): strin
  * local file, it is worthless on another machine, and it must not sync to a
  * shared Postgres or Mongo alongside real memory.
  */
+function cursorName(sessionId: string): string {
+  return `${sessionId.replace(/[^\w-]/g, '_')}.offset`;
+}
+
 function cursorPath(sessionId: string): string {
-  return join(CONFIG_DIR, 'cursors', `${sessionId.replace(/[^\w-]/g, '_')}.offset`);
+  return join(CONFIG_DIR, 'cursors', cursorName(sessionId));
 }
 
 function readCursor(sessionId: string): number {
@@ -163,4 +174,34 @@ export function resetCursor(sessionId: string): void {
 /** The session is over; its offset is scratch state nothing will read again. */
 export function clearCursor(sessionId: string): void {
   rmSync(cursorPath(sessionId), { force: true });
+}
+
+/**
+ * Drops cursors whose transcript no longer exists anywhere.
+ *
+ * Clearing on SessionEnd only covers sessions that end after it shipped, so a
+ * machine that has been running this for a while keeps a file per session it
+ * ever saw. Harmless, and untidy in a way that makes the rest look unmaintained.
+ *
+ * Checked against every transcript on disk rather than this project's, because
+ * cursors are keyed by session alone: sweeping on a per-project basis would
+ * delete another project's live cursor and cost it a full re-read.
+ */
+export function sweepCursors(): number {
+  const dir = join(CONFIG_DIR, 'cursors');
+  let files: string[];
+  try {
+    files = readdirSync(dir);
+  } catch {
+    return 0;
+  }
+
+  const live = new Set(sessionIdsOnDisk().map(cursorName));
+  let removed = 0;
+  for (const file of files) {
+    if (!file.endsWith('.offset') || live.has(file)) continue;
+    rmSync(join(dir, file), { force: true });
+    removed += 1;
+  }
+  return removed;
 }

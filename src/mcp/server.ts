@@ -7,8 +7,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { remember } from '../capture/index.js';
 import { createContext } from '../context.js';
-import type { Observation, ObservationIndexEntry } from '../types.js';
 import { toShortId } from '../util/shortid.js';
+import { renderFull, renderIndex } from './render.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
@@ -44,8 +44,9 @@ const server = new McpServer({ name: 'claude-db', version: packageVersion() });
 server.tool(
   'search',
   'Layer 1. Search project memory and get a compact index of matches ' +
-    '(id, kind, title, date) without bodies. Start here, then fetch details ' +
-    'for only the ids that look relevant.',
+    '(id, kind, date, title, and a line of the matching body) without full ' +
+    'bodies. Start here, and use the snippet to decide which ids are worth ' +
+    'passing to get_observations rather than expanding on the title alone.',
   {
     query: z.string().describe('Natural language description of what you need'),
     project: z
@@ -53,14 +54,22 @@ server.tool(
       .optional()
       .describe('Absolute project path; defaults to cwd. Pass "*" to search every project'),
     kind: z.enum(KINDS).optional(),
+    tag: z
+      .string()
+      .optional()
+      .describe(
+        'Limit to one repository or top-level directory, e.g. "backend". Useful ' +
+          'when a workspace pools several repos under one project',
+      ),
     limit: z.number().int().min(1).max(50).default(10),
   },
-  async ({ query, project, kind, limit }) => {
+  async ({ query, project, kind, tag, limit }) => {
     const entries = await ctx.search.search({
       text: query,
       limit,
       ...(project === '*' ? {} : { project: resolveProject(project) }),
       ...(kind ? { kind } : {}),
+      ...(tag ? { tag } : {}),
     });
     return { content: [{ type: 'text', text: renderIndex(entries) }] };
   },
@@ -76,12 +85,22 @@ server.tool(
     text: z.string().describe('What to remember, in full. First line becomes the title'),
     kind: z.enum(KINDS).default('preference'),
     project: z.string().optional().describe('Absolute project path; defaults to cwd'),
+    key: z
+      .string()
+      .optional()
+      .describe(
+        'Stable name for a note meant to be kept current, e.g. "profile:stack". ' +
+          'Remembering the same key again replaces it instead of adding a duplicate',
+      ),
+    tags: z.array(z.string()).max(5).optional().describe('Extra tags for filtering'),
   },
-  async ({ text, kind, project }) => {
+  async ({ text, kind, project, key, tags }) => {
     const observation = await remember(ctx, {
       project: resolveProject(project),
       text,
       kind,
+      ...(key ? { key } : {}),
+      ...(tags ? { tags } : {}),
     });
     return {
       content: [
@@ -127,43 +146,29 @@ server.tool(
   'Layer 3. Fetch full bodies for specific observation ids, using the short ' +
     'ids returned by search. Always batch every id you need into one call ' +
     'rather than calling repeatedly.',
-  { ids: z.array(z.string()).min(1).max(25) },
-  async ({ ids }) => {
+  {
+    ids: z.array(z.string()).min(1).max(25),
+    chars: z
+      .number()
+      .int()
+      .min(200)
+      .max(20000)
+      .default(2000)
+      .describe(
+        'Characters of each body to return. Bodies run to 4000 and this call ' +
+          'takes 25 ids, so the default keeps a batch readable; raise it when a ' +
+          'truncated answer says there is more',
+      ),
+  },
+  async ({ ids, chars }) => {
     const observations = await ctx.search.getObservations(ids);
-    return { content: [{ type: 'text', text: observations.map(renderFull).join('\n\n---\n\n') }] };
+    return {
+      content: [
+        { type: 'text', text: observations.map((obs) => renderFull(obs, chars)).join('\n\n---\n\n') },
+      ],
+    };
   },
 );
-
-/**
- * Layer 1 rendering. Every character here is multiplied by the number of
- * results and paid on every search, so the format is deliberately terse:
- * short id, kind, month-day, title. No padding, no separators, no year.
- */
-export function renderIndex(entries: ObservationIndexEntry[]): string {
-  if (entries.length === 0) return 'No matching observations.';
-  const rows = entries.map((entry) => {
-    const date = new Date(entry.createdAt).toISOString().slice(5, 10);
-    return `${toShortId(entry.id)} ${entry.kind} ${date} ${entry.title}`;
-  });
-  return `${entries.length} result(s):\n${rows.join('\n')}`;
-}
-
-function renderFull(obs: Observation): string {
-  const date = new Date(obs.createdAt).toISOString();
-  return [
-    `id: ${toShortId(obs.id)}`,
-    `kind: ${obs.kind}`,
-    `when: ${date}`,
-    obs.author ? `who: ${obs.author}` : null,
-    obs.files.length > 0 ? `files: ${obs.files.join(', ')}` : null,
-    '',
-    obs.title,
-    '',
-    obs.body,
-  ]
-    .filter((line) => line !== null)
-    .join('\n');
-}
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
