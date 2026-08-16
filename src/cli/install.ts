@@ -43,6 +43,30 @@ export function instructionsPathFor(scope: Scope, project: string): string {
     : join(homedir(), '.claude', 'CLAUDE.md');
 }
 
+/**
+ * Where the `/cdb-scan` skill is installed.
+ *
+ * A skill rather than a CLI command: surveying a codebase means reading it, and
+ * the agent is already sitting in the repo with the tools to do that. A command
+ * would need its own model, its own key and its own opinion about what matters.
+ */
+export function skillPathFor(scope: Scope, project: string): string {
+  const root = scope === 'project' ? join(project, '.claude') : join(homedir(), '.claude');
+  return join(root, 'skills', 'cdb-scan', 'SKILL.md');
+}
+
+function writeSkill(distDir: string, scope: Scope, project: string): void {
+  const source = resolve(distDir, '..', 'skills', 'cdb-scan', 'SKILL.md');
+  const body = readText(source);
+  // Absent only in a partial checkout; the rest of the install still stands.
+  if (body.length > 0) writeAtomic(skillPathFor(scope, project), body);
+}
+
+function removeSkill(scope: Scope, project: string): void {
+  const path = skillPathFor(scope, project);
+  rmSync(dirname(path), { recursive: true, force: true });
+}
+
 const BLOCK_START = '<!-- claude-db:start -->';
 const BLOCK_END = '<!-- claude-db:end -->';
 
@@ -185,6 +209,7 @@ export function install(distDir: string, scope: Scope, project: string): string 
 
   const server = resolve(distDir, 'mcp', 'server.js');
   writeInstructions(instructionsPathFor(scope, project));
+  writeSkill(distDir, scope, project);
 
   // A global install lands in ~/.claude.json, which holds all of Claude Code's
   // own state. Let its CLI own that file rather than round-tripping megabytes
@@ -248,6 +273,7 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
   writeJson(path, settings);
 
   removeInstructions(instructionsPathFor(scope, project));
+  removeSkill(scope, project);
 
   // Symmetric with install: if the CLI put it there, the CLI takes it out.
   if (scope === 'global' && claudeMcp(['mcp', 'remove', 'memory', '-s', 'user'])) {

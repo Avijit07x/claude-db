@@ -61,6 +61,10 @@ produces 10 to 20 rows, not hundreds.
 best match in full on each prompt. Roughly 350 tokens when something relevant
 exists, zero when it doesn't.
 
+**What search returns.** An id, kind, date, title and one line of the matching
+body — enough to tell two similarly-titled rows apart without expanding either.
+Full bodies come only from `get_observations`, for ids you picked.
+
 An example of one stored memory:
 
 ```
@@ -84,21 +88,29 @@ Ran: Test run: pnpm test
 | --- | --- |
 | `claude-db install [--project]` | Register hooks and the MCP server |
 | `claude-db uninstall [--project]` | Remove them, keeping your memory |
-| `claude-db status` | Is it wired up, has it recorded anything |
-| `claude-db doctor` | Resolved config and database connectivity |
-| `claude-db search [--all] <query>` | Search this project's memory, or every project |
-| `claude-db remember <text>` | Record a rule outright, e.g. "always use pnpm here" |
+| `claude-db status` | Is it wired up, and when did it last record anything |
+| `claude-db doctor [--deep]` | Resolved config; `--deep` proves a full round trip |
+| `claude-db search [--all] [--tag <name>] <query>` | Search this project's memory, or every project |
+| `claude-db remember [--key <name>] <text>` | Record a rule outright, e.g. "always use pnpm here" |
 | `claude-db forget <id>` | Delete specific observations by id |
+| `claude-db seed --from-git` | Fill a cold memory from this repo's history |
 | `claude-db stats` | What this project's memory is made of |
 | `claude-db projects` | Every project with memory stored |
 | `claude-db merge [<path>]` | Move memory from an old project path onto this one |
 | `claude-db use <url>` | Switch database and verify it |
+| `claude-db sync <url>` | Two-way merge with another database |
 | `claude-db flush` | Re-ingest every transcript for this project |
 | `claude-db export [--all]` | Dump memory as JSONL, for backup or migration |
 | `claude-db import <file>` | Load a dump back in; safe to repeat |
 | `claude-db reembed` | Re-embed everything with the current model |
 | `claude-db prune --older-than <days>` | Delete old memory (dry run without `--yes`) |
 | `claude-db reset [--project] --yes` | Delete memory (dry run without `--yes`) |
+
+Install also adds a `/cdb-scan` skill: run it once on an existing project and
+Claude surveys the codebase into memory — stack, layout, conventions,
+workflows — so search has something to find before you have any history. Those
+notes are tagged `inferred`, because they are a reading of the code rather than
+a record of what happened.
 
 `--project` scopes to one repo instead of every project on the machine. It
 writes `.claude/settings.local.json` and `.mcp.json` — add `.mcp.json` to your

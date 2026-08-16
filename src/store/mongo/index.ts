@@ -1,7 +1,7 @@
 import type { Collection, Db, Doc, MongoClient } from './driver.js';
 import { importMongo } from './driver.js';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
-import { isWholeScope } from '../adapter.js';
+import { foreignNames, isWholeScope } from '../adapter.js';
 import type {
   ListFilter,
   Observation,
@@ -14,6 +14,7 @@ import type {
 } from '../../types.js';
 import { cosine } from '../../util/vector.js';
 import { partitionIds } from '../../util/shortid.js';
+import { toSnippet } from '../../util/snippet.js';
 
 interface SessionDoc extends Doc {
   _id: string;
@@ -207,14 +208,39 @@ export class MongoStore implements MemoryStore {
     }));
   }
 
+  async inventory(): Promise<string[]> {
+    // Through `command` rather than `listCollections`, so the structural driver
+    // types this adapter compiles against stay as small as they are.
+    const res = await this.db.command({ listCollections: 1, nameOnly: true });
+    const batch = (res['cursor'] as { firstBatch?: Doc[] } | undefined)?.firstBatch ?? [];
+    return foreignNames(batch.map((doc) => String(doc['name'] ?? '')));
+  }
+
   async searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]> {
     const filter: Doc = {
       $text: { $search: query.text },
       ...this.scopeFilter(query),
     };
 
+    // $text has no fragment operator, so unlike FTS5 and ts_headline this is
+    // the head of the body rather than the text around the match. Still enough
+    // to tell two same-titled rows apart, and it costs one projected field
+    // instead of shipping whole bodies to slice them here.
+    //
+    // Inclusion throughout: MongoDB rejects a projection that mixes included
+    // and excluded fields, so the previous `body: 0, embedding: 0` form cannot
+    // carry a computed one.
     const docs = await this.observations
-      .find(filter, { projection: { score: { $meta: 'textScore' }, body: 0, embedding: 0 } })
+      .find(filter, {
+        projection: {
+          kind: 1,
+          title: 1,
+          project: 1,
+          createdAt: 1,
+          snippet: { $substrCP: ['$body', 0, 240] },
+          score: { $meta: 'textScore' },
+        },
+      })
       .sort({ score: { $meta: 'textScore' } })
       .limit(query.limit)
       .toArray();
@@ -306,6 +332,7 @@ export class MongoStore implements MemoryStore {
     const filter: Record<string, unknown> = {};
     if (query.project) filter['project'] = query.project;
     if (query.kind) filter['kind'] = query.kind;
+    if (query.tag) filter['tags'] = query.tag;
     if (query.since !== undefined || query.until !== undefined) {
       const range: Record<string, number> = {};
       if (query.since !== undefined) range['$gte'] = query.since;
@@ -384,7 +411,7 @@ function toObservation(doc: ObservationDoc): Observation {
 }
 
 function toIndexEntry(doc: Partial<ObservationDoc>, score: number): ObservationIndexEntry {
-  return {
+  const entry: ObservationIndexEntry = {
     id: doc._id as string,
     kind: doc.kind as ObservationKind,
     title: doc.title as string,
@@ -392,4 +419,7 @@ function toIndexEntry(doc: Partial<ObservationDoc>, score: number): ObservationI
     createdAt: doc.createdAt as number,
     score,
   };
+  const snippet = toSnippet((doc as { snippet?: unknown }).snippet);
+  if (snippet) entry.snippet = snippet;
+  return entry;
 }

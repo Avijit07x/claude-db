@@ -1,8 +1,12 @@
 node_modules/
 dist/
 
-# Internal benchmarking notes, not part of the public repo
+# Internal benchmarking and planning notes, not part of the public repo
 SCALING.md
+PLAN*.md
+
+# Personal, per-machine agent instructions
+CLAUDE.local.md
 *.log
 .env
 .env.local

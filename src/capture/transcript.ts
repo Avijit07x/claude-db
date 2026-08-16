@@ -240,6 +240,35 @@ export function transcriptsFor(project: string): string[] {
   return transcripts.sort();
 }
 
+/**
+ * Every session id with a transcript still on disk, across all projects.
+ *
+ * Deliberately not filtered by project: this answers "does this session still
+ * exist at all", which is the only safe question to ask before discarding
+ * local state keyed on a session id alone.
+ */
+export function sessionIdsOnDisk(): string[] {
+  const root = join(homedir(), '.claude', 'projects');
+  const ids: string[] = [];
+  let dirs: string[];
+  try {
+    dirs = readdirSync(root);
+  } catch {
+    return ids;
+  }
+
+  for (const dir of dirs) {
+    try {
+      for (const name of readdirSync(join(root, dir))) {
+        if (name.endsWith('.jsonl')) ids.push(name.slice(0, -'.jsonl'.length));
+      }
+    } catch {
+      // Not a directory, or unreadable: nothing to learn from it.
+    }
+  }
+  return ids;
+}
+
 /** First cwd recorded in a transcript, without reading a 90MB file. */
 function transcriptCwd(path: string): string | null {
   let fd: number;
