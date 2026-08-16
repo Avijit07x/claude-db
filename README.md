@@ -94,6 +94,7 @@ Ran: Test run: pnpm test
 | `claude-db remember [--key <name>] <text>` | Record a rule outright, e.g. "always use pnpm here" |
 | `claude-db forget <id>` | Delete specific observations by id |
 | `claude-db seed --from-git` | Fill a cold memory from this repo's history |
+| `claude-db usages [--regex] <symbol>` | Find real usages via `git grep`, live — not a stored index |
 | `claude-db stats` | What this project's memory is made of |
 | `claude-db projects` | Every project with memory stored |
 | `claude-db merge [<path>]` | Move memory from an old project path onto this one |
