@@ -1,5 +1,96 @@
 # Changelog
 
+## 0.3.0
+
+Every defect shipped so far was silent — hooks swallow their errors so a memory
+layer can never break a session, which is the right call and means nothing ever
+reports that capture has stopped. This release is mostly about the tool proving
+it works, plus the first two answers to "it knows nothing yet".
+
+### Added
+
+- **`status` reports when memory was last written**, and warns when this project
+  has been worked in for two days with nothing recorded. Work happening while
+  capture doesn't is the signal every failure so far has left, and nothing
+  surfaced it
+- **`doctor --deep`** writes an observation, searches for it, expands it and
+  deletes it — through the real adapter, embedder and index. Reachability was
+  all `doctor` ever proved, and every silent failure had a reachable database
+- **`claude-db seed --from-git`** builds memory from commit history: subject,
+  body, changed files, author and date. A fresh install knows nothing for weeks,
+  which is the worst moment to ask anyone to trust it. Merges and releases are
+  skipped, and ids come from the sha, so re-running adds rather than duplicates
+- **`claude-db sync <url>`** two-way merges with another database. Content-derived
+  ids make it nearly free: an id on one side and not the other is memory the
+  other has never seen. Session recaps travel with it. Dry run without `--yes`
+- **`/cdb-scan`**, installed alongside the hooks: Claude surveys the codebase
+  once into five notes — stack, layout, conventions, workflows, architecture.
+  Tagged `inferred`, because everything else in the database is a record of what
+  happened and this is a reading of the code
+- **`search --tag <name>`**, and `tag` over MCP. Tags recorded the repository or
+  directory an observation touched and only ever nudged ranking, so a workspace
+  pooling several repositories could not ask about one of them
+- **`remember --key <name>`**, and `key` over MCP: a stable identity, so a note
+  meant to be kept current is replaced rather than duplicated on every run
+
+- **A snippet of the matching body in every search result.** The index was
+  built on the assumption that a title tells you which row holds the answer,
+  and it often does not: fifteen results dated the same day, titled things like
+  "Committed as 30daa92", leave nothing to choose on, so you expand two at
+  random and pay a full body for each guess. Measured over five real searches,
+  snippets add about 19 tokens a row and one avoided expansion saves about
+  1000. FTS5 `snippet()` and `ts_headline` centre the fragment on the match;
+  MongoDB's `$text` has no equivalent and returns the head of the body. Rows
+  found by vector similarity alone carry none — there are no query terms in
+  them to centre on — and were 20% of results in that measurement
+- **`get_observations` takes a `chars` limit**, default 2000. The cost argument
+  that made the index terse was never applied one layer down, where a single
+  call may ask for twenty-five bodies at once. The remainder is counted rather
+  than dropped in silence
+
+### Fixed
+
+- **Titles still fell back to narration.** 0.2.2 skipped sentences that announce
+  the work; a sentence that merely says nothing still won, so "Working through
+  the improvements now." was a stored title. Titles now take the first sentence
+  carrying evidence — a filename, a number, a past-tense verb — and fall back
+  only when none does
+- **`use` stranded your memory in silence.** Switching backends left everything
+  already recorded behind and started the new one empty. It now says so, and
+  says how to bring it across
+- **`use` wrote into whatever it was pointed at.** One in anger resolved to a
+  live application database; two tables were created inside it without a word.
+  It now reports what else is in there, before adding anything
+- **`kind` barely filtered.** `decision` matched on the bare word *because*,
+  which explains as readily as it decides — 98 of 471 stored decisions matched
+  on nothing else, and half the database was one kind. It now needs a weighed
+  alternative
+- A certificate error from a managed Postgres now names the fix, not just the
+  problem
+- Cursors for transcripts that no longer exist are swept during `flush`.
+  `clearCursor` landed in 0.2.0 and never covered anything written before it
+
+### Changed
+
+- **Postgres `init()` costs one round trip instead of four.** Every hook is its
+  own process, so nothing is pooled and the whole setup ran again on every
+  prompt. Against a managed instance — 49ms at best, 1045ms at the median for a
+  single round trip — that was most of why a remote backend felt broken. A
+  version row now short-circuits it, and anything unexpected falls through to
+  the full setup
+
+### Upgrading
+
+Postgres gains a `claude_db_meta` table on first connection, which is why this
+is a minor release rather than a patch: `updates: auto` will report it and leave
+it to you.
+
+Titles and kinds are rewritten by re-ingesting, per project:
+
+```bash
+cd <project> && claude-db flush
+```
+
 ## 0.2.3
 
 ### Added
