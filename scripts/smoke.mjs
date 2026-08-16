@@ -83,12 +83,34 @@ check('layer 1 surfaces both websocket records',
 check('layer 1 excludes unrelated records',
   !topics.some((t) => t.includes('virtualized')));
 
+// Without this the index gives a reader nothing to choose on, so they expand
+// at random and pay a whole body per guess. FTS5 and ts_headline centre the
+// fragment on the match; Mongo's $text cannot, and returns the head of the body.
+const withSnippet = hits.filter((h) => h.snippet);
+check('keyword hits carry a snippet', withSnippet.length > 0,
+  `${withSnippet.length}/${hits.length}`);
+check('a snippet is one line and bounded',
+  withSnippet.every((h) => !h.snippet.includes('\n') && h.snippet.length <= 120),
+  withSnippet[0]?.snippet);
+check('a snippet shows body text the title does not',
+  withSnippet.some((h) => !h.title.includes(h.snippet.replace(/…/g, '').trim().slice(0, 20))),
+  withSnippet[0]?.snippet);
+
 // Tags carry the repository or top-level directory an observation touched, so
 // they have to be searchable on every backend. "performance" is in tags only,
 // in no title and no body.
 const byTag = await search.search({ text: 'performance', project, limit: 5 });
 check('tags are searchable, not just titles and bodies', byTag.length === 2,
   `${byTag.length} hits`);
+
+// Ranking on a tag is not the same as filtering by one. A workspace pooling
+// several repositories under one project could not ask for just one of them.
+const scoped = await search.search({ text: 'websocket', project, tag: 'auth', limit: 5 });
+check('tag filter narrows to one area',
+  scoped.length === 1 && scoped[0].title.includes('reconnect storm'),
+  scoped.map((h) => h.title).join(' | '));
+check('tag filter matches whole tags, not prefixes',
+  (await search.search({ text: 'websocket', project, tag: 'real', limit: 5 })).length === 0);
 
 // filters
 const onlyDeadends = await search.search({ text: 'redux', project, kind: 'deadend', limit: 5 });
@@ -140,6 +162,22 @@ if (expected === 'sqlite') {
     `${orphans} orphan posting(s)`);
 }
 
+// `use` reads this before init() creates our tables, so it can say "this
+// database already holds 14 other collections" instead of quietly adding two
+// to somebody's production database, which is what it did.
+check('inventory reports none of our own tables',
+  (await store.inventory()).every((name) => !/^(sessions|observations)/.test(name)),
+  (await store.inventory()).join(','));
+
+if (expected === 'sqlite') {
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(uri);
+  raw.exec('CREATE TABLE IF NOT EXISTS orders (id TEXT)');
+  raw.close();
+  check('inventory reports a table that is not ours',
+    (await store.inventory()).includes('orders'), (await store.inventory()).join(','));
+}
+
 const current = await search.search({ text: 'quorbit', project, limit: 5 });
 check('re-ingest keeps the newest version searchable',
   current.length === 1 && current[0].title.includes('Quorbit'),
@@ -173,6 +211,22 @@ check('remember titles from the first line',
 const recalled = await search.search({ text: 'pnpm lockfiles churn', project, limit: 5 });
 check('a remembered note is searchable like any other',
   recalled.some((hit) => hit.id === noted.id), `${recalled.length} hits`);
+
+// A survey of the codebase has to be re-runnable as the codebase changes, so
+// the second run must edit the note rather than leave a stale copy beside it.
+const profile = { project, kind: 'context', key: 'profile:stack', tags: ['inferred'] };
+const first = await remember(ctx, { ...profile, text: 'Node 22 and SQLite' });
+const second = await remember(ctx, { ...profile, text: 'Node 22, SQLite and pgvector' });
+check('a keyed note keeps one identity across runs', first.id === second.id,
+  `${first.id} vs ${second.id}`);
+const [stored] = await store.getObservations([first.id]);
+check('re-remembering a key replaces what was there',
+  stored.body.includes('pgvector') && !stored.body.includes('and SQLite\n'), stored.body);
+// Everything else in here is a record of something that happened; a generated
+// profile is a reading of the code, and a search result must not blur the two.
+check('an inferred note is tagged as inferred', stored.tags.includes('inferred'),
+  stored.tags.join(','));
+await store.remove({ ids: [first.id] });
 
 // The guard that matters most here: forget with nothing resolvable must not
 // be read as "no filter", which is how reset asks to delete everything.

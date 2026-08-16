@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
-import { isWholeScope } from '../adapter.js';
+import { foreignNames, isWholeScope } from '../adapter.js';
 import type {
   ListFilter,
   Observation,
@@ -16,6 +16,7 @@ import type {
 } from '../../types.js';
 import { cosine, packVector, unpackVector } from '../../util/vector.js';
 import { scopeToken } from '../../util/scope.js';
+import { toSnippet } from '../../util/snippet.js';
 import { partitionIds } from '../../util/shortid.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -250,6 +251,16 @@ export class SqliteStore implements MemoryStore {
     }));
   }
 
+  async inventory(): Promise<string[]> {
+    const rows = this.db
+      .prepare(
+        `SELECT name FROM sqlite_master
+         WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'`,
+      )
+      .all() as Row[];
+    return foreignNames(rows.map((row) => String(row['name'] ?? '')));
+  }
+
   async searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]> {
     // The project constraint goes inside the MATCH expression, not the WHERE
     // clause. Filtering after the match makes FTS5 rank every project's
@@ -263,6 +274,10 @@ export class SqliteStore implements MemoryStore {
     if (query.kind) {
       conditions.push('o.kind = ?');
       params.push(query.kind);
+    }
+    if (query.tag) {
+      conditions.push(TAG_PREDICATE('o.'));
+      params.push(query.tag);
     }
     if (query.since !== undefined) {
       conditions.push('o.created_at >= ?');
@@ -278,9 +293,14 @@ export class SqliteStore implements MemoryStore {
     // weights (title, body, tags, scope) make a hit in the one-sentence claim
     // outrank the same word buried in a long body; scope carries no weight
     // because it is a filter, not a relevance signal.
+    // snippet() over column 1 (body) returns the matched fragment, which is
+    // what makes a result choosable without expanding it. Markers are empty
+    // because the fragment itself is the signal; single-quoted, since SQLite
+    // reads a double-quoted literal as an identifier.
     const rows = this.db
       .prepare(
         `SELECT o.id, o.kind, o.title, o.project, o.created_at,
+                snippet(observations_fts, 1, '', '', '…', 14) AS snippet,
                 -bm25(observations_fts, 10.0, 1.0, 5.0, 0.0) AS score
          FROM observations_fts
          JOIN observations o ON o.rowid = observations_fts.rowid
@@ -406,6 +426,13 @@ function removeWhere(filter: RemoveFilter): { where: string; params: unknown[] }
   };
 }
 
+/**
+ * Exact membership in the stored JSON array, rather than a LIKE over the raw
+ * text, so `api` cannot match `api-docs` and a tag containing `%` is harmless.
+ */
+const TAG_PREDICATE = (prefix: string): string =>
+  `EXISTS (SELECT 1 FROM json_each(${prefix}tags) WHERE value = ?)`;
+
 function appendScope(
   query: SearchQuery,
   conditions: string[],
@@ -419,6 +446,10 @@ function appendScope(
   if (query.kind) {
     conditions.push(`${prefix}kind = ?`);
     params.push(query.kind);
+  }
+  if (query.tag) {
+    conditions.push(TAG_PREDICATE(prefix));
+    params.push(query.tag);
   }
   if (query.since !== undefined) {
     conditions.push(`${prefix}created_at >= ?`);
@@ -502,7 +533,7 @@ function toObservation(row: Row): Observation {
 }
 
 function toIndexEntry(row: Row): ObservationIndexEntry {
-  return {
+  const entry: ObservationIndexEntry = {
     id: row['id'] as string,
     kind: row['kind'] as ObservationKind,
     title: row['title'] as string,
@@ -510,4 +541,7 @@ function toIndexEntry(row: Row): ObservationIndexEntry {
     createdAt: Number(row['created_at']),
     score: Number(row['score'] ?? 0),
   };
+  const snippet = toSnippet(row['snippet']);
+  if (snippet) entry.snippet = snippet;
+  return entry;
 }

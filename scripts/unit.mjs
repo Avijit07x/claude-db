@@ -97,6 +97,20 @@ const notARule = observationsFromTurns(
 check('"always" in a complaint is not a preference', notARule[0].kind !== 'preference',
   notARule[0].kind);
 
+// `because` explains as readily as it decides, and matched 98 of 471 stored
+// decisions on its own — half the database was one kind, so the filter stopped
+// narrowing anything.
+const explained = observationsFromTurns([turn({
+  prompt: 'fix the flaky test', reasoning: 'It was flaky because the clock was mocked.',
+})], 's1', '/p', config);
+check('"because" alone no longer makes a decision', explained[0].kind === 'bugfix',
+  explained[0].kind);
+
+const weighed = observationsFromTurns([turn({
+  prompt: 'pick an index', reasoning: 'Went with FTS5 instead of a trigram index.',
+})], 's1', '/p', config);
+check('a weighed alternative still is', weighed[0].kind === 'decision', weighed[0].kind);
+
 // Titles are the whole payload of a search result. Measured on a real database,
 // about half were transitions like these, so nothing ever surfaced the body.
 const narrated = observationsFromTurns([turn({
@@ -111,11 +125,29 @@ const chatty = observationsFromTurns([turn({
 check('and skips conversational filler',
   chatty[0].title.startsWith('FTS5 keeps'), chatty[0].title);
 
+// When the whole reply is narration the prompt is the only record of intent,
+// and intent beats "Working through the improvements now." — which is what one
+// turn in this project's own memory was titled.
 const allNarration = observationsFromTurns([turn({
-  reasoning: 'Now doing the thing:\nLet me start with that.',
+  prompt: 'store the api key somewhere',
+  reasoning: 'Working through the improvements now.\nLet me start with that.',
 })], 's1', '/p', config);
-check('falls back to the opening when every sentence announces',
-  allNarration[0].title.length > 0, allNarration[0].title);
+check('a reply that only narrates falls back to what was asked',
+  allNarration[0].title === 'store the api key somewhere', allNarration[0].title);
+
+// Skipping announcements alone still lets a merely-neutral opening win, which
+// is how "Working through the improvements now." became a stored title.
+const buried = observationsFromTurns([turn({
+  reasoning: 'Working through the improvements now.\nMoved the sweep into flush.ts so a cursor without a transcript is dropped.',
+})], 's1', '/p', config);
+check('a neutral opening loses to a later sentence carrying evidence',
+  buried[0].title.startsWith('Moved the sweep'), buried[0].title);
+
+const pasted = observationsFromTurns([turn({
+  reasoning: 'Notes from the session follow.\nToken is "sk-abcdefghijkl1234567890".',
+})], 's1', '/p', config);
+check('a redacted secret does not count as evidence',
+  pasted[0].title.startsWith('Notes from'), pasted[0].title);
 
 const excluded = observationsFromTurns([turn({ files: ['/p/.env'] })], 's1', '/p', config);
 check('excluded paths are never stored', excluded.length === 0);
@@ -144,6 +176,63 @@ check('turns that changed nothing are dropped', chatter.length === 0);
     summarize([obs('decision', 'a')], 'a | b') === 'a | b');
 }
 
+// --- snippets and body clipping ---------------------------------------------
+{
+  const { toSnippet, clipBody } = await import('../dist/util/snippet.js');
+
+  check('a snippet collapses to one line',
+    toSnippet('first line\n\nsecond   line') === 'first line second line',
+    toSnippet('first line\n\nsecond line'));
+  // ts_headline wraps matches in <b> by default, which is noise once the
+  // fragment itself is the signal.
+  check('search-engine match markers are stripped',
+    toSnippet('the <b>cursor</b> was stale') === 'the cursor was stale');
+  check('markdown table pipes are stripped',
+    !toSnippet('| a | b |').includes('|'), toSnippet('| a | b |'));
+  // Underscores read as emphasis and are almost always an identifier; stripping
+  // them turned aggregation_cursor.js into two words that match nothing.
+  check('identifiers survive intact',
+    toSnippet('at aggregation_cursor.js:46').includes('aggregation_cursor.js'),
+    toSnippet('at aggregation_cursor.js:46'));
+  check('an empty body yields no snippet', toSnippet('   ') === undefined);
+  check('a missing body yields no snippet', toSnippet(undefined) === undefined);
+  check('a long snippet is cut at a word boundary',
+    toSnippet('x'.repeat(20) + ' ' + 'word '.repeat(40), 40).endsWith('…'),
+    toSnippet('x'.repeat(20) + ' ' + 'word '.repeat(40), 40));
+
+  // Layer 3 takes 25 ids at once, so the cost argument that made the index
+  // terse bites far harder here than in the index it was written for.
+  check('a short body is returned whole', clipBody('short', 2000) === 'short');
+  const clipped = clipBody('y'.repeat(5000), 2000);
+  check('a long body is bounded', clipped.startsWith('y'.repeat(2000)) && clipped.length < 2100);
+  check('and says how much was withheld', clipped.includes('3000 more characters'), clipped.slice(-60));
+}
+
+// --- layer rendering ----------------------------------------------------------
+{
+  const { renderIndex, renderFull } = await import('../dist/mcp/render.js');
+  const row = (over = {}) => ({
+    id: '31ad1fc9-f168-800b-28f2-d529d2ff4cc2', kind: 'decision',
+    title: 'Committed as 30daa92', project: '/p', createdAt: Date.parse('2026-08-15'),
+    score: 0.03, ...over,
+  });
+
+  const shown = renderIndex([row({ snippet: 'the cursor sweep runs during flush' })]);
+  check('the index shows the snippet under the title',
+    shown.includes('Committed as 30daa92\n    the cursor sweep runs'), JSON.stringify(shown));
+  // A row only vector search found has no query terms to centre on, so it
+  // renders as it always did rather than as a blank line.
+  check('a row without a snippet renders on one line',
+    renderIndex([row()]).split('\n').length === 2, JSON.stringify(renderIndex([row()])));
+  check('an empty result set still says so',
+    renderIndex([]) === 'No matching observations.');
+
+  const full = renderFull(
+    { ...row(), body: 'b'.repeat(9000), files: ['/p/a.ts'], author: 'ada' }, 2000);
+  check('layer 3 bounds the body it returns', full.includes('7000 more characters'));
+  check('layer 3 keeps the metadata header', full.includes('who: ada') && full.includes('files: /p/a.ts'));
+}
+
 // --- embedding width --------------------------------------------------------
 {
   const { cosine } = await import('../dist/util/vector.js');
@@ -164,14 +253,15 @@ check('turns that changed nothing are dropped', chatter.length === 0);
 // --- install / uninstall ------------------------------------------------------
 {
   const { install, uninstall } = await import('../dist/cli/install.js');
-  const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import('node:fs');
+  const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
 
   // Project scope only: it writes files inside the given directory and never
-  // shells out, so this stays hermetic.
+  // shells out, so this stays hermetic. `dist` is placed so that its sibling
+  // `skills/` directory is the real one shipped with the package.
   const repo = mkdtempSync(join(tmpdir(), 'install-'));
-  const dist = join(repo, 'dist');
+  const dist = new URL('../dist', import.meta.url).pathname;
   const read = (name) => {
     try {
       return JSON.parse(readFileSync(join(repo, name), 'utf8'));
@@ -193,6 +283,11 @@ check('turns that changed nothing are dropped', chatter.length === 0);
     guidance.split('claude-db:start').length - 1 === 1);
   check('the user\'s own notes are left alone', guidance.includes('Something the user wrote.'));
 
+  // The scan skill ships with the package and is installed like the hooks, so
+  // a fresh project has a way to seed memory before it has any history.
+  check('install writes the scan skill',
+    readFileSync(join(repo, '.claude/skills/cdb-scan/SKILL.md'), 'utf8').includes('profile:stack'));
+
   const settings = read('.claude/settings.local.json');
   check('install registers every hook exactly once',
     Object.values(settings.hooks).every((entries) => entries.length === 1),
@@ -205,6 +300,8 @@ check('turns that changed nothing are dropped', chatter.length === 0);
   check('uninstall removes the mcp server even when it was the only one',
     !read('.mcp.json').mcpServers, JSON.stringify(read('.mcp.json')));
   check('uninstall removes the hooks', !read('.claude/settings.local.json').hooks);
+  check('uninstall removes the scan skill',
+    !existsSync(join(repo, '.claude/skills/cdb-scan')));
 
   const afterRemoval = readFileSync(join(repo, 'CLAUDE.local.md'), 'utf8');
   check('uninstall takes back only its own instructions',
@@ -232,6 +329,92 @@ check('turns that changed nothing are dropped', chatter.length === 0);
   check('and not again within the day', !isDue({ checkedAt: Date.now() }));
   check('but is due after one', !isDue({ checkedAt: Date.now() - 23 * 3600_000 })
     && isDue({ checkedAt: Date.now() - 25 * 3600_000 }));
+}
+
+// --- seeding from git ---------------------------------------------------------
+{
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { observationsFromGit } = await import('../dist/capture/index.js');
+
+  const repo = mkdtempSync(join(tmpdir(), 'seed-'));
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'ada', GIT_AUTHOR_EMAIL: 'ada@example.com',
+    GIT_COMMITTER_NAME: 'ada', GIT_COMMITTER_EMAIL: 'ada@example.com',
+  };
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], { env, stdio: 'ignore' });
+
+  git('init', '-q');
+  mkdirSync(join(repo, 'src'));
+  writeFileSync(join(repo, 'src', 'index.ts'), 'export const x = 1\n');
+  git('add', '-A');
+  git('commit', '-qm', 'feat: went with FTS5 instead of a trigram index',
+    '-m', 'The tokenizer is builtin, so there is no extension to install.');
+
+  // Releases touch files like any other commit, so the skip has to come from
+  // reading the subject, not from the commit being empty.
+  writeFileSync(join(repo, 'src', 'index.ts'), 'export const x = 2\n');
+  git('add', '-A');
+  git('commit', '-qm', '0.2.0');
+
+  const seeded = observationsFromGit(repo, 10);
+  check('a commit becomes an observation', seeded.length === 1, `${seeded.length} kept`);
+  check('a version bump is not memory', !seeded.some((o) => o.title === '0.2.0'));
+  check('the subject becomes the title',
+    seeded[0].title === 'feat: went with FTS5 instead of a trigram index', seeded[0].title);
+  check('the commit body becomes the reasoning',
+    seeded[0].body.includes('tokenizer is builtin'));
+  check('changed files are attributed',
+    seeded[0].files.some((f) => f.endsWith('src/index.ts')), seeded[0].files.join(','));
+  check('the directory becomes a tag', seeded[0].tags.includes('src'), seeded[0].tags.join(','));
+  check('the commit author is recorded', seeded[0].author === 'ada', seeded[0].author);
+  check('a weighed alternative is classified as a decision',
+    seeded[0].kind === 'decision', seeded[0].kind);
+  // Ids come from the sha, so seeding twice rewrites rather than duplicates.
+  check('re-seeding produces the same ids',
+    observationsFromGit(repo, 10)[0].id === seeded[0].id);
+
+  rmSync(repo, { recursive: true, force: true });
+}
+
+// --- cursor sweep -------------------------------------------------------------
+{
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+
+  // CONFIG_DIR is derived from the home directory at import time, so a
+  // fabricated $HOME in a child process is the only way to sweep safely.
+  const home = mkdtempSync(join(tmpdir(), 'sweep-'));
+  mkdirSync(join(home, '.claude-memory', 'cursors'), { recursive: true });
+  mkdirSync(join(home, '.claude', 'projects', 'proj'), { recursive: true });
+  writeFileSync(join(home, '.claude', 'projects', 'proj', 'live.jsonl'), '{}\n');
+  for (const name of ['live', 'dead']) {
+    writeFileSync(join(home, '.claude-memory', 'cursors', `${name}.offset`), '42');
+  }
+
+  const probe = join(home, 'probe.mjs');
+  writeFileSync(probe, `
+    import { sweepCursors } from ${JSON.stringify(new URL('../dist/capture/index.js', import.meta.url).href)};
+    process.stdout.write(String(sweepCursors()));
+  `);
+  const removed = execFileSync(process.execPath, [probe], {
+    env: { ...process.env, HOME: home }, encoding: 'utf8',
+  });
+
+  const left = readdirSync(join(home, '.claude-memory', 'cursors'));
+  check('a cursor whose transcript is gone is swept', removed === '1' && !left.includes('dead.offset'),
+    left.join(','));
+  // Cursors are keyed by session alone, so sweeping one project's must never
+  // discard another's: losing a live cursor costs a full 90MB re-read.
+  check('a cursor with a transcript still on disk survives', left.includes('live.offset'),
+    left.join(','));
+
+  rmSync(home, { recursive: true, force: true });
 }
 
 // --- adapter resolution -----------------------------------------------------
