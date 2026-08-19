@@ -15,3 +15,4 @@ export const LINKS = {
 
 export const INSTALL = 'npm install -g claude-db';
 export const AUTHOR = 'Avijit Dey';
+export const CLARITY_ID = 'y4wh2cg9s2';
