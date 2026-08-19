@@ -1,5 +1,86 @@
 # Changelog
 
+## 0.5.0
+
+`find_usages` could only ever answer "where does this string appear". It could
+not say *how* two things relate — a call, an import, an inherit — or trace how
+one symbol reaches another, and it re-paid the full search cost on every
+question.
+
+### Added
+
+- **A code graph, built by `claude-db scan`.** Every source file is parsed with
+  ast-grep and stored as symbols plus the relationships between them. Parsing
+  is local, deterministic and costs no tokens; a rescan re-parses only files
+  whose contents changed, so it is seconds the first time and milliseconds
+  after. TypeScript, TSX, JavaScript, Python, Go and Rust, with the parser
+  shipped as a prebuilt binary per platform so nothing compiles at install
+- **Three new `find_usages` modes**, on the CLI and over MCP: `usages` lists
+  what references a symbol with the relation on each line, `explain` adds what
+  the symbol reaches, and `path` traces how two symbols connect. `text` remains
+  the default and still needs no scan
+- **Every edge carries its confidence.** `EXTRACTED` means it was read literally
+  out of the syntax tree; `INFERRED` means the target was matched by name across
+  files, and carries a score. Name matching is the one guess this makes, so it
+  is labelled rather than presented as fact
+- **A class links to the members it defines**, so a path can cross the class
+  boundary — `boot --> App --> start --> helper` rather than stopping dead at
+  the class, which is where the obvious chain used to break
+- **Work is tracked as unfinished until it is committed.** A captured turn is
+  stored `open` and closes once every file it touched has landed in a commit,
+  which the existing flush already checks — there is no new hook to stop
+  firing. `claude-db status` lists what is still open, and SessionStart injects
+  the newest few, so a fresh chat can answer "what was I doing" instead of
+  searching for words that a prompt like "do the last task" does not contain.
+  Closing is one-way: touching a file again does not reopen finished work, and
+  rows written before this release stay `done` rather than all appearing
+  unfinished
+- **Updating the package is now enough.** The skill and the standing
+  instruction were copied to disk at install time, so `npm i -g claude-db` left
+  them frozen at whatever shipped when install was last run — you had to
+  remember to re-run it. The hooks are registered by absolute path into the
+  package, so they always run the current code; SessionStart now compares those
+  copies against the packaged ones and repairs them. It only ever refreshes
+  what already exists, so nothing is installed behind your back and an
+  uninstalled skill is not resurrected
+- **`/cdb-scan` now runs in two passes** — the deterministic graph first, then
+  the written `profile:*` notes on top of it
+
+### Fixed
+
+- **A NUL byte in `src/capture/manual.ts` made the whole file invisible to**
+  **`find_usages`.** It was committed, renders as a space in every editor, and
+  made git classify a source file as binary — which `-I` then skipped, so a
+  lookup for `remember` returned 32 matches and omitted `remember()`'s own
+  definition. The separator is now written as an escape, which is byte-identical
+  so no stored id changed. A check now fails if any tracked source file contains
+  a NUL, since any such file would be invisible the same way
+- **`--context` counted context lines as matches.** `git grep -z` replaces both
+  the match and context separators with the same NUL, so `-B`/`-A` output could
+  not be told apart from real hits: `total` was inflated, truncation was wrong,
+  and context lines consumed the `limit` budget. Context is now reconstructed
+  from disk after the real matches are known
+- **A `path` pointing at a single file threw instead of scoping to it**, though
+  the tool documented that it accepted one — `git -C` requires a directory
+- **MongoDB's Atlas vector path scored across embedding models.** Every other
+  search path filtered on the embedder that produced a vector; the indexed
+  Atlas path did not, so switching models silently ranked incomparable vectors
+
+### Changed
+
+- Prettier now formats the project, with the config checked in
+- The CLI, the three store adapters and the test scripts are split by
+  responsibility; no source file is over 250 lines
+
+### Upgrading
+
+Nothing changes until you run `claude-db scan`, which builds the graph and adds
+three tables. Postgres gains its tables on first connection after the upgrade.
+
+This release adds real dependencies for the first time — the ast-grep parser
+and graphology — so an install is roughly 23 MB larger. They are prebuilt, so
+there is still no compile step.
+
 ## 0.4.1
 
 ### Fixed
