@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/next';
 import type { Metadata } from 'next';
 import { Azeret_Mono, Bricolage_Grotesque, IBM_Plex_Sans } from 'next/font/google';
 import { SITE } from '@/lib/site';
@@ -84,6 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(SCHEMA) }}
         />
         {children}
+        <Analytics />
       </body>
     </html>
   );
