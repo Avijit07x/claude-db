@@ -35,6 +35,8 @@
     "local": "node scripts/local.mjs",
     "try": "node scripts/try.mjs",
     "bench": "node scripts/bench.mjs",
+    "bench:tokens": "node scripts/bench-tokens.mjs",
+    "bench:ab": "node scripts/bench-ab.mjs",
     "postinstall": "node -e \"const v=process.versions.node.split('.').map(Number); if(v[0]<22||(v[0]===22&&v[1]<5)){console.error('\\n  claude-db needs Node >= 22.5 (node:sqlite is builtin from there). You have '+process.versions.node+'.\\n');process.exit(1)}\"",
     "prepublishOnly": "npm run build && npm test",
     "format": "prettier --write .",

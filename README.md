@@ -8,16 +8,26 @@
 
 ---
 
-## What it is
+## Every session starts from zero
 
-Claude Code forgets everything when a session ends. Next time you open it, you
-re-explain the architecture, why you chose X over Y, and what already failed.
+You spent an hour yesterday explaining why the store uses three adapters, which
+approach you already tried and abandoned, and why that one function must not be
+touched. Today Claude knows none of it. So you explain it again.
 
-claude-db records those decisions as you work and gives them back
-automatically. Local by default, no account, no subscription.
+claude-db fixes that, and the other half too — Claude re-derives your codebase
+every time, grepping a name and opening files to work out what calls what.
 
-It also maps your code: `claude-db scan` builds a graph of every symbol and how
-they connect, so "what breaks if I change this" is a query instead of a grep.
+```console
+$ claude-db search "why does capture read the transcript"
+
+83cf1246-eb14  decision  2026-08-19  Tested and written up.
+    …the old defaults prompt was now cut why does capture read the transcript…
+88fab24f-5e59  decision  2026-08-19  Finding 4's other half needs checking…
+    …cannot work: 0.029483 "why does capture read…" <- highly relevant…
+```
+
+You never run that command. Claude gets the same context injected on every
+prompt, so it walks in already knowing. Nothing leaves your machine.
 
 ## Install
 
@@ -37,18 +47,17 @@ writes `.claude/settings.local.json` and `.mcp.json` — add `.mcp.json` to your
 
 ## Map your code
 
+Memory fills itself as you work. The code graph needs one command:
+
 ```bash
 claude-db scan
-
-claude-db usages --mode explain resolveProject
-claude-db usages --mode path cmdScan observationId
 ```
 
-Claude gets the same four modes through MCP: `text` (a live grep, no scan
-needed), `usages`, `explain` and `path`. Answers re-check the working tree
-before replying, so they never report a line the source has moved past.
+Claude then gets four modes through MCP — `text` (a live grep, works with no
+scan at all), `usages`, `explain` and `path`. Re-running `scan` is cheap: it
+hashes files and re-parses only what changed.
 
-Works out of the box on TypeScript, TSX, JavaScript, Python, Go and Rust — the
+Works out of the box on TypeScript, TSX, JavaScript, Python, Go and Rust. The
 parser ships with the package, so there is nothing else to install.
 
 ## Use another database
@@ -63,6 +72,26 @@ claude-db use "postgres://user:pass@host:5432/memory"
 
 Install the driver you need (`npm install mongodb` or `pg`); neither ships by
 default.
+
+## With it, and without it
+
+Asking _who defines and calls `closeObservations`_ by hand means a grep, then
+opening three store adapters to see which hits are definitions. One `explain`
+call answers it already classified — **2.1x cheaper**, measured across eight
+real symbols in this repo.
+
+Recall costs ~190 tokens per prompt, skipped entirely on 28% of prompts because
+the answer is already in context. It behaves like a subscription:
+
+```
+  every session pays     3,600 tokens   (~180/prompt x 20 prompts)
+  every lookup refunds     597 tokens   (1,115 by hand - 518 with)
+  so it pays for itself at 6 lookups in a session
+```
+
+Check it on your own repo — `npm run bench:ab` and `npm run bench:tokens` from
+a clone. [With and without](./docs/with-and-without.md) has every number,
+including the symbols where plain grep wins.
 
 ## Commands
 
@@ -115,6 +144,8 @@ before anything is written.
 
 - [How it works](./docs/how-it-works.md) — what gets captured and injected, how
   the code graph is built and kept current, and how the database backends differ
+- [With and without](./docs/with-and-without.md) — the same questions answered
+  both ways, measured, including where it does not pay off
 - [Changelog](./CHANGELOG.md)
 
 ## Development
@@ -122,7 +153,7 @@ before anything is written.
 ```bash
 npm install
 npm run build
-npm test      # 263 checks
+npm test      # 326 checks
 npm run try   # simulate a session, touches nothing
 npm run format
 ```

@@ -198,6 +198,56 @@ if (injection) {
   }
 }
 
+const PROMPTS = [
+  'why does capture read the transcript',
+  'how do we close work when a commit lands',
+  'postgres status column bug',
+  'what did we change about find_usages',
+  'how is the code graph kept fresh',
+];
+
+const { createContext } = await import('../dist/context.js');
+const { renderPromptContext } = await import('../dist/hooks/relevance.js');
+const ctx = await createContext();
+const cfg = ctx.config.inject;
+
+console.log('\nINJECTION — what one prompt costs now, vs the old defaults');
+console.log('-'.repeat(70));
+console.log(`  ${pad('prompt', 40)}${num('was', 7)}${num('now', 7)}${num('cut', 7)}`);
+console.log('-'.repeat(70));
+
+let wasTotal = 0;
+let nowTotal = 0;
+for (const prompt of PROMPTS) {
+  const entries = await ctx.search.search({ text: prompt, project: PROJECT, limit: 4 });
+  if (entries.length === 0) continue;
+  const first = entries[0];
+  if (!first) continue;
+
+  const was = renderPromptContext(entries, 500, await ctx.search.getObservations([first.id]), 900);
+  const now = renderPromptContext(entries, cfg.promptMaxChars, [], cfg.expandMaxChars);
+  const wasLen = was?.length ?? 0;
+  const nowLen = now?.length ?? 0;
+  wasTotal += wasLen;
+  nowTotal += nowLen;
+  console.log(
+    `  ${pad(prompt.slice(0, 38), 40)}${num(wasLen, 7)}${num(nowLen, 7)}` +
+      `${num(`${Math.round((1 - nowLen / wasLen) * 100)}%`, 7)}`,
+  );
+}
+console.log('-'.repeat(70));
+console.log(
+  `  ${pad('TOTAL chars', 40)}${num(wasTotal, 7)}${num(nowTotal, 7)}` +
+    `${num(`${Math.round((1 - nowTotal / wasTotal) * 100)}%`, 7)}`,
+);
+console.log(
+  `  ${pad('per prompt, tokens', 40)}${num(tok(wasTotal / PROMPTS.length), 7)}${num(tok(nowTotal / PROMPTS.length), 7)}`,
+);
+console.log(
+  `\n  defaults: expandTop=${cfg.expandTop} promptResults=${cfg.promptResults} promptMaxChars=${cfg.promptMaxChars}`,
+);
+await ctx.close();
+
 const recall = measureRecall('why does capture read the transcript');
 console.log('\nRECALL — asking "why is it like this"');
 console.log('-'.repeat(70));

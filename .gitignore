@@ -4,6 +4,8 @@ dist/
 # Internal benchmarking and planning notes, not part of the public repo
 SCALING.md
 PLAN*.md
+docs/mcp-findings.md
+docs/token-economics.md
 
 # Personal, per-machine agent instructions
 CLAUDE.local.md
