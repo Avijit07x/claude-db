@@ -11,13 +11,6 @@ import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
 
-/**
- * SessionEnd: final flush, and mark the session closed.
- *
- * This is no longer the only chance to capture anything. Prompts flush as they
- * happen, so a session that never reaches this hook has already been recorded.
- * All this adds is the tail of the last turn and an end timestamp.
- */
 await runHook(async () => {
   const payload = await readPayload();
   const sessionId = payload.session_id;
@@ -39,10 +32,6 @@ await runHook(async () => {
 
     clearCursor(sessionId);
 
-    // At session end rather than session start: `npm install -g` replaces the
-    // files these hooks import, and this is the moment least likely to have a
-    // hook running. Detached and unref'd, so the session never waits on the
-    // network or on npm.
     if (ctx.config.updates !== 'off' && isDue(readState())) {
       const cli = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'cli', 'index.js');
       spawn(process.execPath, [cli, 'update', '--quiet'], {

@@ -3,27 +3,17 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { resolveProject } from '../util/project.js';
 
-/** One exchange: what was asked, what was reasoned, what was done. */
 export interface Turn {
   prompt: string;
-  /** The assistant's prose for this turn. This is where the reasoning lives. */
   reasoning: string;
-  /** Files created or modified during the turn. */
   files: string[];
-  /** Shell commands run during the turn. */
   commands: string[];
   timestamp: number;
-  /** Byte offset in the transcript where this turn began. */
   offset: number;
 }
 
 export interface TranscriptRead {
   turns: Turn[];
-  /**
-   * Where the next read should resume: the start of the final turn, which may
-   * still be growing. Reprocessing that turn is harmless because observation
-   * ids are content-derived.
-   */
   nextOffset: number;
 }
 
@@ -35,15 +25,6 @@ interface RawEntry {
   };
 }
 
-/**
- * Claude Code already writes a complete record of every session to disk:
- * prompts, replies, and tool calls, appended as JSONL.
- *
- * Reconstructing that from `PostToolUse` hooks produces a strictly worse copy.
- * A hook sees a file path and nothing else; it never sees what the user asked
- * for or why the agent did what it did. Intent and reasoning are the entire
- * value of a memory, and they exist only here.
- */
 export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
   let fd: number;
   try {
@@ -55,16 +36,10 @@ export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
   try {
     const size = fstatSync(fd).size;
 
-    // A rotated or replaced transcript is shorter than where we left off.
-    // Restarting from zero is correct and cheap: ids are content-derived, so
-    // anything already stored is simply rewritten in place.
     const start = fromOffset > size ? 0 : fromOffset;
     const length = size - start;
     if (length <= 0) return { turns: [], nextOffset: size };
 
-    // Reading only the unseen tail is what keeps this viable: these files reach
-    // 90MB+ on long-running sessions, and a full read on every prompt would
-    // dominate hook latency and memory.
     const buffer = Buffer.allocUnsafe(length);
     const bytesRead = readSync(fd, buffer, 0, length, start);
     const raw = buffer.subarray(0, bytesRead).toString('utf8');
@@ -77,14 +52,10 @@ export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
       if (line.trim().length === 0) continue;
       try {
         entries.push({ entry: JSON.parse(line) as RawEntry, offset: lineStart });
-      } catch {
-        // A torn final line is normal on a file being appended to right now.
-      }
+      } catch {}
     }
 
     const turns = groupIntoTurns(entries);
-    // Hold the cursor at the last turn's start: it is still open and more
-    // assistant output may yet be appended to it.
     const nextOffset = turns.length > 0 ? (turns[turns.length - 1]?.offset ?? size) : size;
 
     return { turns, nextOffset };
@@ -93,14 +64,6 @@ export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
   }
 }
 
-/**
- * A turn opens at a user prompt and absorbs everything until the next one.
- *
- * This grouping is what lets an observation carry intent: the files written
- * after "can you create one icon" belong to that request, and saying so is the
- * difference between "wrote mouse-scroll-icon.tsx" and "created the first
- * Gestures-batch icon because you asked for one".
- */
 function groupIntoTurns(entries: { entry: RawEntry; offset: number }[]): Turn[] {
   const turns: Turn[] = [];
   let current: Turn | null = null;
@@ -110,7 +73,6 @@ function groupIntoTurns(entries: { entry: RawEntry; offset: number }[]): Turn[] 
 
     if (entry.type === 'user') {
       const text = extractText(entry.message?.content);
-      // Tool results arrive as `user` entries too; only real prose is a prompt.
       if (!text || isSyntheticPrompt(text)) continue;
 
       if (current) turns.push(current);
@@ -133,7 +95,6 @@ function groupIntoTurns(entries: { entry: RawEntry; offset: number }[]): Turn[] 
   return turns;
 }
 
-/** Content is either a plain string or an array of typed blocks. */
 function extractText(content: unknown): string {
   if (typeof content === 'string') return content.trim();
   if (!Array.isArray(content)) return '';
@@ -141,9 +102,7 @@ function extractText(content: unknown): string {
   return content
     .filter(
       (block): block is { type: string; text: string } =>
-        typeof block === 'object' &&
-        block !== null &&
-        (block as { type?: string }).type === 'text',
+        typeof block === 'object' && block !== null && (block as { type?: string }).type === 'text',
     )
     .map((block) => block.text)
     .join('\n')
@@ -171,10 +130,6 @@ function extractToolCalls(content: unknown): { file?: string; command?: string }
   return calls;
 }
 
-/**
- * Filters entries that are structurally user messages but not things a person
- * typed: injected reminders, hook output, interruption notices.
- */
 function isSyntheticPrompt(text: string): boolean {
   return (
     text.includes('<system-reminder>') ||
@@ -186,39 +141,18 @@ function isSyntheticPrompt(text: string): boolean {
   );
 }
 
-/**
- * Locates the transcript for a session.
- *
- * Claude Code passes `transcript_path` in the hook payload, which is
- * authoritative. The derived path is a fallback for other agents and for
- * backfilling sessions recorded before this existed: the project directory is
- * the absolute path with separators and dots replaced by dashes.
- */
 export function transcriptPathFor(project: string, sessionId: string): string {
   const slug = project.replace(/[/.]/g, '-');
   return join(homedir(), '.claude', 'projects', slug, `${sessionId}.jsonl`);
 }
 
-/**
- * Every transcript belonging to a project, including sessions started from one
- * of its subdirectories.
- *
- * Claude Code files transcripts under the directory the agent was launched in,
- * while memory is keyed on the repository root, and those differ the moment
- * anyone runs the agent from `repo/frontend`. Candidate directories are found
- * by prefix and then confirmed by the `cwd` each transcript records: the slug
- * maps both `/` and `.` to `-`, so it cannot tell `~/app` from `~/app-extra`,
- * and without the second step a flush would ingest a neighbour's history.
- */
 export function transcriptsFor(project: string): string[] {
   const root = join(homedir(), '.claude', 'projects');
   const slug = project.replace(/[/.]/g, '-');
 
   let candidates: string[];
   try {
-    candidates = readdirSync(root).filter(
-      (name) => name === slug || name.startsWith(`${slug}-`),
-    );
+    candidates = readdirSync(root).filter((name) => name === slug || name.startsWith(`${slug}-`));
   } catch {
     return [];
   }
@@ -240,13 +174,6 @@ export function transcriptsFor(project: string): string[] {
   return transcripts.sort();
 }
 
-/**
- * Every session id with a transcript still on disk, across all projects.
- *
- * Deliberately not filtered by project: this answers "does this session still
- * exist at all", which is the only safe question to ask before discarding
- * local state keyed on a session id alone.
- */
 export function sessionIdsOnDisk(): string[] {
   const root = join(homedir(), '.claude', 'projects');
   const ids: string[] = [];
@@ -262,14 +189,11 @@ export function sessionIdsOnDisk(): string[] {
       for (const name of readdirSync(join(root, dir))) {
         if (name.endsWith('.jsonl')) ids.push(name.slice(0, -'.jsonl'.length));
       }
-    } catch {
-      // Not a directory, or unreadable: nothing to learn from it.
-    }
+    } catch {}
   }
   return ids;
 }
 
-/** First cwd recorded in a transcript, without reading a 90MB file. */
 function transcriptCwd(path: string): string | null {
   let fd: number;
   try {
@@ -284,9 +208,7 @@ function transcriptCwd(path: string): string | null {
       try {
         const cwd = (JSON.parse(line) as { cwd?: string }).cwd;
         if (typeof cwd === 'string' && cwd.length > 0) return cwd;
-      } catch {
-        // Entry without a cwd, or the torn last line of the window.
-      }
+      } catch {}
     }
     return null;
   } finally {

@@ -1,12 +1,5 @@
 name: Publish
 
-# Pushing a version tag publishes. A plain push to main never does, so a merge
-# cannot accidentally ship.
-#
-# Deliberately not triggered by `release: published` as well. With both, the
-# usual flow (push a tag, then draft a Release from it) fires the job twice and
-# the second run fails on the "already on npm" guard, which looks like a broken
-# pipeline rather than the safety net doing its job.
 on:
   push:
     tags: ['v*']
@@ -18,8 +11,6 @@ jobs:
 
     permissions:
       contents: read
-      # Required for npm provenance: npm verifies the package was built by this
-      # workflow from this commit, and shows a "Provenance" badge on the listing.
       id-token: write
 
     steps:
@@ -66,7 +57,6 @@ jobs:
         run: npm test
 
       - name: Publish to npm
-        # --provenance ties the tarball to this commit and workflow.
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -8,18 +8,11 @@ export const CONFIG_DIR = join(homedir(), '.claude-memory');
 export const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 export const DEFAULT_DB_PATH = join(CONFIG_DIR, 'memory.db');
 
-/**
- * Precedence: CLAUDE_DB_URL env var, then config.json, then a local SQLite
- * file. The env var wins so CI and containers can point at a shared database
- * without rewriting config on disk.
- */
 export function loadConfig(): Config {
   let fileConfig: unknown = {};
   try {
     fileConfig = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-  } catch {
-    // Missing or unreadable config is not an error; defaults apply.
-  }
+  } catch {}
 
   const config = ConfigSchema.parse(fileConfig);
   const envUrl = process.env['CLAUDE_DB_URL']?.trim();

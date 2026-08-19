@@ -10,14 +10,13 @@ import { createContext } from '../context.js';
 import { toShortId } from '../util/shortid.js';
 import { renderFull, renderIndex } from './render.js';
 import { resolveProject } from '../util/project.js';
-import { findUsages, formatUsages } from '../usages/index.js';
+import { findUsages, formatUsages, repoRootFor } from '../usages/index.js';
+import { formatGraph, queryGraph, refreshGraph } from '../graph/index.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
 
-const KINDS = [
-  'decision', 'pattern', 'bugfix', 'context', 'deadend', 'preference',
-] as const;
+const KINDS = ['decision', 'pattern', 'bugfix', 'context', 'deadend', 'preference'] as const;
 
 function packageVersion(): string {
   try {
@@ -28,16 +27,6 @@ function packageVersion(): string {
   }
 }
 
-/**
- * Three read tools mirroring the progressive disclosure layers, plus two that
- * write. Tool descriptions spell out the intended order, because the saving
- * only materializes if the agent filters at `search` before calling
- * `get_observations`.
- *
- * `remember` exists because capture is inferred from transcripts, and a rule
- * is not an event: "we always use pnpm here" produces no edit and no command,
- * so the one thing most worth keeping is the one thing never recorded.
- */
 const ctx = await createContext();
 
 const server = new McpServer({ name: 'claude-db', version: packageVersion() });
@@ -165,7 +154,10 @@ server.tool(
     const observations = await ctx.search.getObservations(ids);
     return {
       content: [
-        { type: 'text', text: observations.map((obs) => renderFull(obs, chars)).join('\n\n---\n\n') },
+        {
+          type: 'text',
+          text: observations.map((obs) => renderFull(obs, chars)).join('\n\n---\n\n'),
+        },
       ],
     };
   },
@@ -173,14 +165,32 @@ server.tool(
 
 server.tool(
   'find_usages',
-  'Find real usages of a symbol or component name via `git grep` — a live read ' +
-    'of the current source, not a stored index, so it is never stale. Returns ' +
-    'file:line and the matching line, with a best-effort [definition?] marker on ' +
-    'lines that look like a declaration. Use this before editing or removing a ' +
-    'shared or exported name, or to answer "what uses this" (structure). Use ' +
-    '`search` instead for "why is this the way it is" (history).',
+  'Find real usages of a symbol, and how the code around it connects. ' +
+    '`mode: "text"` (default) is a live `git grep` — never stale, works with no ' +
+    'setup, and returns file:line with a best-effort [definition?] marker. The ' +
+    'other modes read the code graph built by `claude-db scan`, which knows a ' +
+    'call from an import from an inherit: "usages" lists what references the ' +
+    'symbol with the relation on each line, "explain" adds what the symbol ' +
+    'reaches, and "path" traces how two symbols connect (pass the second as ' +
+    '`target`). Graph answers re-parse anything that changed before replying, ' +
+    'so they cannot report a line the source has moved past. Every edge is ' +
+    'tagged EXTRACTED (read literally from the syntax) or INFERRED (matched by ' +
+    'name across files, with a score). Use `search` instead for "why is this ' +
+    'the way it is" (history).',
   {
-    symbol: z.string().min(1).max(200).describe('Exact name to search for, e.g. "useAuth" or "CartButton"'),
+    symbol: z
+      .string()
+      .min(1)
+      .max(200)
+      .describe('Exact name to search for, e.g. "useAuth" or "CartButton"'),
+    mode: z
+      .enum(['text', 'usages', 'explain', 'path'])
+      .default('text')
+      .describe(
+        'How to answer. "text" greps live and needs no scan; the rest query the ' +
+          'stored graph and return nothing useful until `claude-db scan` has run',
+      ),
+    target: z.string().optional().describe('The second symbol, for mode "path" only'),
     path: z
       .string()
       .optional()
@@ -210,9 +220,23 @@ server.tool(
       .default(100)
       .describe('Cap on matching lines returned; the result says how many more exist'),
   },
-  async ({ symbol, path, regex, context, limit }) => {
-    const result = findUsages({ symbol, regex, context, limit, ...(path ? { path } : {}) });
-    return { content: [{ type: 'text', text: formatUsages(result) }] };
+  async ({ symbol, mode, target, path, regex, context, limit }) => {
+    if (mode === 'text') {
+      const result = findUsages({ symbol, regex, context, limit, ...(path ? { path } : {}) });
+      return { content: [{ type: 'text', text: formatUsages(result) }] };
+    }
+
+    const root = repoRootFor(path ?? process.cwd());
+    const project = resolveProject(undefined);
+    const refreshed = await refreshGraph(ctx.store, root, project);
+    const answer = await queryGraph(ctx.store, project, {
+      mode,
+      symbol,
+      ...(target ? { target } : {}),
+      limit,
+    });
+    answer.refreshed = refreshed;
+    return { content: [{ type: 'text', text: formatGraph(answer, root) }] };
   },
 );
 

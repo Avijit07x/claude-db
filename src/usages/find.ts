@@ -1,18 +1,19 @@
 import { execFileSync } from 'node:child_process';
-import { realpathSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 
 export interface UsageMatch {
-  file: string; // relative to the repo root
+  file: string;
   line: number;
   text: string;
   isDefinition: boolean;
+  isMatch: boolean;
 }
 
 export interface UsagesResult {
   root: string;
   matches: UsageMatch[];
-  total: number; // full parsed count, before `limit` truncation
+  total: number;
   truncated: boolean;
 }
 
@@ -24,33 +25,13 @@ export interface FindUsagesInput {
   limit: number;
 }
 
-// A hit here means the term is too generic to be a symbol lookup at all; the
-// fix is a narrower query, not a bigger buffer.
 const MAX_BUFFER = 16 * 1024 * 1024;
 
-/**
- * Live `git grep`, never a persisted index.
- *
- * A symbol index that drifts from an edit is the same failure shape as every
- * silent-staleness bug this project has already shipped and fixed. This
- * re-derives the answer from the current source on every call, so there is
- * nothing to invalidate.
- */
 export function findUsages(input: FindUsagesInput): UsagesResult {
-  // realpath'd up front: git's own --show-toplevel always resolves symlinks
-  // (on macOS, tmpdir()'s /var/folders/... is itself a symlink to
-  // /private/var/folders/...), so comparing an un-resolved `start` against it
-  // below would produce a bogus, always-".."-prefixed relative path and
-  // silently disable scoping rather than apply it.
   const start = realpathSync(resolve(input.path ?? process.cwd()));
   const root = repoRootFor(start);
   const args = buildArgs(input);
 
-  // An explicit path narrows the search to that subtree; omitting it searches
-  // the whole repository. Defaulting to cwd's subtree would silently hide a
-  // usage that lives elsewhere in the repo — exactly the case this tool
-  // exists to catch — so only a caller who deliberately asked to narrow gets
-  // narrowed. git accepts a file or a directory here equally.
   if (input.path) {
     const scope = relative(root, start);
     if (scope && !scope.startsWith('..')) args.push('--', scope);
@@ -61,7 +42,6 @@ export function findUsages(input: FindUsagesInput): UsagesResult {
     raw = execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: MAX_BUFFER });
   } catch (error) {
     const err = error as { status?: number; stderr?: string; message: string };
-    // git grep exits 1 for "ran fine, found nothing" — not an error.
     if (err.status === 1) return { root, matches: [], total: 0, truncated: false };
     if (/maxBuffer/i.test(err.message)) {
       throw new Error(
@@ -75,27 +55,22 @@ export function findUsages(input: FindUsagesInput): UsagesResult {
   const parsed = parseGrepOutput(raw).map((row) => ({
     ...row,
     isDefinition: isDefinitionLike(input.symbol, row.text),
+    isMatch: true,
   }));
+  const kept = parsed.slice(0, input.limit);
 
   return {
     root,
-    matches: parsed.slice(0, input.limit),
+    matches: input.context > 0 ? withContext(root, kept, input.context) : kept,
     total: parsed.length,
     truncated: parsed.length > input.limit,
   };
 }
 
-/**
- * Deliberately not resolveProject(): that widens to the repository root for
- * MEMORY partitioning, and inside a workspace pooling several sibling repos
- * it can resolve to a directory that is not itself a git working tree, which
- * `git grep` cannot search at all. Delegating to git's own discovery keeps
- * this in sync with whatever repo git itself would act on (worktrees,
- * submodules, symlinks included) without a second implementation of the walk.
- */
-function repoRootFor(start: string): string {
+export function repoRootFor(start: string): string {
+  const dir = statSync(start).isDirectory() ? start : dirname(start);
   try {
-    return execFileSync('git', ['-C', start, 'rev-parse', '--show-toplevel'], {
+    return execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], {
       encoding: 'utf8',
     }).trim();
   } catch (error) {
@@ -104,23 +79,56 @@ function repoRootFor(start: string): string {
   }
 }
 
-function buildArgs({ symbol, regex, context }: FindUsagesInput): string[] {
-  // -I: skip binary files — a binary hit otherwise prints a headerless
-  // "Binary file X matches" line that corrupts the -z parse below.
-  // --untracked: a brand-new file the agent just created and has not `git
-  // add`ed yet is exactly the blast-radius case this tool exists for; without
-  // this flag it is silently invisible. Still respects .gitignore.
+function buildArgs({ symbol, regex }: FindUsagesInput): string[] {
   const args = ['grep', '-n', '-z', '-I', '--untracked'];
-  if (context > 0) args.push(`-B${context}`, `-A${context}`);
-  // Word-regexp only in literal mode: a regex author already controls their
-  // own boundaries, so imposing one on top would be a surprise, not a safety net.
   args.push(...(regex ? ['--extended-regexp'] : ['--fixed-strings', '--word-regexp']));
   args.push('-e', symbol);
   return args;
 }
 
-/** `-z` NUL-delimits path\0line\0content per record; a stray line with no
- *  NUL (a `--` context divider, a binary-match notice) is simply dropped. */
+function withContext(root: string, matches: UsageMatch[], context: number): UsageMatch[] {
+  const fileLines = new Map<string, string[] | null>();
+  const out: UsageMatch[] = [];
+  let lastFile = '';
+  let lastLineShown = 0;
+
+  for (const m of matches) {
+    let lines = fileLines.get(m.file);
+    if (lines === undefined) {
+      try {
+        lines = readFileSync(join(root, m.file), 'utf8').split('\n');
+      } catch {
+        lines = null;
+      }
+      fileLines.set(m.file, lines);
+    }
+    if (!lines) {
+      out.push(m);
+      continue;
+    }
+
+    const from = Math.max(1, m.line - context);
+    const to = Math.min(lines.length, m.line + context);
+    const start = m.file === lastFile ? Math.max(from, lastLineShown + 1) : from;
+    for (let n = start; n <= to; n += 1) {
+      out.push(
+        n === m.line
+          ? m
+          : {
+              file: m.file,
+              line: n,
+              text: lines[n - 1] ?? '',
+              isDefinition: false,
+              isMatch: false,
+            },
+      );
+    }
+    lastFile = m.file;
+    lastLineShown = to;
+  }
+  return out;
+}
+
 function parseGrepOutput(raw: string): { file: string; line: number; text: string }[] {
   const rows: { file: string; line: number; text: string }[] = [];
   for (const record of raw.split('\n')) {
@@ -133,12 +141,6 @@ function parseGrepOutput(raw: string): { file: string; line: number; text: strin
   return rows;
 }
 
-/**
- * Cheap, best-effort "this looks like the declaration" marker. Unlike
- * classifyTurn's `because` regression, this never hides or filters a line —
- * it only annotates one already-shown line, so a false positive costs a
- * wrong label, not a silently misfiled result.
- */
 function isDefinitionLike(symbol: string, text: string): boolean {
   const s = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(
@@ -153,10 +155,12 @@ function isDefinitionLike(symbol: string, text: string): boolean {
 export function formatUsages(result: UsagesResult): string {
   if (result.matches.length === 0) return `No usages of that symbol found under ${result.root}.`;
   const rows = result.matches.map(
-    (m) => `${m.file}:${m.line}${m.isDefinition ? '  [definition?]' : ''}  ${m.text.trim()}`,
+    (m) =>
+      `${m.file}${m.isMatch ? ':' : '-'}${m.line}${m.isDefinition ? '  [definition?]' : ''}  ${m.text.trim()}`,
   );
+  const shown = result.matches.filter((m) => m.isMatch).length;
   const header = result.truncated
-    ? `showing ${result.matches.length} of ${result.total}+ match(es) (raise \`limit\` or narrow \`symbol\`):`
+    ? `showing ${shown} of ${result.total}+ match(es) (raise \`limit\` or narrow \`symbol\`):`
     : `${result.total} match(es):`;
   return `${header}\n${rows.join('\n')}`;
 }

@@ -1,19 +1,44 @@
 ---
 name: cdb-scan
-description: Survey this codebase once and store a profile of it in project memory — stack, layout, conventions, workflows. Re-run any time to refresh it in place. Use when memory is newly installed on an existing project, or when the project has changed enough that the stored profile is stale.
+description: Map this codebase into project memory — a code graph of every symbol and how they connect, plus a written profile of stack, layout, conventions and workflows. Re-run any time to refresh both in place. Use when memory is newly installed on an existing project, or when the project has changed enough that the stored map is stale.
 ---
 
-# Survey this project into memory
+# Map this project into memory
 
 Everything else in claude-db's memory is testimony: it records what happened,
 turn by turn, as it happened. A fresh install knows none of that, and stays
 useless for weeks while it fills up.
 
-This fills the gap from the one source available on day one — the code itself.
-What you write here is **your reading of the codebase, not a record of events**,
-so it is tagged `inferred` and must never be phrased as history.
+This fills the gap from the one source available on day one — the code itself,
+in two passes.
 
-## How to run it
+## Pass 1 — the code graph
+
+Run this first, from the project root:
+
+```bash
+claude-db scan
+```
+
+It parses every supported source file and stores each symbol and each
+relationship between them: what calls what, what imports what, what extends
+what. It is deterministic, costs no tokens, and takes seconds. Report the
+symbol and edge counts it prints.
+
+Once it has run, `find_usages` answers structural questions from the graph:
+
+- `mode: "usages"` — what references this symbol, with the relation on each line
+- `mode: "explain"` — that, plus what the symbol itself reaches
+- `mode: "path"` with `target` — how two symbols connect
+
+Prefer those over reading files when the question is about structure.
+
+## Pass 2 — the written profile
+
+The graph records what the code _is_. It cannot say why the project is built
+this way, so the sections below capture that in prose. What you write here is
+**your reading of the codebase, not a record of events**, so it is tagged
+`inferred` and must never be phrased as history.
 
 Work through the sections below in order. For each one, look at the actual
 files, then call the `remember` MCP tool once with the given `key`.
