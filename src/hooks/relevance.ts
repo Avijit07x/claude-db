@@ -24,7 +24,8 @@ export function renderPromptContext(
   for (const entry of entries) {
     if (expandedIds.has(entry.id)) continue;
     const date = new Date(entry.createdAt).toISOString().slice(0, 7);
-    const line = `${toShortId(entry.id)} ${entry.kind} ${date} ${entry.title}`;
+    const head = `${toShortId(entry.id)} ${entry.kind} ${date} ${entry.title}`;
+    const line = entry.snippet ? `${head}\n    ${entry.snippet}` : head;
     if (line.length > budget) break;
     budget -= line.length + 1;
     lines.push(line);

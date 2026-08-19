@@ -32,6 +32,21 @@ export default async function run() {
     ].join('\n'),
   );
   writeFileSync(join(repo, 'src', 'helper.ts'), 'export function helper(n) {\n  return n;\n}\n');
+  writeFileSync(
+    join(repo, 'src', 'factory.ts'),
+    [
+      'export function makeIt() {',
+      '  const made = Widget.create(1);',
+      '  const { a, b } = pick(2);',
+      '  return made;',
+      '}',
+      '',
+      'run(() => {',
+      '  const thing = pick(3);',
+      '  return thing;',
+      '});',
+    ].join('\n'),
+  );
   writeFileSync(join(repo, 'notes.md'), '# not code\n');
   git('add', '-A');
   git('commit', '-qm', 'seed');
@@ -121,6 +136,46 @@ export default async function run() {
   check(
     'a never-committed file is scanned',
     untracked.symbols.some((s) => s.name === 'fresh'),
+  );
+
+  const inFactory = (name) =>
+    scan.edges.filter((e) => e.file === 'src/factory.ts' && e.dstName === name);
+
+  check(
+    'a static factory call references the class, not just the method',
+    inFactory('Widget').some((e) => e.relation === 'references'),
+    inFactory('Widget')
+      .map((e) => e.relation)
+      .join(','),
+  );
+  check(
+    'the object of a member call is not stored as a dotted non-symbol',
+    !scan.edges.some((e) => e.relation === 'references' && e.dstName.includes('.')),
+  );
+  check(
+    'a destructuring pattern is not stored as a symbol name',
+    !scan.symbols.some((s) => s.name.includes('{')),
+    scan.symbols
+      .map((s) => s.name)
+      .filter((n) => n.includes('{'))
+      .join(','),
+  );
+  check(
+    'a call is not attributed to the variable it is assigned to',
+    !scan.edges.some((e) => e.srcName === 'made' || e.srcName === 'thing'),
+    scan.edges
+      .filter((e) => e.srcName === 'made' || e.srcName === 'thing')
+      .map((e) => `${e.srcName}>${e.dstName}`)
+      .join(','),
+  );
+
+  const sameCall = scan.edges.filter(
+    (e) => e.file === 'src/factory.ts' && e.relation === 'calls' && e.line === 2,
+  );
+  check(
+    'one call yields one edge, not a qualified and a bare copy',
+    sameCall.length <= 1,
+    sameCall.map((e) => `${e.dstName}/${e.confidence}`).join(','),
   );
 
   check(

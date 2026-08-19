@@ -47,7 +47,9 @@ export class SearchService {
   }
 
   async timeline(query: TimelineQuery): Promise<ObservationIndexEntry[]> {
-    return this.store.timeline(query);
+    const [anchor] = await this.store.getObservations([query.observationId]);
+    if (!anchor) return [];
+    return this.store.timeline({ ...query, observationId: anchor.id });
   }
 
   async getObservations(ids: string[]): Promise<Observation[]> {

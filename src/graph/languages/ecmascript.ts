@@ -10,6 +10,7 @@ const SHARED_DEFINITIONS: DefinitionRule[] = [
 const SHARED_REFERENCES: ReferenceRule[] = [
   { kind: 'call_expression', field: ['function'], relation: 'calls' },
   { kind: 'call_expression', field: ['function', 'property'], relation: 'calls' },
+  { kind: 'call_expression', field: ['function', 'object'], relation: 'references' },
   { kind: 'new_expression', field: ['constructor'], relation: 'calls' },
   { kind: 'import_statement', field: ['source'], relation: 'imports' },
   { kind: 'export_statement', field: ['source'], relation: 'imports' },

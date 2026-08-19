@@ -25,6 +25,7 @@ interface Span {
 }
 
 const CALLABLE = new Set(['function', 'method', 'class']);
+const IDENTIFIER = /^[\w$]+$/;
 
 export function symbolId(project: string, file: string, name: string, kind: string): string {
   return observationId('graph', 0, `${project}\0${file}\0${name}\0${kind}`);
@@ -51,9 +52,10 @@ function enclosing(line: number, spans: Span[]): CodeSymbol | null {
     const width = span.end - span.start;
     if (CALLABLE.has(span.symbol.kind)) {
       if (!best || width < best.end - best.start) best = span;
-    } else if (!fallback || width < fallback.end - fallback.start) {
-      fallback = span;
+      continue;
     }
+    if (span.start === line) continue;
+    if (!fallback || width < fallback.end - fallback.start) fallback = span;
   }
   return (best ?? fallback)?.symbol ?? null;
 }
@@ -70,7 +72,7 @@ export function extractFile(file: SourceFile, project: string): Extraction {
     for (const node of root.findAll({ rule: { kind: rule.kind } })) {
       const named = resolveField(node, rule.field);
       const name = named?.text();
-      if (!named || !name) continue;
+      if (!named || !name || !IDENTIFIER.test(name)) continue;
 
       const line = named.range().start.line + 1;
       const symbol: CodeSymbol = {
@@ -117,6 +119,7 @@ export function extractFile(file: SourceFile, project: string): Extraction {
 
       const name = unquote(raw.trim());
       if (!name || /\s/.test(name)) continue;
+      if (rule.relation === 'references' && name.includes('.')) continue;
 
       const line = target.range().start.line + 1;
       references.push({

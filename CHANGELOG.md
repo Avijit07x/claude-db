@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.5.3
+
+### Fixed
+
+- **`timeline` could not accept the ids it was shown.** Every id that reaches a
+  caller is shortened to 13 characters for display, and `get_observations`
+  resolves those by prefix — but `timeline` matched exactly, in all three
+  adapters, and its miss surfaced as the plausible "No matching observations."
+  rather than an error. The tool had never worked over MCP. It now resolves the
+  anchor the same way `get_observations` does; the smoke test that missed this
+  fed it a full id straight from the store, the one input shape no real caller
+  produces, and now feeds a short one.
+- **`Class.method()` did not count as a reference to `Class`.** A member call
+  produced edges to the method and to the qualified name, never to the object,
+  so a class only ever built through a static factory looked unreferenced —
+  including every store backend in this project, where `SqliteStore.create(uri)`
+  is the sole construction site. A blast-radius check would have reported one
+  caller (itself) and a rename on that basis breaks the store factory.
+- **Callers inside anonymous functions were named after a nearby variable.**
+  `const ctx = await createContext()` attributed the call to `ctx`, and
+  `const result = await flushSession(...)` to `result` — assignment targets, not
+  callers, and every hook entry point in this codebase is an anonymous callback.
+  A variable declared on the line making the call is no longer treated as the
+  enclosing scope; those sites now name the file, which is at least true.
+- **One call was reported as two edges, and destructuring patterns as symbols.**
+  `ctx.store.insertObservations()` appeared once qualified and once bare, and
+  `const { turns, nextOffset } = ...` stored the pattern text as a symbol name.
+  The two edges are now merged into one, keeping the qualified name for reading
+  and the resolved target for traversal — the qualified edge resolves to nothing
+  on its own, so dropping the bare one instead would have severed the only
+  working link.
+
+### Changed
+
+- **Stopped pre-expanding a full observation body on every prompt.** The
+  per-prompt block pasted in the top hit's entire body, up to 900 characters,
+  before anything had asked for it — layer 3 of a three-layer disclosure design,
+  paid unconditionally for a roughly 1-in-9 chance of being used. `expandTop`
+  now defaults to `0`, and the index line carries the matched snippet instead,
+  which is capped at 110 characters and shows *why* a result matched. Measured
+  across four real prompts, the block goes from ~1,560 to ~520 characters, a 67%
+  cut, and still names the id to expand on demand. `promptMaxChars` rises 500 ->
+  700 so the budget fits the four results `promptResults` asks for.
+
+  Existing installs materialise every config value to disk, so a schema default
+  alone would have reached nobody. A saved `inject` block still holding both old
+  defaults exactly is now treated as untouched and picks up the new ones; anyone
+  who tuned either value keeps what they set.
+- **Stopped re-injecting what a session had already been shown.** Every prompt
+  got a `<recalled-memory>` block from a fresh search, and because the best
+  match for one prompt is usually the best match for the next, the same
+  observations were pasted in over and over. Measured across 25 real sessions,
+  **56% of everything injected was already in the conversation** — roughly 950
+  wasted tokens per session. Each session now tracks which observations it has
+  surfaced and skips them; when every match is already in context it injects
+  nothing at all, which happened on 28% of prompts in the replay. Nothing is
+  lost: the content was in the transcript either way.
+
 ## 0.5.2
 
 ### Fixed

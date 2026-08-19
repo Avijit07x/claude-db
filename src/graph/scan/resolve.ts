@@ -53,5 +53,35 @@ export function resolveEdges(
       line: reference.line,
     });
   }
-  return edges;
+  return mergeMemberCalls(edges);
+}
+
+function mergeMemberCalls(edges: CodeEdge[]): CodeEdge[] {
+  const byLine = new Map<string, CodeEdge[]>();
+  for (const edge of edges) {
+    const key = `${edge.file}\0${edge.line}`;
+    const bucket = byLine.get(key);
+    if (bucket) bucket.push(edge);
+    else byLine.set(key, [edge]);
+  }
+
+  const merged = new Set<string>();
+  for (const bucket of byLine.values()) {
+    for (const qualified of bucket) {
+      const dot = qualified.dstName.lastIndexOf('.');
+      if (dot < 0) continue;
+      const tail = qualified.dstName.slice(dot + 1);
+      for (const bare of bucket) {
+        if (bare === qualified) continue;
+        if (bare.dstName !== tail || bare.relation !== qualified.relation) continue;
+        if (!qualified.dstId && bare.dstId) {
+          qualified.dstId = bare.dstId;
+          qualified.confidence = bare.confidence;
+          qualified.score = bare.score;
+        }
+        merged.add(bare.id);
+      }
+    }
+  }
+  return edges.filter((edge) => !merged.has(edge.id));
 }

@@ -28,8 +28,8 @@ export const ConfigSchema = z.object({
 
       perPrompt: z.boolean().default(true),
       promptResults: z.number().int().positive().max(10).default(4),
-      promptMaxChars: z.number().int().positive().default(500),
-      expandTop: z.number().int().min(0).max(3).default(1),
+      promptMaxChars: z.number().int().positive().default(700),
+      expandTop: z.number().int().min(0).max(3).default(0),
       expandMaxChars: z.number().int().positive().default(900),
     })
     .prefault({}),

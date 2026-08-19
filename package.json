@@ -1,6 +1,6 @@
 {
   "name": "claude-db",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Persistent memory for Claude Code. Captures why decisions were made, not just which files changed. Bring your own database: SQLite, MongoDB or Postgres. No cloud, no subscription.",
   "license": "Apache-2.0",
   "type": "module",

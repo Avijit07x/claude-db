@@ -57,7 +57,12 @@ export default async function run(
   const otherProject = await search.search({ text: 'websocket', project: '/tmp/nope', limit: 5 });
   check('project scoping isolates memory', otherProject.length === 0);
 
-  const tl = await search.timeline({ observationId: observations[2].id, before: 2, after: 2 });
+  const { toShortId } = await import('../../dist/util/shortid.js');
+  const tl = await search.timeline({
+    observationId: toShortId(observations[2].id),
+    before: 2,
+    after: 2,
+  });
   check('layer 2 returns neighbours', tl.length >= 3, `${tl.length} entries`);
   check(
     'layer 2 is chronological',

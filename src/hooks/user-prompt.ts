@@ -2,6 +2,7 @@
 import { flushSession } from '../capture/index.js';
 import { createContext } from '../context.js';
 import { emitContext, readPayload, runHook } from './payload.js';
+import { markShown, readShown } from './shown.js';
 import { renderPromptContext } from './relevance.js';
 import { isSearchable } from '../util/prompt.js';
 import { resolveProject } from '../util/project.js';
@@ -25,11 +26,15 @@ await runHook(async () => {
     const prompt = payload.prompt ?? '';
     if (!ctx.config.inject.perPrompt || !isSearchable(prompt)) return;
 
-    const entries = await ctx.search.search({
+    const shown = readShown(sessionId);
+    const found = await ctx.search.search({
       text: prompt,
       project,
       limit: ctx.config.inject.promptResults,
     });
+
+    const entries = found.filter((entry) => !shown.has(entry.id));
+    if (entries.length === 0) return;
 
     const toExpand = entries.slice(0, ctx.config.inject.expandTop);
     const expanded =
@@ -43,7 +48,12 @@ await runHook(async () => {
       expanded,
       ctx.config.inject.expandMaxChars,
     );
-    if (block) emitContext(`${block}\n`);
+    if (!block) return;
+    markShown(
+      sessionId,
+      entries.map((entry) => entry.id),
+    );
+    emitContext(`${block}\n`);
   } finally {
     await ctx.close();
   }

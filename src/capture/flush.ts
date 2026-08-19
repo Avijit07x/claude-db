@@ -125,6 +125,7 @@ export function resetCursor(sessionId: string): void {
 
 export function clearCursor(sessionId: string): void {
   rmSync(cursorPath(sessionId), { force: true });
+  rmSync(cursorPath(sessionId).replace(/\.offset$/, '.shown'), { force: true });
 }
 
 export function sweepCursors(): number {
@@ -136,10 +137,11 @@ export function sweepCursors(): number {
     return 0;
   }
 
-  const live = new Set(sessionIdsOnDisk().map(cursorName));
+  const live = new Set(sessionIdsOnDisk().map((id) => id.replace(/[^\w-]/g, '_')));
   let removed = 0;
   for (const file of files) {
-    if (!file.endsWith('.offset') || live.has(file)) continue;
+    const match = /^(.+)\.(offset|shown)$/.exec(file);
+    if (!match?.[1] || live.has(match[1])) continue;
     rmSync(join(dir, file), { force: true });
     removed += 1;
   }
