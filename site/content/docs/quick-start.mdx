@@ -1,0 +1,55 @@
+Memory fills itself as you work, so a fresh install has nothing to recall yet. These three steps give
+it something to find on day one.
+
+## Map the code
+
+The graph is the one part that needs a command. It parses every supported source file and stores each
+symbol and each relationship between symbols.
+
+```bash
+claude-db scan
+```
+
+It takes about a second on a mid-size repository and costs no tokens, because parsing is local.
+Re-running is cheap: files are hashed and only what changed is re-parsed.
+
+## Seed from git history
+
+Your repository already contains a record of what happened. This reads it into memory so search has
+something to match before you have built up any sessions.
+
+```bash
+claude-db seed --from-git
+```
+
+<Callout title="Or let Claude do both">
+Install also adds a `/cdb-scan` skill. Run it once inside Claude Code and it builds the graph, then
+writes five notes about your stack, layout, conventions, workflows and architecture into memory under
+stable keys.
+</Callout>
+
+## Ask something
+
+From here you do not run commands. Ask Claude the questions you would normally ask, and the answers
+come from the graph instead of from four file reads:
+
+```text
+what breaks if I change closeObservations?
+why does capture read the transcript instead of the diff?
+what was I in the middle of yesterday?
+```
+
+The first is answered by [the code graph](/docs/code-graph), the second by memory, and the third by
+the open-work list that `claude-db status` also prints.
+
+## Record a rule
+
+Most memory is captured automatically, but a standing preference is worth stating outright. Tell
+Claude to remember it, or write it yourself:
+
+```bash
+claude-db remember "always use pnpm in this repo"
+```
+
+Rules recorded this way come back the same as anything else: injected above your prompt when they are
+relevant.

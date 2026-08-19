@@ -1,0 +1,172 @@
+{
+  "generated": "2026-08-19",
+  "version": "0.5.3",
+  "scenarios": [
+    {
+      "id": "path",
+      "label": "How do these two connect",
+      "question": "how does cmdScan reach observationId?",
+      "without": {
+        "tokens": 3740,
+        "foot": "3 files read to follow the chain by hand.",
+        "lines": [
+          {
+            "text": "grep -rn \"cmdScan\" src/",
+            "tone": "cmd"
+          },
+          {
+            "text": "then follow each call site outward",
+            "tone": "dim"
+          },
+          {
+            "text": "read src/cli/commands/graph.ts",
+            "tone": "file"
+          },
+          {
+            "text": "read src/graph/scan/extract.ts",
+            "tone": "file"
+          },
+          {
+            "text": "read src/capture/git.ts",
+            "tone": "file"
+          },
+          {
+            "text": "",
+            "tone": "dim"
+          },
+          {
+            "text": "cmdScan calls into the scan path, but I need to open\neach hop to be sure nothing in between is indirect.",
+            "tone": "answer"
+          }
+        ]
+      },
+      "with": {
+        "tokens": 25,
+        "foot": "The whole chain, in one query.",
+        "lines": [
+          {
+            "text": "find_usages  mode: path",
+            "tone": "cmd"
+          },
+          {
+            "text": "Shortest path (4 hops):",
+            "tone": "dim"
+          },
+          {
+            "text": "  cmdScan",
+            "tone": "file"
+          },
+          {
+            "text": "  --> scanRepository",
+            "tone": "plain"
+          },
+          {
+            "text": "  --> extractFile",
+            "tone": "plain"
+          },
+          {
+            "text": "  --> symbolId",
+            "tone": "plain"
+          },
+          {
+            "text": "  --> observationId",
+            "tone": "file"
+          },
+          {
+            "text": "",
+            "tone": "dim"
+          },
+          {
+            "text": "4 hops, every edge read out of the syntax tree.\nNo file was opened to answer it.",
+            "tone": "answer"
+          }
+        ]
+      }
+    },
+    {
+      "id": "explain",
+      "label": "What breaks if I change this",
+      "question": "what breaks if I change closeObservations?",
+      "without": {
+        "tokens": 2018,
+        "foot": "4 files opened to work out which hits were definitions.",
+        "lines": [
+          {
+            "text": "grep -rn \"closeObservations\" src/",
+            "tone": "cmd"
+          },
+          {
+            "text": "16 hits across 8 files",
+            "tone": "dim"
+          },
+          {
+            "text": "read src/capture/progress.ts",
+            "tone": "file"
+          },
+          {
+            "text": "read src/store/adapter.ts",
+            "tone": "file"
+          },
+          {
+            "text": "read src/store/mongo/index.ts",
+            "tone": "file"
+          },
+          {
+            "text": "read src/store/mongo/observations.ts",
+            "tone": "file"
+          },
+          {
+            "text": "",
+            "tone": "dim"
+          },
+          {
+            "text": "Three adapters define it. Something in capture/ calls it,\nlet me open the tests as well to be sure.",
+            "tone": "answer"
+          }
+        ]
+      },
+      "with": {
+        "tokens": 803,
+        "foot": "One call. Every reference already labelled.",
+        "lines": [
+          {
+            "text": "find_usages  mode: explain",
+            "tone": "cmd"
+          },
+          {
+            "text": "closeObservations  [method]",
+            "tone": "plain"
+          },
+          {
+            "text": "  Source: src/store/mongo/index.ts:180",
+            "tone": "file"
+          },
+          {
+            "text": "  Referenced by (3):",
+            "tone": "dim"
+          },
+          {
+            "text": "    <-- MongoStore  [defines]  src/store/mongo/index.ts:180",
+            "tone": "plain"
+          },
+          {
+            "text": "    <-- PostgresStore  [defines]  src/store/postgres/index.ts:173",
+            "tone": "plain"
+          },
+          {
+            "text": "    <-- SqliteStore  [defines]  src/store/sqlite/index.ts:127",
+            "tone": "plain"
+          },
+          {
+            "text": "",
+            "tone": "dim"
+          },
+          {
+            "text": "Three store adapters implement it, and closeLandedWork\nis the only caller. Renaming it touches all four.",
+            "tone": "answer"
+          }
+        ]
+      }
+    }
+  ]
+}

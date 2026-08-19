@@ -1,0 +1,63 @@
+One command parses every supported source file and stores what it finds: each symbol, and each
+relationship between symbols. Parsing is local and deterministic, and costs no tokens.
+
+## Build it
+
+```bash
+claude-db scan          # build or refresh
+claude-db scan --force  # re-parse everything
+```
+
+About a second on a mid-size repository. A rescan only re-parses files whose contents changed, so
+running it again is close to free.
+
+## The four modes
+
+The same question can be answered four ways, over MCP as `find_usages` and on the command line as
+`claude-db usages`:
+
+| Mode      | Answers                                                                 |
+| --------- | ----------------------------------------------------------------------- |
+| `text`    | Live `git grep`. Needs no scan at all and is never stale. The default.   |
+| `usages`  | What references this symbol, with the relation on each line.            |
+| `explain` | That, plus what the symbol itself reaches.                              |
+| `path`    | How two symbols connect.                                                |
+
+```bash
+claude-db usages --mode explain closeObservations
+claude-db usages --mode path cmdScan observationId
+```
+
+<Path
+  hops={4}
+  nodes={['cmdScan', 'scanRepository', 'extractFile', 'symbolId', 'observationId']}
+/>
+
+## Confidence on every edge
+
+`EXTRACTED` means the relationship was read literally out of the syntax tree. An import names its own
+target, so nothing is guessed. `INFERRED` means the target was matched by name across files, which is
+wrong when two files export the same identifier, and it carries a score saying how sure the match
+was.
+
+<Callout title="One guess, labelled as one">
+Name matching is the only guess this makes, so it is labelled rather than presented as fact. You can
+see which half of an answer is certain.
+</Callout>
+
+## Never stale
+
+Every graph query hashes the working tree first and re-parses whatever changed before answering, so
+it cannot report a line the source has already moved past. The SessionStart hook does the same
+refresh in the background for repositories that have been scanned, but correctness does not depend on
+it having run.
+
+Traversal is keyed on symbol id rather than name. Keying by name would merge every same-named symbol
+into one node, and a repository with a `run` in each test file would grow shortcuts between unrelated
+code, making the shortest path a route nothing can actually take.
+
+## Languages
+
+TypeScript, TSX, JavaScript, Python, Go and Rust. The parser is ast-grep, which ships with the
+package as a prebuilt binary per platform, so nothing compiles at install and nothing else has to be
+installed.

@@ -1,0 +1,56 @@
+SQLite by default, with no setup and no network. The connection string picks the backend, so moving
+to Postgres or Mongo is one command.
+
+## SQLite
+
+Stored at `~/.claude-memory/memory.db`. It comes from Node's builtin `node:sqlite`, so there is
+nothing to install and nothing compiles. Memory is partitioned by project path, so one database
+serves every repo you work in.
+
+## Switch database
+
+```bash
+claude-db use "postgres://user:pass@host:5432/memory"
+claude-db use "mongodb+srv://user:pass@cluster.mongodb.net/memory"
+```
+
+`use` switches the backend and verifies it can be reached before saving. Install the driver you need
+first, either `npm install pg` or `npm install mongodb`, since neither ships by default. `CLAUDE_DB_URL`
+overrides the config file when you need a one-off.
+
+<Callout title="Recall does not change with the backend">
+Search is hybrid, keyword plus vector, on all three. Ranking, fusion and token budgeting live above
+the adapters, so results behave identically no matter which database is plugged in. Only retrieval
+cost changes.
+</Callout>
+
+## Sync two databases
+
+```bash
+claude-db sync "postgres://user:pass@host:5432/memory"
+```
+
+A two-way merge, so a laptop and a desktop can each keep working offline and reconcile later.
+`export` and `import` cover the same ground as files when you would rather move a dump by hand.
+
+## MongoDB Atlas vector index
+
+Atlas can index vector search instead of scanning brute-force, but Atlas indexes are not created by
+this tool. Add one by hand on the `observations` collection:
+
+```json
+{
+  "name": "memory_vector",
+  "type": "vectorSearch",
+  "fields": [
+    { "type": "vector", "path": "embedding", "numDimensions": 256, "similarity": "cosine" },
+    { "type": "filter", "path": "project" },
+    { "type": "filter", "path": "kind" },
+    { "type": "filter", "path": "tags" },
+    { "type": "filter", "path": "createdAt" }
+  ]
+}
+```
+
+`numDimensions` is 256 for the builtin embedder and 384 once `@xenova/transformers` is installed.
+Without this index Mongo still works: vector search falls back to scoring candidates in process.

@@ -1,0 +1,85 @@
+Almost everything here is answered by two commands: `claude-db status` for whether it is wired up,
+and `claude-db doctor` for what it resolved.
+
+## Start with doctor
+
+```bash
+claude-db doctor
+```
+
+It prints the version, the database URL, the adapter in use, whether that database is reachable, the
+embedder and its dimensions, and how many vectors are stored. Most problems are visible in those
+seven lines.
+
+```bash
+claude-db doctor --deep
+```
+
+The deep check writes one observation, searches for it, expands it, then deletes it, proving the
+whole round trip rather than just the connection. Each step reports `ok` or `FAIL`, so a failure
+tells you which half is broken.
+
+## Nothing is being captured
+
+| Check                            | Fix                                                             |
+| -------------------------------- | --------------------------------------------------------------- |
+| Did you restart Claude Code?      | Hooks are read at startup, so a running session never sees them |
+| Was `install` run in this repo?   | `claude-db install --project` from the repository root          |
+| Has any turn changed a file?      | Questions and read-only commands are skipped by design          |
+
+Run `claude-db status` to see when it last recorded anything. If the answer is never, it is one of
+the first two rows.
+
+## Search returns nothing
+
+On a fresh install this is expected: there is no history yet. Give it something to find with
+[`claude-db seed --from-git`](/docs/quick-start) or the [`/cdb-scan` skill](/docs/cdb-scan).
+
+If memory is not empty, check that you are in the same directory it was recorded under. Memory is
+partitioned by project path, so a moved repository looks empty:
+
+```bash
+claude-db merge /old/path/to/project
+```
+
+## doctor says reachable: no
+
+The database URL resolved but could not be opened. For Postgres or Mongo, the driver does not ship
+by default:
+
+```bash
+npm install pg       # postgres://
+npm install mongodb  # mongodb+srv://
+```
+
+`CLAUDE_DB_URL` overrides the config file, so check it is not set to something stale.
+
+## find_usages has no graph
+
+The graph is the one part that is not automatic. Build it once:
+
+```bash
+claude-db scan
+```
+
+Until then, `text` mode still answers: it is a live `git grep` and needs no scan at all.
+
+## Behaviour looks old after upgrading
+
+Hooks are registered by absolute path into the installed package, so they always run the current
+code. The skill and instruction copies are refreshed by SessionStart when they differ from what
+shipped, which means `npm i -g claude-db` is enough, but the refresh happens at session start, so
+restart Claude Code once after upgrading.
+
+## Search got worse after installing a better embedder
+
+Existing rows are still stored at the old dimension. Re-embed them:
+
+```bash
+claude-db reembed
+```
+
+<Callout title="Nothing here deletes memory">
+`uninstall` removes the hooks and leaves your database alone. Only `forget`, `prune` and `reset`
+delete anything, and the last two are dry runs without `--yes`.
+</Callout>

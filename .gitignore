@@ -1,9 +1,19 @@
 node_modules/
 dist/
 
+# site build output
+site/.next/
+site/out/
+site/next-env.d.ts
+*.tsbuildinfo
+
+# browser-automation scratch
+.playwright-mcp/
+
 # Internal benchmarking and planning notes, not part of the public repo
 SCALING.md
 PLAN*.md
+plan/
 docs/mcp-findings.md
 docs/token-economics.md
 
