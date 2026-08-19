@@ -4,7 +4,11 @@ import { SITE } from '@/lib/site';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
-    { url: SITE, priority: 1 },
-    ...DOCS.map((doc) => ({ url: `${SITE}${href(doc.slug)}`, priority: 0.8 })),
+    { url: SITE, priority: 1, changeFrequency: 'weekly' as const },
+    ...DOCS.map((doc) => ({
+      url: `${SITE}${href(doc.slug)}`,
+      priority: 0.8,
+      changeFrequency: 'monthly' as const,
+    })),
   ];
 }

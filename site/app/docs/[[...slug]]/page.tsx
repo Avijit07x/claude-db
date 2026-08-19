@@ -4,8 +4,8 @@ import { DocsToc } from '@/components/docs/DocsToc';
 import { Pager } from '@/components/docs/Pager';
 import { Icon } from '@/components/ui/Icon';
 import { BODIES } from '@/content/docs';
-import { DOCS, findDoc } from '@/lib/docs';
-import { GITHUB } from '@/lib/site';
+import { DOCS, findDoc, href } from '@/lib/docs';
+import { GITHUB, SITE } from '@/lib/site';
 import { readToc } from '@/lib/toc';
 
 export const dynamicParams = true;
@@ -18,7 +18,26 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
   const { slug } = await params;
   const found = findDoc(slug?.[0] ?? '');
   if (!found) return {};
-  return { title: `${found.doc.title} | claude-db`, description: found.doc.description };
+  const { doc } = found;
+  const url = `${SITE}${href(doc.slug)}`;
+
+  return {
+    title: doc.title,
+    description: doc.description,
+    alternates: { canonical: url },
+    openGraph: {
+      title: `${doc.title} | claude-db`,
+      description: doc.description,
+      url,
+      siteName: 'claude-db',
+      type: 'article',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${doc.title} | claude-db`,
+      description: doc.description,
+    },
+  };
 }
 
 export default async function DocPage({ params }: { params: Promise<{ slug?: string[] }> }) {
