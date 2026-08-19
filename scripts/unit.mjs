@@ -18,6 +18,7 @@ import graph from './unit/graph.mjs';
 import graphQuery from './unit/graph-query.mjs';
 import progress from './unit/progress.mjs';
 import refresh from './unit/refresh.mjs';
+import adapters from './unit/adapters.mjs';
 import { report } from './lib/check.mjs';
 
 await ranking();
@@ -40,5 +41,6 @@ await graph();
 await graphQuery();
 await progress();
 await refresh();
+await adapters();
 
 report('unit');

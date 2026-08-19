@@ -27,6 +27,7 @@ export async function insertObservations(
         'created_at',
         'embedder',
         'author',
+        'status',
       ];
       const values: unknown[] = [
         obs.id,
@@ -40,6 +41,7 @@ export async function insertObservations(
         obs.createdAt,
         obs.embedder ?? null,
         obs.author ?? null,
+        obs.status ?? 'done',
       ];
       if (vectors && obs.embedding?.length === width) {
         columns.push('embedding');
