@@ -1,0 +1,35 @@
+Nothing leaves your machine unless you point it at a remote database. There is no account, no
+telemetry and no phone-home.
+
+## Local by default
+
+Memory is a SQLite file in your home directory, embeddings are computed locally, and the parser runs
+on your machine. The only network traffic claude-db can make is to a database you configured yourself
+with `claude-db use`.
+
+## What is never stored
+
+- `.env` files and anything under `secrets/`
+- `node_modules` and `.git/`
+- Anything you wrap in `<private>...</private>`, which is stripped before the turn is written
+
+## Redaction
+
+API keys and tokens are redacted before anything is written, so a key pasted into a prompt does not
+end up in the database as a side effect of the turn being captured.
+
+<Callout title="Turns are summarised, not copied">
+One observation per turn holds a title, the reasoning, and the files touched. The raw transcript
+stays where Claude Code already put it.
+</Callout>
+
+## Deleting memory
+
+```bash
+claude-db forget <id>                  # one observation
+claude-db prune --older-than 90 --yes  # everything past a cutoff
+claude-db reset --project --yes        # this project's memory
+```
+
+`prune` and `reset` are dry runs without `--yes`, so you can see the count before anything is
+deleted. Uninstalling does not delete memory; these commands are the only thing that does.

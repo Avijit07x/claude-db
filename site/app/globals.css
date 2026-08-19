@@ -1,0 +1,117 @@
+@import 'tailwindcss';
+
+/* Engineering paper. A code-graph tool gets a grid, not a gradient. */
+:root {
+  --paper: #f6f6f4;
+  --panel: #ffffff;
+  --ink: #16191d;
+  --ink-2: #5d646d;
+  --rule: #dcdcd6;
+  --accent: #c85f38;
+  --accent-ink: #ffffff;
+  --accent-wash: #fbeee8;
+  --term-bg: #14171b;
+  --term-ink: #d8dbe0;
+  --term-dim: #6d757f;
+  --term-file: #9fb8d4;
+  --cold: #7a838d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #101216;
+    --panel: #171a1f;
+    --ink: #e9ebee;
+    --ink-2: #98a0a9;
+    --rule: #272b31;
+    --accent: #e07a52;
+    --accent-ink: #14171b;
+    --accent-wash: #2a1a13;
+    --term-bg: #0b0d10;
+    --term-ink: #d8dbe0;
+    --term-dim: #6d757f;
+    --term-file: #9fb8d4;
+    --cold: #79828c;
+  }
+}
+
+:root[data-theme='dark'] {
+  --paper: #101216;
+  --panel: #171a1f;
+  --ink: #e9ebee;
+  --ink-2: #98a0a9;
+  --rule: #272b31;
+  --accent: #e07a52;
+  --accent-ink: #14171b;
+  --accent-wash: #2a1a13;
+  --term-bg: #0b0d10;
+  --term-ink: #d8dbe0;
+  --term-dim: #6d757f;
+  --term-file: #9fb8d4;
+  --cold: #79828c;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-term: var(--term-bg);
+  --color-term-ink: var(--term-ink);
+  --color-term-dim: var(--term-dim);
+  --color-term-file: var(--term-file);
+  --color-cold: var(--cold);
+
+  --font-mono: var(--font-mono-code), ui-monospace, SFMono-Regular, monospace;
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Colours the hero's drifting graph reads at runtime. */
+.field {
+  --field-ink: 120, 132, 146;
+  --field-hot: 200, 95, 56;
+  mask-image: radial-gradient(120% 95% at 60% 38%, #000 12%, rgba(0, 0, 0, 0.55) 48%, transparent 82%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .field {
+    --field-ink: 150, 162, 176;
+    --field-hot: 224, 122, 82;
+  }
+}
+
+:root[data-theme='dark'] .field {
+  --field-ink: 150, 162, 176;
+  --field-hot: 224, 122, 82;
+}
+
+.display {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+  font-optical-sizing: auto;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

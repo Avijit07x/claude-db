@@ -1,0 +1,54 @@
+Every command is also available as `cdb`. Most of the time you will not run any of these: capture and
+recall are hooks, and Claude reaches the rest over MCP.
+
+## Setup
+
+| Command                            | What it does                                         |
+| ---------------------------------- | ---------------------------------------------------- |
+| `claude-db install [--project]`    | Register hooks and the MCP server                    |
+| `claude-db uninstall [--project]`  | Remove them, keeping your memory                     |
+| `claude-db status`                 | Is it wired up, and when did it last record anything |
+| `claude-db doctor [--deep]`        | Resolved config; `--deep` proves a full round trip   |
+
+## Memory
+
+| Command                                           | What it does                                        |
+| ------------------------------------------------- | --------------------------------------------------- |
+| `claude-db search [--all] [--tag <name>] <query>` | Search this project's memory, or every project      |
+| `claude-db remember [--key <name>] <text>`        | Record a rule outright, e.g. "always use pnpm here" |
+| `claude-db forget <id>`                           | Delete specific observations by id                  |
+| `claude-db seed --from-git`                       | Fill a cold memory from this repo's history         |
+| `claude-db stats`                                 | What this project's memory is made of               |
+| `claude-db projects`                              | Every project with memory stored                    |
+
+## Code graph
+
+| Command                                  | What it does                                           |
+| ---------------------------------------- | ------------------------------------------------------ |
+| `claude-db scan [--force]`               | Build the code graph for this repo                     |
+| `claude-db usages [--mode <m>] <symbol>` | What uses a symbol: live `git grep`, or the code graph |
+
+Modes are `text`, `usages`, `explain` and `path`. See [Code graph](/docs/code-graph) for what each
+one answers.
+
+## Database
+
+| Command                    | What it does                                          |
+| -------------------------- | ----------------------------------------------------- |
+| `claude-db use <url>`      | Switch database and verify it                         |
+| `claude-db sync <url>`     | Two-way merge with another database                   |
+| `claude-db export [--all]` | Dump memory as JSONL, for backup or migration         |
+| `claude-db import <file>`  | Load a dump back in; safe to repeat                   |
+| `claude-db merge [<path>]` | Move memory from an old project path onto this one    |
+
+## Maintenance
+
+| Command                                | What it does                                  |
+| -------------------------------------- | --------------------------------------------- |
+| `claude-db flush`                      | Re-ingest every transcript for this project   |
+| `claude-db reembed`                    | Re-embed everything with the current model    |
+| `claude-db prune --older-than <days>`  | Delete old memory (dry run without `--yes`)   |
+| `claude-db reset [--project] --yes`    | Delete memory (dry run without `--yes`)       |
+
+`reembed` is what you run after installing `@xenova/transformers`, so existing rows are searchable at
+the new dimension rather than only new ones.

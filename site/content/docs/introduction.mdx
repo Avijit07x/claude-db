@@ -1,0 +1,62 @@
+claude-db gives Claude Code two things it does not have on its own: a memory of what you already
+explained, and a real graph of your code. Both run locally, against your own database.
+
+## The problem
+
+You spent an hour yesterday explaining why the store uses three adapters, which approach you already
+tried and abandoned, and why one function must not be touched. Today Claude knows none of it, so you
+explain it again.
+
+The other half is the codebase itself. Without an index, Claude re-derives it every time: grep a
+name, open four files, work out which hits were definitions and which were calls. You pay for that
+in tokens on every question.
+
+## What it does
+
+<Cards
+  items={[
+    {
+      icon: 'recall',
+      title: 'Captures every turn that changed something',
+      body: 'Claude Code already writes each session to disk as JSONL. claude-db reads that transcript, so it records why you did something, not just which files changed.',
+    },
+    {
+      icon: 'flow',
+      title: 'Injects the best match on every prompt',
+      body: 'Capture and recall are hooks, so neither depends on Claude deciding to look something up. You never run a search command.',
+    },
+    {
+      icon: 'graph',
+      title: 'Answers questions about symbols from a graph',
+      body: 'One scan stores every symbol and every relationship: what calls what, what imports what, what extends what.',
+    },
+  ]}
+/>
+
+```bash
+npm install -g claude-db
+
+cd your-project
+claude-db install --project
+```
+
+Restart Claude Code and it is running. The rest of these docs cover what that install writes, how to
+map your code, and every command and MCP tool you get.
+
+## What it is not
+
+It is not a cloud service and it is not an account. There is no telemetry, no sign-up, and nothing
+leaves your machine unless you deliberately point it at a remote database. It also does not replace
+`CLAUDE.md`: a stable overview of your project belongs there, while claude-db stores the things that
+actually happened.
+
+## Requirements
+
+Node 22.5 or newer. That is the only hard requirement. SQLite comes from Node's builtin
+`node:sqlite`, and the parser ships as a prebuilt binary, so nothing compiles at install time.
+
+<Callout title="Better embeddings, optional">
+Embeddings run locally with a zero-dependency embedder at 256 dimensions. For real semantic search,
+`npm install @xenova/transformers` and it upgrades itself to 384. See [Databases](/docs/databases)
+for what that changes.
+</Callout>

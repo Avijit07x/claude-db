@@ -1,0 +1,94 @@
+Claude Code writes every session to disk as JSONL: your prompts, its replies, every tool call.
+claude-db reads that transcript, which is why it can record why you did something rather than only
+which files changed.
+
+## Capture
+
+<Flow
+  trigger="you send a prompt"
+  branches={[
+    {
+      title: 'Save the previous turn',
+      steps: [
+        'read new lines from the session transcript',
+        'keep turns that changed something',
+        'store title + reasoning + files, with an embedding',
+      ],
+    },
+    {
+      title: 'Search memory using your prompt',
+      steps: ['inject the best match above your message'],
+    },
+  ]}
+/>
+
+Both steps are hooks, so they always run. Nothing depends on Claude deciding to look something up.
+
+## What gets saved
+
+One observation per turn, and only if that turn edited a file or ran a real command. Questions,
+`grep` and "ok" are skipped. A busy day produces 10 to 20 rows, not hundreds.
+
+```text
+[decision] Chose WebSocket over polling for live order updates
+
+Asked: the order feed keeps dropping
+
+Polling at 3s hammered the API and still lagged behind. Switched to a
+WebSocket subscription with exponential backoff and a replay flag, so no
+order is missed during a drop.
+
+Files: src/ws/client.ts, src/ws/reconnect.ts
+Ran: Test run: pnpm test
+```
+
+## The six kinds
+
+Every observation is classified as it is captured, and `search` can filter on the result. The rules
+run in order, so the first one that matches wins.
+
+| Kind         | Matched when the turn                                                        |
+| ------------ | ---------------------------------------------------------------------------- |
+| `preference` | states a standing rule: "from now on", "prefer", "always use", "never run"  |
+| `decision`   | weighs options: "instead of", "rather than", "chose", "decided", "trade-off" |
+| `deadend`    | records a failure: "didn't work", "reverted", "abandoned", "gave up"         |
+| `bugfix`     | mentions a fix, bug, regression, error or crash                              |
+| `pattern`    | changed files without matching any of the above                              |
+| `context`    | changed no files                                                             |
+
+Order matters: a turn that says "we reverted the retry fix" is a `deadend`, not a `bugfix`, because
+the abandonment is the thing worth remembering.
+
+## What gets injected
+
+- Recent session summaries at startup.
+- The single best match, in full, above each prompt.
+
+Roughly 350 tokens when something relevant exists, and zero when it does not. Search results return
+an id, kind, date, title and one line of the matching body, which is enough to tell two
+similarly-titled rows apart without expanding either. Full bodies come only from `get_observations`,
+for ids that were actually chosen.
+
+## Unfinished work
+
+A captured turn is stored `open` and closes when every file it touched has been committed. That check
+runs inside the flush that already happens on each prompt, so nothing extra has to fire for it to
+stay accurate.
+
+Closing is deliberately one-way. Editing a file again does not reopen work that already landed, or a
+finished task would flicker back into the list every time a neighbouring line changed.
+
+<Callout title="Why recency is stored separately">
+Memory search ranks by relevance, and a prompt like "do the last task" contains no words worth
+matching. The open-work list is what lets a brand-new chat answer "what was I doing".
+</Callout>
+
+## Staying current
+
+Claude Code only reads skills from `~/.claude/skills/`, so a copy has to exist there, and a copy
+drifts as soon as the package updates. The hooks are registered by absolute path into the installed
+package, so they always run the current code even when those copies are stale.
+
+SessionStart compares the copies against what shipped and rewrites them when they differ, which makes
+`npm i -g claude-db` sufficient on its own. It only refreshes files that already exist, so nothing is
+created behind your back and anything `uninstall` removed stays removed.

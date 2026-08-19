@@ -6,6 +6,10 @@
 [![CI](https://github.com/Avijit07x/claude-db/actions/workflows/ci.yml/badge.svg)](https://github.com/Avijit07x/claude-db/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
+[Documentation](https://claude-db.vercel.app/docs) ·
+[Quick start](https://claude-db.vercel.app/docs/quick-start) ·
+[CLI reference](https://claude-db.vercel.app/docs/cli)
+
 ---
 
 ## Every session starts from zero
@@ -96,31 +100,19 @@ including the symbols where plain grep wins.
 
 ## Commands
 
-`cdb` is a shorter alias for all of them.
+`cdb` is a shorter alias for all of them. These are the ones you actually type:
 
-| Command                                           | What it does                                           |
-| ------------------------------------------------- | ------------------------------------------------------ |
-| `claude-db install [--project]`                   | Register hooks and the MCP server                      |
-| `claude-db uninstall [--project]`                 | Remove them, keeping your memory                       |
-| `claude-db status`                                | Is it wired up, and when did it last record anything   |
-| `claude-db doctor [--deep]`                       | Resolved config; `--deep` proves a full round trip     |
-| `claude-db search [--all] [--tag <name>] <query>` | Search this project's memory, or every project         |
-| `claude-db remember [--key <name>] <text>`        | Record a rule outright, e.g. "always use pnpm here"    |
-| `claude-db forget <id>`                           | Delete specific observations by id                     |
-| `claude-db seed --from-git`                       | Fill a cold memory from this repo's history            |
-| `claude-db scan [--force]`                        | Build the code graph for this repo                     |
-| `claude-db usages [--mode <m>] <symbol>`          | What uses a symbol: live `git grep`, or the code graph |
-| `claude-db stats`                                 | What this project's memory is made of                  |
-| `claude-db projects`                              | Every project with memory stored                       |
-| `claude-db merge [<path>]`                        | Move memory from an old project path onto this one     |
-| `claude-db use <url>`                             | Switch database and verify it                          |
-| `claude-db sync <url>`                            | Two-way merge with another database                    |
-| `claude-db flush`                                 | Re-ingest every transcript for this project            |
-| `claude-db export [--all]`                        | Dump memory as JSONL, for backup or migration          |
-| `claude-db import <file>`                         | Load a dump back in; safe to repeat                    |
-| `claude-db reembed`                               | Re-embed everything with the current model             |
-| `claude-db prune --older-than <days>`             | Delete old memory (dry run without `--yes`)            |
-| `claude-db reset [--project] --yes`               | Delete memory (dry run without `--yes`)                |
+| Command                                  | What it does                                           |
+| ---------------------------------------- | ------------------------------------------------------ |
+| `claude-db install [--project]`          | Register hooks and the MCP server                      |
+| `claude-db status`                       | Is it wired up, and when did it last record anything   |
+| `claude-db doctor [--deep]`              | Resolved config; `--deep` proves a full round trip     |
+| `claude-db scan [--force]`               | Build the code graph for this repo                     |
+| `claude-db usages [--mode <m>] <symbol>` | What uses a symbol: live `git grep`, or the code graph |
+| `claude-db use <url>`                    | Switch database and verify it                          |
+
+Every other command, including `search`, `remember`, `seed`, `sync`, `export`,
+`prune` and `reset`, is in the [CLI reference](https://claude-db.vercel.app/docs/cli).
 
 Install also adds a `/cdb-scan` skill: run it once on an existing project and
 Claude maps the codebase into memory, so search has something to find before
@@ -143,11 +135,16 @@ before anything is written.
 
 ## Documentation
 
-- [How it works](./docs/how-it-works.md): what gets captured and injected, how
-  the code graph is built and kept current, and how the database backends differ
-- [With and without](./docs/with-and-without.md): the same questions answered
-  both ways, measured, including where it does not pay off
-- [Changelog](./CHANGELOG.md)
+**[claude-db.vercel.app/docs](https://claude-db.vercel.app/docs)** has the rest:
+the [CLI reference](https://claude-db.vercel.app/docs/cli),
+[MCP tools](https://claude-db.vercel.app/docs/mcp-tools),
+[how it works](https://claude-db.vercel.app/docs/how-it-works),
+[databases](https://claude-db.vercel.app/docs/databases) and
+[troubleshooting](https://claude-db.vercel.app/docs/troubleshooting).
+
+[Benchmarks](https://claude-db.vercel.app/docs/benchmarks) has every number,
+including the symbols where plain grep wins. Releases are in the
+[changelog](./CHANGELOG.md).
 
 ## Development
 

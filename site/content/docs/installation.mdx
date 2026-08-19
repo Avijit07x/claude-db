@@ -1,0 +1,74 @@
+One global package, then one command inside the repo you want it to remember. Capture and recall are
+hooks, so there is nothing to run afterwards.
+
+## Install
+
+```bash
+npm install -g claude-db
+```
+
+Every command is also available as `cdb`, which is the same binary under a shorter name.
+
+## Wire it to a repo
+
+<Steps>
+<Step n={1} title="Run install inside the project">
+
+```bash
+cd your-project
+claude-db install --project
+```
+
+`--project` scopes everything to this one repo. Without it, the install is machine-wide and applies
+to every project you open.
+
+</Step>
+<Step n={2} title="Restart Claude Code">
+
+Hooks are read at startup, so a running session will not pick them up.
+
+</Step>
+<Step n={3} title="Ignore the machine-specific file">
+
+```bash
+echo '.mcp.json' >> .gitignore
+```
+
+`.mcp.json` holds an absolute path to the installed package, so it should not be committed.
+
+</Step>
+</Steps>
+
+## What install writes
+
+| Path                          | What it is                                                        |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `.claude/settings.local.json` | Registers the SessionStart, UserPromptSubmit and Stop hooks       |
+| `.mcp.json`                   | Registers the server exposing the six [MCP tools](/docs/mcp-tools) |
+| `CLAUDE.local.md`             | A standing instruction to search memory before re-explaining      |
+| `~/.claude/skills/cdb-scan`   | The skill that maps an existing codebase in one pass              |
+
+A machine-wide install writes that instruction into `~/.claude/CLAUDE.md` instead.
+
+<Callout title="Why a memory file as well as hooks">
+Hook output is context the agent may or may not act on. A memory file is a rule for the whole
+session, which is what makes recall the default rather than something you have to ask for.
+</Callout>
+
+## Verify
+
+```bash
+claude-db status        # wired up? when did it last record anything?
+claude-db doctor        # resolved config, database, embedder
+claude-db doctor --deep # proves a full write-read-search round trip
+```
+
+## Uninstall
+
+```bash
+claude-db uninstall --project
+```
+
+This removes the hooks, the MCP entry and the instruction block. Your memory is left untouched on
+disk, so reinstalling picks up exactly where you left off. To delete the memory itself, see
+[Privacy](/docs/privacy).

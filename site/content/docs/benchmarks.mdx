@@ -1,0 +1,44 @@
+Recall is not free: it costs tokens on every prompt. These are the measured numbers from this
+repository, including the cases where it does not pay off.
+
+## The standing cost
+
+Recall costs about 180 tokens a prompt, and is skipped entirely on 28% of prompts because the answer
+is already in context.
+
+## The refund
+
+Asking who defines and calls `closeObservations` by hand means a grep, then opening three store
+adapters to work out which hits are definitions. One `explain` call answers it already classified:
+**2.1x cheaper**, measured across eight real symbols in this repo.
+
+```text
+  every prompt costs      180 tokens of recall
+  every lookup refunds    597 tokens   (1,115 by hand - 518 with)
+
+  so one lookup pays for 3.3 prompts of recall
+```
+
+## Where it loses
+
+A symbol with two or three references is cheaper to grep than to look up, because the graph answer
+carries structure the question did not need. The full write-up lists every symbol measured, including
+those.
+
+<Callout title="Read the numbers, not the claim">
+[With and without](https://github.com/Avijit07x/claude-db/blob/main/docs/with-and-without.md) has the
+same questions answered both ways, per symbol, with the losses left in.
+</Callout>
+
+## Run it yourself
+
+```bash
+git clone https://github.com/Avijit07x/claude-db
+cd claude-db && npm install && npm run build
+
+npm run bench:ab      # with and without, per symbol
+npm run bench:tokens  # what recall costs per prompt
+```
+
+Both run against whatever repository you point them at, so the interesting number is the one from
+your own codebase rather than from this one.

@@ -1,0 +1,46 @@
+Memory fills itself from the work you do, which means a repository you have not used it on yet has
+nothing to recall. The `/cdb-scan` skill closes that gap in one pass, from inside Claude Code.
+
+## What it is
+
+A skill installed alongside the hooks, at `~/.claude/skills/cdb-scan`. You run it by typing
+`/cdb-scan` in Claude Code. It is worth running when memory is newly installed on an existing
+project, or when the project has changed enough that the stored map is stale.
+
+## The two passes
+
+<Flow
+  trigger="/cdb-scan"
+  branches={[
+    {
+      title: 'Build the code graph',
+      steps: ['runs claude-db scan', 'every symbol, and every relationship between symbols'],
+    },
+    {
+      title: 'Write the project profile',
+      steps: [
+        'five notes: stack, layout, conventions, workflows, architecture',
+        'stored under stable keys, so a re-run updates them in place',
+      ],
+    },
+  ]}
+/>
+
+The graph records what the code _is_. The notes record why it is built that way, the part no
+parser can read off the syntax tree.
+
+## Why the notes are tagged inferred
+
+Those five notes are tagged `inferred`, because they are Claude's reading of the code rather than a
+record of anything that happened.
+
+<Callout title="Testimony and inference are not the same thing">
+Everything else in the database is testimony: a turn that really ran, a decision you really made. A
+search result must not blur the two, so anything derived by reading the code carries the tag that
+says so.
+</Callout>
+
+## Re-running it
+
+Safe to repeat. The graph re-parses only files whose contents changed, and the five notes are keyed,
+so a second run overwrites them instead of stacking up near-duplicates in your search results.

@@ -1,0 +1,56 @@
+Installing registers an MCP server that gives Claude six tools. You do not call these yourself. They
+are what Claude reaches for when a question needs more than the recall already injected above your
+prompt.
+
+## The three layers
+
+Memory search is deliberately staged, so a broad question does not drag full bodies into context
+before anything has been chosen.
+
+- **Layer 1.** `search` returns a compact index: id, kind, date, title, and one line of the matching
+  body.
+- **Layer 2.** The snippet is enough to tell two similarly-titled rows apart and decide which ids
+  are worth reading.
+- **Layer 3.** `get_observations` fetches full bodies, and only for the ids that were picked.
+
+## search
+
+Natural language search over this project's memory: past decisions, bugs and reasoning. Takes a
+`query`, an optional `kind` filter (`decision`, `pattern`, `bugfix`, `context`, `deadend`,
+`preference`), a `tag`, and a `project` path. Pass `"*"` to search every project.
+
+## get_observations
+
+Full bodies for specific ids returned by `search`. Takes up to 25 ids at once and a `chars` budget
+per body, so a batch stays readable.
+
+## find_usages
+
+The code graph, in the four modes described in [Code graph](/docs/code-graph). Takes a `symbol`, a
+`mode`, and a `target` for `path` queries.
+
+<Callout title="Why this beats grep for symbols">
+It tags the likely definition and re-derives the answer from current source on every call, so it is
+never stale. Plain grep still wins for anything that is not a code identifier: log files, comments,
+strings and prose.
+</Callout>
+
+## remember
+
+Records something outright rather than waiting for it to be captured from a turn. The first line
+becomes the title. This is what fires when you tell Claude a standing rule, so it survives the
+session.
+
+```text
+"remember that we always use pnpm in this repo"
+```
+
+## timeline
+
+What happened recently, in order, rather than by relevance. This is what answers "what was I working
+on" when the prompt itself has no words worth matching.
+
+## forget
+
+Deletes observations by id. Used when something was captured that turned out to be wrong, so it stops
+coming back as context.
