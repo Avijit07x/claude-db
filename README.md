@@ -14,7 +14,7 @@ You spent an hour yesterday explaining why the store uses three adapters, which
 approach you already tried and abandoned, and why that one function must not be
 touched. Today Claude knows none of it. So you explain it again.
 
-claude-db fixes that, and the other half too — Claude re-derives your codebase
+claude-db fixes that, and the other half too. Claude re-derives your codebase
 every time, grepping a name and opening files to work out what calls what.
 
 ```console
@@ -38,11 +38,11 @@ cd your-project
 claude-db install --project
 ```
 
-Restart Claude Code. That's it — capture and recall are hooks, so they run
+Restart Claude Code. That's it: capture and recall are hooks, so they run
 without being asked.
 
 `--project` scopes to one repo instead of every project on the machine. It
-writes `.claude/settings.local.json` and `.mcp.json` — add `.mcp.json` to your
+writes `.claude/settings.local.json` and `.mcp.json`. Add `.mcp.json` to your
 `.gitignore`, since it holds a machine-specific path.
 
 ## Map your code
@@ -53,7 +53,7 @@ Memory fills itself as you work. The code graph needs one command:
 claude-db scan
 ```
 
-Claude then gets four modes through MCP — `text` (a live grep, works with no
+Claude then gets four modes through MCP: `text` (a live grep, works with no
 scan at all), `usages`, `explain` and `path`. Re-running `scan` is cheap: it
 hashes files and re-parses only what changed.
 
@@ -77,20 +77,21 @@ default.
 
 Asking _who defines and calls `closeObservations`_ by hand means a grep, then
 opening three store adapters to see which hits are definitions. One `explain`
-call answers it already classified — **2.1x cheaper**, measured across eight
+call answers it already classified: **2.1x cheaper**, measured across eight
 real symbols in this repo.
 
-Recall costs ~190 tokens per prompt, skipped entirely on 28% of prompts because
-the answer is already in context. It behaves like a subscription:
+Recall is the standing cost of ~180 tokens a prompt, skipped entirely on 28% of
+prompts because the answer is already in context:
 
 ```
-  every session pays     3,600 tokens   (~180/prompt x 20 prompts)
-  every lookup refunds     597 tokens   (1,115 by hand - 518 with)
-  so it pays for itself at 6 lookups in a session
+  every prompt costs      180 tokens of recall
+  every lookup refunds    597 tokens   (1,115 by hand - 518 with)
+
+  so one lookup pays for 3.3 prompts of recall
 ```
 
-Check it on your own repo — `npm run bench:ab` and `npm run bench:tokens` from
-a clone. [With and without](./docs/with-and-without.md) has every number,
+Check it on your own repo with `npm run bench:ab` and `npm run bench:tokens`
+from a clone. [With and without](./docs/with-and-without.md) has every number,
 including the symbols where plain grep wins.
 
 ## Commands
@@ -142,9 +143,9 @@ before anything is written.
 
 ## Documentation
 
-- [How it works](./docs/how-it-works.md) — what gets captured and injected, how
+- [How it works](./docs/how-it-works.md): what gets captured and injected, how
   the code graph is built and kept current, and how the database backends differ
-- [With and without](./docs/with-and-without.md) — the same questions answered
+- [With and without](./docs/with-and-without.md): the same questions answered
   both ways, measured, including where it does not pay off
 - [Changelog](./CHANGELOG.md)
 

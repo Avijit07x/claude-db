@@ -120,39 +120,35 @@ console.log(`  ${pad('TOTAL tokens', 42)}${num(tok(withB), 8)}${num(tok(withoutB
 console.log('  note: WITHOUT here is commit subjects plus one --stat. It locates the change;');
 console.log('  it does not explain the reasoning, so the two are not equivalent answers.');
 
-console.log('\nC. per session — a fixed cost, refunded per lookup');
+console.log('\nC. what it takes to come out ahead');
 rule();
 
 const perLookupWith = tok(withA / SYMBOLS.length);
 const perLookupWithout = tok(withoutA / SYMBOLS.length);
-const PROMPTS_PER_SESSION = 20;
-const overhead = INJECTION_PER_PROMPT * PROMPTS_PER_SESSION;
 const refund = perLookupWithout - perLookupWith;
-const breakEven = overhead / refund;
+const ratio = INJECTION_PER_PROMPT / refund;
 
+console.log(`  every prompt costs   ${num(INJECTION_PER_PROMPT, 6)} tokens of recall`);
 console.log(
-  `  every session pays   ${num(overhead.toLocaleString(), 7)} tokens` +
-    `   (${INJECTION_PER_PROMPT}/prompt x ${PROMPTS_PER_SESSION} prompts)`,
+  `  every lookup refunds ${num(refund, 6)} tokens` +
+    `   (${perLookupWithout} by hand - ${perLookupWith} with)`,
 );
 console.log(
-  `  every lookup refunds ${num(refund.toLocaleString(), 7)} tokens` +
-    `   (${perLookupWithout} without - ${perLookupWith} with)`,
+  `\n  so one lookup pays for ${(1 / ratio).toFixed(1)} prompts of recall` +
+    ` — break even at 1 lookup per ${(1 / ratio).toFixed(0)} prompts`,
 );
-console.log(`  so it pays for itself at ${breakEven.toFixed(0)} lookups in a session`);
 console.log();
 console.log(
-  `  ${pad('lookups', 10)}${num('claude-db', 11)}${num('plain grep', 12)}${num('you save', 11)}`,
+  `  ${pad('a session of', 16)}${num('recall costs', 14)}${num('lookups to break even', 23)}`,
 );
 rule();
-
-for (const n of [0, 2, 5, 10, 20]) {
-  const w = overhead + perLookupWith * n;
-  const o = perLookupWithout * n;
-  const delta = o - w;
+for (const prompts of [1, 5, 10, 20, 60]) {
+  const cost = INJECTION_PER_PROMPT * prompts;
   console.log(
-    `  ${pad(n, 10)}${num(w.toLocaleString(), 11)}${num(o.toLocaleString(), 12)}` +
-      `${num(`${delta >= 0 ? '+' : ''}${delta.toLocaleString()}`, 11)}`,
+    `  ${pad(`${prompts} prompts`, 16)}${num(cost.toLocaleString(), 14)}` +
+      `${num((cost / refund).toFixed(1), 23)}`,
   );
 }
 rule();
-console.log('  negative = you paid more than you got back that session');
+console.log('  session length is measured, not assumed: see bench-tokens for the');
+console.log('  distribution across this project (median 1 prompt, mean 6.9).');

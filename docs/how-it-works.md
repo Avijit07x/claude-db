@@ -6,7 +6,7 @@ graph stays honest.
 
 ## Capture
 
-Claude Code already writes every session to disk as JSONL — your prompts, its
+Claude Code already writes every session to disk as JSONL: your prompts, its
 replies, every tool call. claude-db reads that file, so it captures **why** you
 did something, not just which files changed.
 
@@ -41,7 +41,7 @@ best match in full on each prompt. Roughly 350 tokens when something relevant
 exists, zero when it doesn't.
 
 **What search returns.** An id, kind, date, title and one line of the matching
-body — enough to tell two similarly-titled rows apart without expanding either.
+body, enough to tell two similarly-titled rows apart without expanding either.
 Full bodies come only from `get_observations`, for ids you picked.
 
 One stored memory looks like this:
@@ -71,8 +71,8 @@ already landed, or a finished task would flicker back into the list every time
 a neighbouring line changed.
 
 `claude-db status` lists what is still open, and SessionStart injects the
-newest few. That is what lets a brand-new chat answer "what was I doing" —
-memory search ranks by relevance, and a prompt like "do the last task" contains
+newest few. That is what lets a brand-new chat answer "what was I doing".
+Memory search ranks by relevance, and a prompt like "do the last task" contains
 no words worth matching, so recency has to come from somewhere else.
 
 Rows captured before this existed default to `done`. Marking a whole existing
@@ -82,7 +82,7 @@ database unfinished would be worse than saying nothing.
 
 `claude-db install` copies two things to disk: the `/cdb-scan` skill, and a
 standing instruction block in `CLAUDE.local.md`. Claude Code only reads skills
-from `~/.claude/skills/`, so a copy has to exist there — but a copy drifts as
+from `~/.claude/skills/`, so a copy has to exist there, but a copy drifts as
 soon as the package updates.
 
 The hooks are registered by absolute path into the installed package, so they
@@ -97,7 +97,7 @@ back, and anything `uninstall` removed stays removed.
 ## The code graph
 
 `claude-db scan` parses every supported source file and stores what it finds:
-each symbol, and each relationship between symbols — what calls what, what
+each symbol, and each relationship between symbols: what calls what, what
 imports what, what extends what. Parsing is local and deterministic, costs no
 tokens, and takes about a second on a mid-size repository. A rescan only
 re-parses files whose contents changed.
@@ -117,7 +117,7 @@ Shortest path (4 hops):
 ```
 
 **Every edge carries its confidence.** `EXTRACTED` means the relationship was
-read literally out of the syntax tree — an import names its own target, so
+read literally out of the syntax tree. An import names its own target, so
 nothing is guessed. `INFERRED` means the target was matched by name across
 files, which is wrong when two files export the same identifier, and carries a
 score saying how sure the match was. Name matching is the one guess this makes,
@@ -131,7 +131,7 @@ have been scanned, but correctness does not depend on it having run.
 
 Traversal is keyed on symbol id rather than name. Keying by name would merge
 every same-named symbol into one node, and a repository with a `run` in each
-test file would then grow shortcuts between unrelated code — making the
+test file would then grow shortcuts between unrelated code, making the
 shortest path a route nothing can actually take.
 
 Languages: TypeScript, TSX, JavaScript, Python, Go and Rust. The parser is
@@ -141,8 +141,8 @@ nothing compiles at install and nothing else has to be installed.
 ## The `/cdb-scan` skill
 
 Installed alongside the hooks, it runs two passes: `claude-db scan` for the
-graph, then five written notes — stack, layout, conventions, workflows,
-architecture — stored under stable keys so a re-run updates them in place.
+graph, then five written notes (stack, layout, conventions, workflows,
+architecture) stored under stable keys so a re-run updates them in place.
 
 The graph records what the code _is_; the notes record why it is built that
 way. Those notes are tagged `inferred`, because they are Claude's reading of
@@ -154,7 +154,7 @@ database is testimony, and a search result must not blur the two.
 SQLite by default, at `~/.claude-memory/memory.db`. The connection string picks
 the backend, and `CLAUDE_DB_URL` overrides the config file.
 
-Search is hybrid — keyword plus vector — on all three backends. Ranking, fusion
+Search is hybrid, keyword plus vector, on all three backends. Ranking, fusion
 and token budgeting live in `src/search` rather than in the adapters, so recall
 behaves identically no matter which database is plugged in; only retrieval cost
 changes. Memory is partitioned by project path, so one database serves every
@@ -179,5 +179,5 @@ Atlas indexes are not created by this tool. Add one by hand on the
 ```
 
 `numDimensions` is 256 for the builtin embedder, 384 once
-`@xenova/transformers` is installed. Without this index Mongo still works —
+`@xenova/transformers` is installed. Without this index Mongo still works,
 vector search falls back to scoring candidates in process.

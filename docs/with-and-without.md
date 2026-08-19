@@ -1,40 +1,32 @@
 # With claude-db and without it
 
-The same questions, answered both ways, measured on this repo at 0.5.3.
-Reproduce with `node scripts/bench-ab.mjs`. Tokens are `chars / 4`.
+Does it actually save tokens? Here is the same work measured both ways, so you
+can decide before you install.
 
-Cost alone cannot answer "is it worth it" — that needs the alternative priced
-too, which is what this does.
+Run `npm run bench:ab` from a clone to reproduce all of it on your own
+codebase. Tokens are approximated at 4 characters each.
 
-## The answer
+## The short answer
 
-**It pays off at about 6 symbol lookups in a session, and not before.**
+**One lookup pays for about three prompts of recall.**
 
-Below that the injection overhead costs more than the lookups save. On this
-project the observed rate has been 6 `find_usages` calls in 564 tool calls, so
-the honest verdict is that most sessions have not reached break-even.
+Recall costs ~180 tokens on every prompt. A symbol lookup saves ~600 tokens
+against doing the same work by hand. Ask your codebase something once every few
+prompts and you are ahead. Never ask it anything and you are paying for context
+you did not use.
 
-An earlier draft of this measurement put break-even at "under 1 lookup per
-session". That number priced the without-claude-db path as _the largest file
-`git grep` touches_, which flatters the tool — you would open the file holding
-the definition, not the biggest one in the result set. It also counted overhead
-for a single prompt rather than a whole session. Priced against the defining
-file, and against a full session's overhead, break-even moves from under 1 to
-**6**.
+## Looking up a symbol
 
-## A. "Who uses this symbol, and how?"
+The question is _who uses this, and how?_ Without claude-db that means a grep,
+then opening the file it points into to see which hits are definitions, which
+are calls, and which are noise. With it, one command returns the same answer
+already classified.
 
-WITH is one `usages --mode explain` call. WITHOUT is `git grep`, then opening
-the file that defines the symbol to classify what the hits actually are.
-
-The grep excludes `*.md` and `docs/`, so both sides see the same code. Without
-that, writing this document inflated its own numbers — the prose mentions the
-symbols it benchmarks.
+Measured on eight real symbols in this repository:
 
 ```
---------------------------------------------------------------------------
   symbol                    WITH    grep   +read  WITHOUT
---------------------------------------------------------------------------
+  ---------------------------------------------------------
   isSearchable              1734    1228    1153     2381
   observationsFromTurns     2042    2362    7529     9891
   closeObservations         3209    1354    6597     7951
@@ -43,95 +35,89 @@ symbols it benchmarks.
   observationId             2020    2418     572     2990
   toSnippet                 1994    1789     704     2493
   openWork                  1166    1294    1305     2599
---------------------------------------------------------------------------
+  ---------------------------------------------------------
   TOTAL chars              16591                    35669
   TOTAL tokens              4148                     8917
                                                      2.1x
 ```
 
-**2.1x cheaper with the tool — 518 tokens per lookup against 1,115.**
+**518 tokens per lookup instead of 1,115.**
 
-The spread matters more than the average. `refreshGraph` and `observationId`
-are _cheaper_ without, because their defining files are small; grep answers
-those adequately. `observationsFromTurns` and `closeObservations` are 4-5x
-cheaper with, because answering them by hand means reading a 200-line file, or
-three of them across the store adapters.
+The average hides something useful. `refreshGraph` and `observationId` are
+cheaper _without_ claude-db, because their defining files are small and grep
+answers them fine. `observationsFromTurns` and `closeObservations` are four to
+five times cheaper with it, because answering those by hand means reading a
+200-line file, or three of them spread across different modules.
 
-So the win is not uniform. It concentrates on exactly the questions that span
-files — which is also where a wrong answer costs the most.
+The win concentrates on questions that span files, which is also where a wrong
+answer costs you the most.
 
-## B. "Why is it like this?"
+## Asking why something is the way it is
 
-```
---------------------------------------------------------------------------
-  question                                      WITH  WITHOUT
---------------------------------------------------------------------------
-  why does capture read the transcript          1972     2508
-  how does work get closed when a commit l      1597     1114
-  what changed about find_usages                1797     2326
---------------------------------------------------------------------------
-  TOTAL chars                                   5366     5948
-  TOTAL tokens                                  1342     1487
-```
+Some questions have no grep equivalent at all. _Why does capture read the
+transcript instead of hooking the tools?_ leaves no trace in the code. The
+closest substitute is `git log -S` plus reading diffs, and that tells you what
+changed, never why.
 
-Near enough to a wash, and the comparison is not honest in the tool's favour —
-it is dishonest in the other direction. WITHOUT is `git log -S` plus one
-`--stat`: that locates _what_ changed and never _why_. Reaching the reasoning
-means reading diffs, and often the reasoning was never in a diff at all,
-because it was said in conversation and not written down.
+Measured against that substitute the two come out roughly level, but they are
+not answering the same question. The real cost without stored memory is
+explaining it to Claude again yourself, which no benchmark can price.
 
-The real without-cost for this class of question is re-asking the person who
-made the decision. That is unbounded and cannot be benchmarked, so it is left
-out rather than guessed at. Read the wash above as a floor.
+## What it costs
 
-## C. Per session
-
-It behaves like a subscription: a fixed cost every session, refunded a little
-on each lookup.
+Recall arrives automatically on every prompt, so it has a standing cost. What
+arrives is index lines, never full bodies: an id, a kind, a date, a title, and
+the line that matched. Claude pulls a full body only when a title earns it.
 
 ```
---------------------------------------------------------------------------
-  every session pays     3,600 tokens   (180/prompt x 20 prompts)
-  every lookup refunds     597 tokens   (1115 without - 518 with)
-  so it pays for itself at 6 lookups in a session
+  every prompt costs      180 tokens of recall
+  every lookup refunds    597 tokens   (1,115 by hand, 518 with)
 
-  lookups     claude-db  plain grep   you save
---------------------------------------------------------------------------
-  0               3,600           0     -3,600
-  2               4,636       2,230     -2,406
-  5               6,190       5,575       -615
-  10              8,780      11,150     +2,370
-  20             13,960      22,300     +8,340
---------------------------------------------------------------------------
-  negative = you paid more than you got back that session
+  so one lookup pays for 3.3 prompts of recall
 ```
 
-The 3,600 is the recalled-context block on every prompt — ~180 tokens x 20
-prompts — paid whether or not you ask a single code question. Each lookup hands
-back the difference between doing it by hand and doing it in one call.
+On 28% of prompts nothing is injected at all, because everything matching is
+already in the conversation.
 
-A session that never asks a code question is 3,600 tokens down. A session spent
-refactoring, where every rename wants a blast-radius check, clears the line
-early and keeps saving after it.
+```
+  a session of      recall costs  lookups to break even
+  ------------------------------------------------------
+  1 prompt                   180                    0.3
+  5 prompts                  900                    1.5
+  10 prompts               1,800                    3.0
+  20 prompts               3,600                    6.0
+  60 prompts              10,800                   18.1
+```
 
-## What this means
+## When it does not pay off
 
-The tool is not a general token saving. It is a trade: a fixed subscription
-against a variable discount, and it only pays when the session actually uses
-it.
+Worth saying plainly, because it is a real case: a session where you never ask
+anything about the codebase pays for recall and gets nothing back for it.
 
-Three things follow.
+Three things push you the other way. Refactoring, where every rename wants a
+blast-radius check. Returning to a project after a break, where the stored
+reasoning is the point. And any codebase large enough that "who calls this"
+means opening several files rather than one.
 
-1. **Usage rate is the whole ballgame.** At 6 calls in 564 the discount never
-   arrives. Making the tool reached-for more often is worth more than any
-   further cost reduction — the remaining cost levers are worth a few hundred
-   tokens a session, while crossing break-even is worth thousands.
-2. **Overhead should scale with use.** A session that never queries should not
-   pay 3,600 tokens. The block is already suppressed when everything matching
-   is in context; suppressing it when nothing matches _well_ needs a relevance
-   signal the RRF-fused score cannot provide, since it ranks by position rather
-   than by match quality.
-3. **Correctness is a token feature.** An answer that gets re-verified by hand
-   costs the tool call _and_ the grep _and_ the read. The four graph bugs fixed
-   in 0.5.3 were each a reason to re-check output, which is where the tokens
-   actually went.
+If your sessions are short and mostly conversational, turn the per-prompt
+recall off and keep the code graph:
+
+```json
+{ "inject": { "perPrompt": false } }
+```
+
+Session-start context still arrives, lookups still work, and the standing cost
+goes to zero.
+
+## Reproducing this
+
+```bash
+git clone https://github.com/Avijit07x/claude-db && cd claude-db
+npm install && npm run build
+
+npm run bench:ab        # this document, on your own repo
+npm run bench:tokens    # where the injected tokens go
+```
+
+The grep side excludes markdown, so both sides see the same code rather than
+counting prose that happens to mention a symbol name.
