@@ -8,15 +8,6 @@ export { BuiltinEmbedder } from './builtin.js';
 
 export type EmbeddingProvider = 'auto' | 'local' | 'builtin' | 'none';
 
-/**
- * `auto` is the default and the reason zero-config installs still get fuzzy
- * recall: it prefers the real sentence-transformer, but a missing or broken
- * ONNX runtime silently falls back to the builtin rather than leaving the
- * user with keyword-only search and no explanation.
- *
- * The probe runs one real embedding, because importing the module succeeds in
- * cases where the native backend still fails at inference time.
- */
 export async function createEmbedder(provider: EmbeddingProvider): Promise<Embedder> {
   switch (provider) {
     case 'none':

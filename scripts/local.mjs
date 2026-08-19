@@ -1,5 +1,3 @@
-// Proves the zero-config local path: no CLAUDE_DB_URL, no config.json,
-// no optional dependencies, no network.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,7 +12,6 @@ const check = (label, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  (${detail})` : ''}`);
 };
 
-// --- embedder resolves with nothing installed --------------------------------
 const embedder = await createEmbedder('auto');
 check('auto provider yields a working embedder', embedder.dimensions > 0, embedder.id);
 const [probe] = await embedder.embed(['hello world']);
@@ -23,20 +20,27 @@ check('auto embedder produces vectors', probe.length === embedder.dimensions);
 const unit = Math.sqrt(probe.reduce((s, v) => s + v * v, 0));
 check('vectors are unit length', Math.abs(unit - 1) < 1e-6, unit.toFixed(6));
 
-// --- builtin captures morphology that exact-token search misses ---------------
 const b = new BuiltinEmbedder();
 const cos = (x, y) => x.reduce((s, v, i) => s + v * y[i], 0);
 const [reconnect, reconnecting, unrelated] = await b.embed([
-  'reconnect socket', 'reconnecting sockets', 'invoice pdf export',
+  'reconnect socket',
+  'reconnecting sockets',
+  'invoice pdf export',
 ]);
 const near = cos(reconnect, reconnecting);
 const far = cos(reconnect, unrelated);
-check('morphological variants score close', near > far * 3, `${near.toFixed(3)} vs ${far.toFixed(3)}`);
+check(
+  'morphological variants score close',
+  near > far * 3,
+  `${near.toFixed(3)} vs ${far.toFixed(3)}`,
+);
 
 const [cjk] = await b.embed(['修复登录接口的超时问题']);
-check('non-latin text produces a real vector', cjk.some((v) => v !== 0));
+check(
+  'non-latin text produces a real vector',
+  cjk.some((v) => v !== 0),
+);
 
-// --- end to end, default sqlite, no url --------------------------------------
 const dir = mkdtempSync(join(tmpdir(), 'recall-local-'));
 const store = await createStore(join(dir, 'memory.db'));
 await store.init();
@@ -51,22 +55,32 @@ const observations = [];
 for (const [kind, title, body] of rows) {
   const [embedding] = await embedder.embed([`${title}\n${body}`]);
   observations.push({
-    id: randomUUID(), sessionId: 's', project, kind, title, body,
-    files: [], tags: [], createdAt: now, embedding,
+    id: randomUUID(),
+    sessionId: 's',
+    project,
+    kind,
+    title,
+    body,
+    files: [],
+    tags: [],
+    createdAt: now,
+    embedding,
   });
 }
 await store.insertObservations(observations);
 
 const search = new SearchService(store, embedder);
 
-// "reconnect" is not a literal token in any stored title ("reconnecting" is).
 const hits = await search.search({ text: 'reconnect', project, limit: 5 });
 check('vector recall finds a non-exact token match', hits.length > 0, `${hits.length} hits`);
 check('correct record ranks first', hits[0]?.title.includes('reconnecting'), hits[0]?.title);
 
 const stored = await store.getObservations([observations[0].id]);
-check('embeddings round-trip through sqlite',
-  stored[0].embedding?.length === embedder.dimensions, String(stored[0].embedding?.length));
+check(
+  'embeddings round-trip through sqlite',
+  stored[0].embedding?.length === embedder.dimensions,
+  String(stored[0].embedding?.length),
+);
 
 await store.close();
 rmSync(dir, { recursive: true, force: true });

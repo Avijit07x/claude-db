@@ -1,38 +1,68 @@
 import type { Observation, ObservationIndexEntry } from '../types.js';
 import { toShortId } from '../util/shortid.js';
 
-/**
- * Prompts that carry no retrievable intent. Searching memory for "ok" or
- * "continue" wastes a query and, worse, risks injecting unrelated context that
- * teaches the reader to ignore the memory block entirely.
- */
 const TRIVIAL = new Set([
-  'ok', 'okay', 'yes', 'no', 'yep', 'nope', 'sure', 'thanks', 'thank you',
-  'continue', 'go on', 'go ahead', 'next', 'stop', 'wait', 'done', 'good',
-  'nice', 'perfect', 'great', 'do it', 'proceed', 'retry', 'again', 'fix it',
+  'ok',
+  'okay',
+  'yes',
+  'no',
+  'yep',
+  'nope',
+  'sure',
+  'thanks',
+  'thank you',
+  'continue',
+  'go on',
+  'go ahead',
+  'next',
+  'stop',
+  'wait',
+  'done',
+  'good',
+  'nice',
+  'perfect',
+  'great',
+  'do it',
+  'proceed',
+  'retry',
+  'again',
+  'fix it',
 ]);
 
-/** Tokens that appear in almost every prompt and cannot discriminate. */
 const NOISE = new Set([
-  'the', 'and', 'for', 'this', 'that', 'with', 'you', 'can', 'please', 'now',
-  'what', 'why', 'how', 'when', 'where', 'are', 'was', 'were', 'have', 'has',
-  'not', 'let', 'make', 'get', 'add', 'use', 'need', 'want', 'should',
+  'the',
+  'and',
+  'for',
+  'this',
+  'that',
+  'with',
+  'you',
+  'can',
+  'please',
+  'now',
+  'what',
+  'why',
+  'how',
+  'when',
+  'where',
+  'are',
+  'was',
+  'were',
+  'have',
+  'has',
+  'not',
+  'let',
+  'make',
+  'get',
+  'add',
+  'use',
+  'need',
+  'want',
+  'should',
 ]);
 
-/**
- * Scripts written without spaces. "修复登录接口的超时问题" is one token, so the
- * two-content-word bar has to be counted in characters instead.
- */
-const DENSE_SCRIPT =
-  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
+const DENSE_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
 
-/**
- * Decides whether a prompt is worth a memory lookup at all.
- *
- * This runs before the query, so a cheap reject here saves the entire search.
- * The bar is deliberately low: two content words. The goal is to skip
- * conversational filler, not to predict relevance, which is what search is for.
- */
 export function isSearchable(prompt: string): boolean {
   const normalized = prompt.trim().toLowerCase();
   if (TRIVIAL.has(normalized.replace(/[.!?]+$/, ''))) return false;
@@ -47,16 +77,6 @@ export function isSearchable(prompt: string): boolean {
   return content.length >= 2;
 }
 
-/**
- * Renders the block injected above a user prompt.
- *
- * Titles only, no bodies. The point is to tell Claude that relevant history
- * exists and give it the ids to expand, not to pre-load the history itself.
- * Pre-loading bodies is what makes naive memory tools expensive.
- *
- * Returns null when there is nothing worth saying, so the caller emits
- * nothing at all rather than an empty container.
- */
 export function renderPromptContext(
   entries: ObservationIndexEntry[],
   maxChars: number,
@@ -68,17 +88,13 @@ export function renderPromptContext(
   const expandedIds = new Set(expanded.map((obs) => obs.id));
   const sections: string[] = [];
 
-  // Best match in full. This is the part that answers the question outright
-  // instead of telling the agent where it could look.
   for (const obs of expanded) {
     const date = new Date(obs.createdAt).toISOString().slice(0, 10);
     sections.push(
-      `${toShortId(obs.id)} ${obs.kind} ${date} ${obs.title}\n` +
-        clip(obs.body, expandMaxChars),
+      `${toShortId(obs.id)} ${obs.kind} ${date} ${obs.title}\n` + clip(obs.body, expandMaxChars),
     );
   }
 
-  // Remaining matches stay as pointers, cheap enough to be worth listing.
   const lines: string[] = [];
   let budget = maxChars;
   for (const entry of entries) {

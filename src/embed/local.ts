@@ -6,19 +6,9 @@ type FeatureExtractor = (
   options: { pooling: 'mean'; normalize: boolean },
 ) => Promise<{ tolist(): number[][] }>;
 
-/**
- * all-MiniLM-L6-v2 running locally through transformers.js. No API key, no
- * per-token cost, and observations never leave the machine. The model (~25MB)
- * downloads once on first use and is cached by the library thereafter.
- *
- * The pipeline is loaded lazily and memoized: importing this module must stay
- * cheap because hook scripts import it on every tool call.
- */
 export class LocalEmbedder implements Embedder {
   readonly id = 'Xenova/all-MiniLM-L6-v2';
   readonly dimensions = 384;
-  // MiniLM packs unrelated sentence pairs around 0.1-0.3 and related pairs
-  // above 0.4, so its noise floor sits well above the builtin's.
   readonly minRelevance = 0.35;
 
   private pipelinePromise: Promise<FeatureExtractor> | null = null;
@@ -38,8 +28,6 @@ export class LocalEmbedder implements Embedder {
       }
       let transformers: TransformersModule;
       try {
-        // Widened specifier: the package is an optional peer and may be absent
-        // at build time, so TypeScript must not try to resolve it.
         transformers = (await import(
           '@xenova/transformers' as string
         )) as unknown as TransformersModule;

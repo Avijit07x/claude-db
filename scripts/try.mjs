@@ -1,12 +1,3 @@
-/**
- * Interactive local trial. Simulates a full Claude Code session end to end
- * without touching ~/.claude/settings.json, so you can see what claude-db
- * would remember before installing anything.
- *
- *   npm run try
- *
- * Uses a throwaway database in the system temp dir and deletes it on exit.
- */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,8 +28,6 @@ const at = (min) => new Date(Date.now() - (60 - min) * 60_000).toISOString();
 console.log('\x1b[1mclaude-db local trial\x1b[0m');
 console.log(`throwaway db: ${db}`);
 
-// Claude Code writes this file itself during a real session. Here we stand in
-// for it, because the transcript is the only place intent and reasoning exist.
 step(1, 'Claude Code records the session as JSONL');
 const rows = [
   { type: 'user', timestamp: at(0), message: { content: 'the order feed keeps dropping' } },
@@ -86,7 +75,9 @@ for (const row of handle.prepare('SELECT kind, title FROM observations').all()) 
 console.log('  \x1b[2mdropped: the grep (exploration), and "ok" (no change)\x1b[0m');
 
 step(4, 'A NEW session starts. This lands in context automatically');
-console.log('\x1b[36m' + hook('session-start', { session_id: 'demo-2', cwd: project }).trim() + '\x1b[0m');
+console.log(
+  '\x1b[36m' + hook('session-start', { session_id: 'demo-2', cwd: project }).trim() + '\x1b[0m',
+);
 
 step(5, 'And this is injected above a related prompt, with no tool call');
 const injected = hook('user-prompt', {

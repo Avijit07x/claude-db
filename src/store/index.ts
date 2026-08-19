@@ -2,17 +2,6 @@ import type { MemoryStore } from './adapter.js';
 
 export type { MemoryStore, StoreFactory } from './adapter.js';
 
-/**
- * Resolve a store from a connection URI. The scheme alone decides the backend,
- * so users configure one variable and never name an adapter explicitly.
- *
- *   mongodb://... | mongodb+srv://...  -> MongoDB
- *   postgres://... | postgresql://...  -> Postgres + pgvector
- *   sqlite:///abs/path | ./file.db     -> SQLite (default)
- *
- * Adapters are imported lazily so a user on Mongo never loads the Postgres
- * driver, and a missing optional dependency surfaces as a clear message.
- */
 export async function createStore(uri: string): Promise<MemoryStore> {
   const scheme = parseScheme(uri);
 

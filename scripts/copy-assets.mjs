@@ -1,4 +1,3 @@
-// Non-TS assets that must sit beside the compiled output.
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 

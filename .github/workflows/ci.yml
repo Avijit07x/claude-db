@@ -11,9 +11,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22.5 is the floor the package declares; 24 is the current line.
-        # macOS is included deliberately: the symlink handling in resolveProject
-        # only misbehaves there, where /tmp is a link to /private/tmp.
         os: [ubuntu-latest, macos-latest]
         node: ['22.x', '24.x']
 
@@ -43,9 +40,6 @@ jobs:
           claude-db doctor
           cdb --help || true
 
-  # The job above only ever exercised SQLite, which is how two Postgres bugs
-  # shipped. The smoke suite takes a connection string, so this is the same
-  # checks against the other two backends.
   adapters:
     runs-on: ubuntu-latest
 

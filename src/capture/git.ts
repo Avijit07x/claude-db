@@ -4,25 +4,9 @@ import type { Observation } from '../types.js';
 import { observationId } from './identity.js';
 import { classifyTurn, redact, topLevelDirs } from './turn-extractor.js';
 
-/**
- * Builds memory from git history.
- *
- * A fresh install knows nothing and stays useless for weeks while it fills up,
- * which is the worst moment to be asking someone to trust it. Git history is
- * already a near-perfect source for exactly the fields an observation wants —
- * subject, reasoning, files, author, date — and unlike a profile written by a
- * model it is a record of things that actually happened.
- *
- * Ids derive from the commit sha, so this is safe to re-run: later commits are
- * added and earlier ones are rewritten in place rather than duplicated.
- */
-
-// Unit and record separators: neither can appear in a commit message, so the
-// output parses without any quoting rules.
 const RECORD = '';
 const FIELD = '';
 
-/** Releases and formatting sweeps touch many files and explain nothing. */
 const NOT_WORTH_KEEPING =
   /^(v?\d+\.\d+\.\d+|merge |revert "|bump |release |chore\(release\)|\d+\.\d+\.\d+$)/i;
 
@@ -52,9 +36,6 @@ export function observationsFromGit(project: string, limit: number): Observation
 function toObservation(record: string, project: string): Observation | null {
   if (record.trim().length === 0) return null;
 
-  // The format string ends with a separator, so --name-only's paths arrive as
-  // their own field rather than having to be told apart from the body — which
-  // cannot be done by looking, since commit bodies contain blank lines too.
   const [sha, author, date, subject, body = '', paths = ''] = record.split(FIELD);
   if (!sha || !subject || !date) return null;
   if (NOT_WORTH_KEEPING.test(subject.trim())) return null;
@@ -72,8 +53,6 @@ function toObservation(record: string, project: string): Observation | null {
 
   const timestamp = createdAt;
   return {
-    // The sha alone, so re-seeding rewrites rather than appends and two
-    // machines seeding the same repository agree on every id.
     id: observationId('git', 0, sha),
     sessionId: 'git',
     project,
