@@ -1,10 +1,15 @@
 import type {
+  CodeEdge,
+  CodeSymbol,
+  EdgeFilter,
   ListFilter,
   Observation,
   ObservationIndexEntry,
   RemoveFilter,
+  ScannedFile,
   SearchQuery,
   Session,
+  SymbolFilter,
   TimelineQuery,
 } from '../types.js';
 
@@ -14,21 +19,11 @@ export interface ProjectSummary {
   lastActive: number;
 }
 
-/**
- * The contract every database backend implements.
- *
- * Adapters own persistence only. Ranking, fusion and token budgeting live in
- * src/search so they stay identical no matter which database is plugged in.
- * An adapter that cannot do vectors returns [] from `searchVector`; the search
- * service degrades to keyword-only rather than failing.
- */
 export interface MemoryStore {
   readonly kind: string;
 
-  /** Create collections/tables and indexes. Must be idempotent. */
   init(): Promise<void>;
   close(): Promise<void>;
-  /** Cheap liveness probe used by `claude-db doctor`. */
   ping(): Promise<boolean>;
 
   upsertSession(session: Session): Promise<void>;
@@ -38,68 +33,46 @@ export interface MemoryStore {
   insertObservations(observations: Observation[]): Promise<void>;
   getObservations(ids: string[]): Promise<Observation[]>;
 
-  /**
-   * Deletes memory matching a filter, returning how many observations went.
-   *
-   * One method rather than three because `reset`, `prune` and `forget` differ
-   * only in how they narrow. Belongs on the adapter rather than being handled
-   * by deleting a file, because on a shared Postgres or Mongo there is none.
-   *
-   * Sessions are removed only for a whole-project or whole-database wipe; a
-   * pruned or forgotten observation leaves its session intact.
-   */
   remove(filter: RemoveFilter): Promise<number>;
 
-  /**
-   * Bulk read, oldest first, for export, re-embedding and statistics. Paged by
-   * `after` + `limit` so a large database is never held in memory at once.
-   */
   list(filter: ListFilter): Promise<Observation[]>;
 
-  /** Every project with memory in this database, most recently active first. */
   listProjects(): Promise<ProjectSummary[]>;
 
-  /**
-   * Tables or collections in this database that belong to somebody else.
-   *
-   * Called by `use` before `init()` creates ours, because afterwards there is
-   * no way to tell an empty memory database from an application database we
-   * just added two tables to. One `use` in anger pointed at a live e-commerce
-   * database and nothing said a word.
-   */
   inventory(): Promise<string[]>;
 
-  /** Lexical match. Returns scores on an adapter-defined scale. */
   searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]>;
-  /** Vector match. Return [] when the backend has no vector support. */
   searchVector(vector: number[], query: SearchQuery): Promise<ObservationIndexEntry[]>;
 
   timeline(query: TimelineQuery): Promise<ObservationIndexEntry[]>;
+
+  closeObservations(ids: string[]): Promise<number>;
+
+  upsertGraph(scan: {
+    symbols: CodeSymbol[];
+    edges: CodeEdge[];
+    files: ScannedFile[];
+  }): Promise<void>;
+
+  findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]>;
+  findEdges(filter: EdgeFilter): Promise<CodeEdge[]>;
+  scannedFiles(project: string): Promise<ScannedFile[]>;
+
+  removeGraph(project: string, files?: string[]): Promise<number>;
 }
 
-/**
- * True when a filter names a whole project, or the whole database.
- *
- * Sessions follow their observations only in that case: pruning by date or
- * forgetting one row must leave the session record alone, or the recap at
- * SessionStart loses sessions whose work is still there.
- */
 export function isWholeScope(filter: RemoveFilter): boolean {
   return !filter.ids && !filter.kind && filter.before === undefined;
 }
 
-/**
- * Ours, on any backend: the two tables, SQLite's FTS shadow tables, and the
- * Postgres schema-version row.
- */
-const OURS = /^(claude_db_meta|sessions|observations)(_fts(_\w+)?)?$/;
+const OURS =
+  /^(claude_db_meta|sessions|observations|symbols|symbol_edges|scanned_files)(_fts(_\w+)?)?$/;
 
 export function foreignNames(names: string[]): string[] {
   return names.filter((name) => name.length > 0 && !OURS.test(name));
 }
 
 export interface StoreFactory {
-  /** Lowercase URI schemes this factory claims, e.g. ['mongodb','mongodb+srv']. */
   schemes: string[];
   create(uri: string): Promise<MemoryStore>;
 }

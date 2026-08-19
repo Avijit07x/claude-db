@@ -1,12 +1,6 @@
-/**
- * Command classification: exploration must be dropped, consequential
- * operations kept. Cases taken from real captured sessions.
- */
 import { classifyCommand } from '../dist/capture/command.js';
 
 const noise = [
-  // Real compound commands captured from a live session. The exploration
-  // segments must not qualify the whole chain.
   "sed -n '1,50p' npm/scripts/check-icon-naming.ts",
   'test.ts; echo "=== check-icon-naming ==="; sed -n \'1,50p\' npm/scripts/x.ts',
   'cat test.ts',
@@ -42,15 +36,20 @@ let bad = 0;
 console.log('SHOULD BE DROPPED (exploration):');
 for (const c of noise) {
   const r = classifyCommand(c);
-  if (r) { bad++; console.log(`  KEPT (wrong): ${c.slice(0,55)} -> ${r.label}`); }
+  if (r) {
+    bad++;
+    console.log(`  KEPT (wrong): ${c.slice(0, 55)} -> ${r.label}`);
+  }
 }
 if (bad === 0) console.log(`  all ${noise.length} correctly dropped`);
 
 console.log('\nSHOULD BE KEPT (consequential):');
 for (const c of signal) {
   const r = classifyCommand(c);
-  if (!r) { bad++; console.log(`  DROPPED (wrong): ${c}`); }
-  else console.log(`  ${r.kind.padEnd(9)} ${r.label}`);
+  if (!r) {
+    bad++;
+    console.log(`  DROPPED (wrong): ${c}`);
+  } else console.log(`  ${r.kind.padEnd(9)} ${r.label}`);
 }
 console.log(bad === 0 ? '\nFilter correct.' : `\n${bad} misclassified.`);
 process.exit(bad ? 1 : 0);

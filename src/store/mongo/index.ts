@@ -1,76 +1,74 @@
-import type { Collection, Db, Doc, MongoClient } from './driver.js';
-import { importMongo } from './driver.js';
-import type { MemoryStore, ProjectSummary } from '../adapter.js';
-import { foreignNames, isWholeScope } from '../adapter.js';
+import * as vectorSearchOps from './vectorSearch.js';
+import * as searchOps from './search.js';
+import { scopeFilter } from './filters.js';
+import type { VectorCache } from './filters.js';
+import * as observationsOps from './observations.js';
+import * as sessionsOps from './sessions.js';
+import * as graphOps from './graph.js';
 import type {
+  CodeEdge,
+  CodeSymbol,
+  EdgeFilter,
   ListFilter,
   Observation,
   ObservationIndexEntry,
-  ObservationKind,
   RemoveFilter,
+  ScannedFile,
   SearchQuery,
   Session,
+  SymbolFilter,
   TimelineQuery,
 } from '../../types.js';
+import type { Collection, Db, Doc, MongoClient } from './driver.js';
+import type { MemoryStore, ProjectSummary } from '../adapter.js';
+import {
+  EdgeDoc,
+  ObservationDoc,
+  ScannedFileDoc,
+  SessionDoc,
+  SymbolDoc,
+  toDoc,
+  toEdge,
+  toIndexEntry,
+  toObservation,
+  toSession,
+  toSymbol,
+  upsertsOf,
+} from './docs.js';
 import { cosine } from '../../util/vector.js';
+import { databaseNameFrom, escapeRegex } from './helpers.js';
+import { foreignNames, isWholeScope } from '../adapter.js';
+import { importMongo } from './driver.js';
 import { partitionIds } from '../../util/shortid.js';
-import { toSnippet } from '../../util/snippet.js';
 
-interface SessionDoc extends Doc {
-  _id: string;
-  project: string;
-  startedAt: number;
-  endedAt?: number;
-  summary?: string;
-}
-
-interface ObservationDoc extends Doc {
-  _id: string;
-  sessionId: string;
-  project: string;
-  kind: ObservationKind;
-  title: string;
-  body: string;
-  files: string[];
-  tags: string[];
-  createdAt: number;
-  embedding?: number[];
-  embedder?: string;
-  author?: string;
-}
-
-/**
- * Works against any MongoDB: Atlas, self-hosted, or a local container.
- *
- * Keyword search uses a compound text index, available in every deployment.
- * Vector search prefers an Atlas `$vectorSearch` index when one exists and
- * otherwise falls back to scoring candidates in process, so a plain
- * `mongodb://localhost` connection string still gets semantic recall.
- */
 export class MongoStore implements MemoryStore {
   readonly kind = 'mongodb';
 
-  /** Resolved on first vector query, then cached for the process lifetime. */
-  private atlasVectorIndex: boolean | null = null;
+  private readonly cache: VectorCache = { atlasVectorIndex: null };
 
   private constructor(
     private readonly client: MongoClient,
     private readonly db: Db,
     private readonly sessions: Collection<SessionDoc>,
     private readonly observations: Collection<ObservationDoc>,
+    private readonly symbols: Collection<SymbolDoc>,
+    private readonly edges: Collection<EdgeDoc>,
+    private readonly scanned: Collection<ScannedFileDoc>,
   ) {}
 
   static async create(uri: string): Promise<MongoStore> {
     const mongo = await importMongo();
     const client = new mongo.MongoClient(uri);
     await client.connect();
-    // Honour a database name in the URI, fall back to a sensible default.
     const db = client.db(databaseNameFrom(uri) ?? 'claude_memory_db');
     return new MongoStore(
       client,
       db,
       db.collection<SessionDoc>('sessions'),
       db.collection<ObservationDoc>('observations'),
+      db.collection<SymbolDoc>('symbols'),
+      db.collection<EdgeDoc>('symbol_edges'),
+      db.collection<ScannedFileDoc>('scanned_files'),
     );
   }
 
@@ -82,6 +80,12 @@ export class MongoStore implements MemoryStore {
       { title: 'text', body: 'text', tags: 'text' },
       { name: 'memory_text', weights: { title: 10, tags: 5, body: 1 } },
     );
+    await this.symbols.createIndex({ project: 1, name: 1 });
+    await this.symbols.createIndex({ project: 1, file: 1 });
+    await this.edges.createIndex({ project: 1, srcId: 1 });
+    await this.edges.createIndex({ project: 1, dstId: 1 });
+    await this.edges.createIndex({ project: 1, file: 1 });
+    await this.scanned.createIndex({ project: 1, path: 1 }, { unique: true });
   }
 
   async close(): Promise<void> {
@@ -94,332 +98,118 @@ export class MongoStore implements MemoryStore {
   }
 
   async upsertSession(session: Session): Promise<void> {
-    const set: Partial<SessionDoc> = {
-      project: session.project,
-      startedAt: session.startedAt,
-    };
-    if (session.endedAt !== undefined) set.endedAt = session.endedAt;
-    if (session.summary !== undefined) set.summary = session.summary;
-
-    await this.sessions.updateOne(
-      { _id: session.id },
-      { $set: set },
-      { upsert: true },
-    );
+    return sessionsOps.upsertSession(this.sessions, session);
   }
 
   async getSession(id: string): Promise<Session | null> {
-    const doc = await this.sessions.findOne({ _id: id });
-    return doc ? toSession(doc) : null;
+    return sessionsOps.getSession(this.sessions, id);
   }
 
   async recentSessions(project: string, limit: number): Promise<Session[]> {
-    const docs = await this.sessions
-      .find({ project, summary: { $type: 'string' } })
-      .sort({ startedAt: -1 })
-      .limit(limit)
-      .toArray();
-    return docs.map(toSession);
+    return sessionsOps.recentSessions(this.sessions, project, limit);
   }
 
   async insertObservations(observations: Observation[]): Promise<void> {
-    if (observations.length === 0) return;
-    await this.observations.bulkWrite(
-      observations.map((obs) => ({
-        replaceOne: {
-          filter: { _id: obs.id },
-          replacement: toDoc(obs),
-          upsert: true,
-        },
-      })),
-      { ordered: false },
+    return observationsOps.insertObservations(
+      this.observations,
+      this.sessions,
+      this.symbols,
+      this.edges,
+      this.scanned,
+      observations,
     );
   }
 
   async getObservations(ids: string[]): Promise<Observation[]> {
-    if (ids.length === 0) return [];
-    const { exact, prefixes } = partitionIds(ids);
-
-    const or: Record<string, unknown>[] = [];
-    if (exact.length > 0) or.push({ _id: { $in: exact } });
-    for (const prefix of prefixes) {
-      // Anchored regex on _id is index-eligible in MongoDB.
-      or.push({ _id: { $regex: `^${escapeRegex(prefix)}` } });
-    }
-
-    const docs = await this.observations
-      .find({ $or: or } as Doc)
-      .toArray();
-    return docs.map(toObservation);
+    return observationsOps.getObservations(
+      this.observations,
+      this.sessions,
+      this.symbols,
+      this.edges,
+      this.scanned,
+      ids,
+    );
   }
 
   async remove(filter: RemoveFilter): Promise<number> {
-    if (filter.ids?.length === 0) return 0;
-
-    const query: Record<string, unknown> = {};
-    if (filter.project) query['project'] = filter.project;
-    if (filter.kind) query['kind'] = filter.kind;
-    if (filter.before !== undefined) query['createdAt'] = { $lt: filter.before };
-
-    if (filter.ids) {
-      const { exact, prefixes } = partitionIds(filter.ids);
-      const alternatives: Record<string, unknown>[] = [];
-      if (exact.length > 0) alternatives.push({ _id: { $in: exact } });
-      for (const prefix of prefixes) {
-        alternatives.push({ _id: { $regex: `^${escapeRegex(prefix)}` } });
-      }
-      query['$or'] = alternatives;
-    }
-
-    const count = await this.observations.countDocuments(query as Doc);
-    await this.observations.deleteMany(query as Doc);
-    if (isWholeScope(filter)) {
-      await this.sessions.deleteMany(filter.project ? { project: filter.project } : {});
-    }
-    return count;
+    return observationsOps.remove(
+      this.observations,
+      this.sessions,
+      this.symbols,
+      this.edges,
+      this.scanned,
+      filter,
+    );
   }
 
   async list(filter: ListFilter): Promise<Observation[]> {
-    const query: Record<string, unknown> = {};
-    if (filter.project) query['project'] = filter.project;
-    if (filter.kind) query['kind'] = filter.kind;
-    if (filter.after !== undefined) query['createdAt'] = { $gt: filter.after };
-
-    const docs = await this.observations
-      .find(query as Doc)
-      .sort({ createdAt: 1 })
-      .limit(filter.limit ?? 1000)
-      .toArray();
-    return docs.map(toObservation);
+    return observationsOps.list(
+      this.observations,
+      this.sessions,
+      this.symbols,
+      this.edges,
+      this.scanned,
+      filter,
+    );
   }
 
   async listProjects(): Promise<ProjectSummary[]> {
-    const rows = await this.observations
-      .aggregate<{ _id: string; n: number; last: number }>([
-        { $group: { _id: '$project', n: { $sum: 1 }, last: { $max: '$createdAt' } } },
-        { $sort: { last: -1 } },
-      ])
-      .toArray();
-
-    return rows.map((row) => ({
-      project: row._id,
-      observations: row.n,
-      lastActive: row.last,
-    }));
+    return observationsOps.listProjects(
+      this.observations,
+      this.sessions,
+      this.symbols,
+      this.edges,
+      this.scanned,
+    );
   }
 
   async inventory(): Promise<string[]> {
-    // Through `command` rather than `listCollections`, so the structural driver
-    // types this adapter compiles against stay as small as they are.
     const res = await this.db.command({ listCollections: 1, nameOnly: true });
     const batch = (res['cursor'] as { firstBatch?: Doc[] } | undefined)?.firstBatch ?? [];
     return foreignNames(batch.map((doc) => String(doc['name'] ?? '')));
   }
 
   async searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]> {
-    const filter: Doc = {
-      $text: { $search: query.text },
-      ...this.scopeFilter(query),
-    };
-
-    // $text has no fragment operator, so unlike FTS5 and ts_headline this is
-    // the head of the body rather than the text around the match. Still enough
-    // to tell two same-titled rows apart, and it costs one projected field
-    // instead of shipping whole bodies to slice them here.
-    //
-    // Inclusion throughout: MongoDB rejects a projection that mixes included
-    // and excluded fields, so the previous `body: 0, embedding: 0` form cannot
-    // carry a computed one.
-    const docs = await this.observations
-      .find(filter, {
-        projection: {
-          kind: 1,
-          title: 1,
-          project: 1,
-          createdAt: 1,
-          snippet: { $substrCP: ['$body', 0, 240] },
-          score: { $meta: 'textScore' },
-        },
-      })
-      .sort({ score: { $meta: 'textScore' } })
-      .limit(query.limit)
-      .toArray();
-
-    return docs.map((doc) => toIndexEntry(doc, (doc['score'] as number) ?? 0));
+    return searchOps.searchKeyword(this.observations, query);
   }
 
-  async searchVector(
-    vector: number[],
-    query: SearchQuery,
-  ): Promise<ObservationIndexEntry[]> {
-    if (this.atlasVectorIndex === null) {
-      this.atlasVectorIndex = await this.hasAtlasVectorIndex();
-    }
+  async searchVector(vector: number[], query: SearchQuery): Promise<ObservationIndexEntry[]> {
+    return vectorSearchOps.searchVector(this.observations, this.cache, vector, query);
+  }
 
-    if (this.atlasVectorIndex) {
-      const docs = await this.observations
-        .aggregate<ObservationDoc & { score: number }>([
-          {
-            $vectorSearch: {
-              index: 'memory_vector',
-              path: 'embedding',
-              queryVector: vector,
-              numCandidates: Math.max(query.limit * 10, 100),
-              limit: query.limit,
-              filter: this.scopeFilter(query),
-            },
-          },
-          {
-            $project: {
-              kind: 1, title: 1, project: 1, createdAt: 1,
-              score: { $meta: 'vectorSearchScore' },
-            },
-          },
-        ])
-        .toArray();
-      return docs.map((doc) => toIndexEntry(doc, doc.score));
-    }
-
-    // Portable path: score candidates in process. Bounded by the scope filter,
-    // which in practice narrows to a single project.
-    const docs = await this.observations
-      .find(
-        {
-          embedding: { $exists: true },
-          ...(query.embedder
-            ? { $or: [{ embedder: query.embedder }, { embedder: { $exists: false } }] }
-            : {}),
-          ...this.scopeFilter(query),
-        },
-        { projection: { kind: 1, title: 1, project: 1, createdAt: 1, embedding: 1 } },
-      )
-      .sort({ createdAt: -1 })
-      .limit(query.maxScanCandidates ?? 25000)
-      .toArray();
-
-    return docs
-      .map((doc) => toIndexEntry(doc, doc.embedding ? cosine(vector, doc.embedding) : 0))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, query.limit);
+  async closeObservations(ids: string[]): Promise<number> {
+    return observationsOps.closeObservations(this.observations, ids);
   }
 
   async timeline(query: TimelineQuery): Promise<ObservationIndexEntry[]> {
-    const anchor = await this.observations.findOne(
-      { _id: query.observationId },
-      { projection: { project: 1, createdAt: 1 } },
-    );
-    if (!anchor) return [];
-
-    const projection = { kind: 1, title: 1, project: 1, createdAt: 1 };
-
-    const [before, after] = await Promise.all([
-      this.observations
-        .find({ project: anchor.project, createdAt: { $lte: anchor.createdAt } }, { projection })
-        .sort({ createdAt: -1 })
-        .limit(query.before + 1)
-        .toArray(),
-      this.observations
-        .find({ project: anchor.project, createdAt: { $gt: anchor.createdAt } }, { projection })
-        .sort({ createdAt: 1 })
-        .limit(query.after)
-        .toArray(),
-    ]);
-
-    return [...before.reverse(), ...after].map((doc) => toIndexEntry(doc, 0));
+    return searchOps.timeline(this.observations, query);
   }
 
-  private scopeFilter(query: SearchQuery): Doc {
-    const filter: Record<string, unknown> = {};
-    if (query.project) filter['project'] = query.project;
-    if (query.kind) filter['kind'] = query.kind;
-    if (query.tag) filter['tags'] = query.tag;
-    if (query.since !== undefined || query.until !== undefined) {
-      const range: Record<string, number> = {};
-      if (query.since !== undefined) range['$gte'] = query.since;
-      if (query.until !== undefined) range['$lte'] = query.until;
-      filter['createdAt'] = range;
-    }
-    return filter;
+  async hasAtlasVectorIndex(): Promise<boolean> {
+    return searchOps.hasAtlasVectorIndex(this.observations);
   }
 
-  private async hasAtlasVectorIndex(): Promise<boolean> {
-    try {
-      const indexes = await this.observations.listSearchIndexes().toArray();
-      return indexes.some((index) => index['name'] === 'memory_vector');
-    } catch {
-      // listSearchIndexes is Atlas-only; anything else means no vector index.
-      return false;
-    }
+  async upsertGraph(scan: {
+    symbols: CodeSymbol[];
+    edges: CodeEdge[];
+    files: ScannedFile[];
+  }): Promise<void> {
+    return graphOps.upsertGraph(this.symbols, this.edges, this.scanned, scan);
   }
-}
 
-function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+  async findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]> {
+    return graphOps.findSymbols(this.symbols, this.edges, this.scanned, filter);
+  }
 
-function databaseNameFrom(uri: string): string | null {
-  const match = /\/\/[^/]+\/([^?]+)/.exec(uri);
-  const name = match?.[1]?.trim();
-  return name && name.length > 0 ? name : null;
-}
+  async findEdges(filter: EdgeFilter): Promise<CodeEdge[]> {
+    return graphOps.findEdges(this.symbols, this.edges, this.scanned, filter);
+  }
 
-function toSession(doc: SessionDoc): Session {
-  const session: Session = {
-    id: doc._id,
-    project: doc.project,
-    startedAt: doc.startedAt,
-  };
-  if (doc.endedAt !== undefined) session.endedAt = doc.endedAt;
-  if (doc.summary !== undefined) session.summary = doc.summary;
-  return session;
-}
+  async scannedFiles(project: string): Promise<ScannedFile[]> {
+    return graphOps.scannedFiles(this.symbols, this.edges, this.scanned, project);
+  }
 
-function toDoc(obs: Observation): ObservationDoc {
-  const doc: ObservationDoc = {
-    _id: obs.id,
-    sessionId: obs.sessionId,
-    project: obs.project,
-    kind: obs.kind,
-    title: obs.title,
-    body: obs.body,
-    files: obs.files,
-    tags: obs.tags,
-    createdAt: obs.createdAt,
-  };
-  if (obs.embedding) doc.embedding = obs.embedding;
-  if (obs.embedder) doc.embedder = obs.embedder;
-  if (obs.author) doc.author = obs.author;
-  return doc;
-}
-
-function toObservation(doc: ObservationDoc): Observation {
-  const obs: Observation = {
-    id: doc._id,
-    sessionId: doc.sessionId,
-    project: doc.project,
-    kind: doc.kind,
-    title: doc.title,
-    body: doc.body,
-    files: doc.files ?? [],
-    tags: doc.tags ?? [],
-    createdAt: doc.createdAt,
-  };
-  if (doc.embedding) obs.embedding = doc.embedding;
-  if (doc.embedder) obs.embedder = doc.embedder;
-  if (doc.author) obs.author = doc.author;
-  return obs;
-}
-
-function toIndexEntry(doc: Partial<ObservationDoc>, score: number): ObservationIndexEntry {
-  const entry: ObservationIndexEntry = {
-    id: doc._id as string,
-    kind: doc.kind as ObservationKind,
-    title: doc.title as string,
-    project: doc.project as string,
-    createdAt: doc.createdAt as number,
-    score,
-  };
-  const snippet = toSnippet((doc as { snippet?: unknown }).snippet);
-  if (snippet) entry.snippet = snippet;
-  return entry;
+  async removeGraph(project: string, files?: string[]): Promise<number> {
+    return graphOps.removeGraph(this.symbols, this.edges, this.scanned, project, files);
+  }
 }

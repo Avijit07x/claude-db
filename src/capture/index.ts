@@ -20,3 +20,4 @@ export {
   embedObservations,
 } from './flush.js';
 export type { FlushResult } from './flush.js';
+export { closeLandedWork, openWork } from './progress.js';

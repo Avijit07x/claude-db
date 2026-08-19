@@ -4,14 +4,36 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createContext } from '../context.js';
+import { openWork } from '../capture/index.js';
+import type { MemoryStore } from '../store/index.js';
 import { emitContext, readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
+import { refreshInstalled } from '../cli/refresh.js';
 import { updateNotice } from '../update.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'mcp', 'server.js');
+
+async function refreshGraphQuietly(store: MemoryStore, project: string): Promise<void> {
+  try {
+    if ((await store.scannedFiles(project)).length === 0) return;
+    const { refreshGraph } = await import('../graph/index.js');
+    const { repoRootFor } = await import('../usages/index.js');
+    await refreshGraph(store, repoRootFor(project), project);
+  } catch {
+    return;
+  }
+}
+
+function refreshInstalledQuietly(project: string): void {
+  try {
+    refreshInstalled(resolve(dirname(fileURLToPath(import.meta.url)), '..'), project);
+  } catch {
+    return;
+  }
+}
 
 function mcpRegistered(project: string): boolean {
   return [join(project, '.mcp.json'), join(homedir(), '.claude.json')].some((path) => {
@@ -23,24 +45,16 @@ function mcpRegistered(project: string): boolean {
   });
 }
 
-/**
- * SessionStart: prime the agent with what past sessions concluded.
- *
- * Only session summaries are injected, never raw observations. Summaries are
- * dense and few; observations are numerous and are better pulled on demand
- * through the MCP tools once the agent knows what it is looking for.
- */
 await runHook(async () => {
   const payload = await readPayload();
   const project = resolveProject(payload.cwd);
+
+  refreshInstalledQuietly(project);
 
   const ctx = await createContext();
   try {
     const sessions = await ctx.store.recentSessions(project, ctx.config.inject.sessions);
 
-    // One line on an empty database, so "installed but no history yet" is
-    // distinguishable from "never installed" without leaving the session.
-    // Costs ~12 tokens and disappears permanently after the first real session.
     if (sessions.length === 0) {
       emitContext(
         '<project-memory>none yet for this project; ' +
@@ -60,21 +74,28 @@ await runHook(async () => {
       lines.push(line);
     }
 
+    const open = await openWork(ctx.store, project);
+    if (open.length > 0) {
+      lines.push('');
+      lines.push('Not committed yet, newest first:');
+      for (const obs of open.slice(0, 3)) {
+        lines.push(`- ${obs.title}`);
+      }
+    }
+
     lines.push('</project-memory>');
-    // Only advertise the tools when they are actually registered; pointing the
-    // agent at an MCP server that was never installed just wastes a turn.
     if (mcpRegistered(project)) {
       lines.push(
-        'Search this project\'s full history with the memory MCP tools before ' +
+        "Search this project's full history with the memory MCP tools before " +
           'asking the user to re-explain prior decisions.',
       );
     }
 
-    // Read from a local file the detached updater wrote; never a live check.
     const notice = ctx.config.updates === 'off' ? null : updateNotice();
     if (notice) lines.push(notice);
 
     emitContext(`${lines.join('\n')}\n`);
+    await refreshGraphQuietly(ctx.store, project);
   } finally {
     await ctx.close();
   }

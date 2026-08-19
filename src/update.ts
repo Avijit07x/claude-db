@@ -9,11 +9,8 @@ const REGISTRY = 'https://registry.npmjs.org/claude-db/latest';
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export interface UpdateState {
-  /** When the registry was last asked. */
   checkedAt?: number;
-  /** Newest version the registry reported. */
   latest?: string;
-  /** Version we installed ourselves, so the next session can mention it. */
   installed?: string;
 }
 
@@ -38,16 +35,13 @@ function writeState(state: UpdateState): void {
   try {
     mkdirSync(CONFIG_DIR, { recursive: true });
     writeFileSync(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
-  } catch {
-    // A lost state file only costs one redundant check.
-  }
+  } catch {}
 }
 
 export function isDue(state: UpdateState, now = Date.now()): boolean {
   return now - (state.checkedAt ?? 0) > CHECK_INTERVAL_MS;
 }
 
-/** -1, 0 or 1. Numeric per segment, so 0.2.10 beats 0.2.9. */
 export function compareVersions(a: string, b: string): number {
   const left = a.split('.').map((part) => Number.parseInt(part, 10) || 0);
   const right = b.split('.').map((part) => Number.parseInt(part, 10) || 0);
@@ -58,25 +52,12 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/**
- * Caret semantics: 1.x may take any 1.y.z, but 0.2.x may only take 0.2.z.
- *
- * A release outside this range is allowed to change the database schema or the
- * config, and `init()` migrates on first connection — so installing one without
- * being asked would rewrite a user's database on their behalf. Those are
- * reported and left for a human.
- */
 export function isCompatible(current: string, candidate: string): boolean {
   const [curMajor = 0, curMinor = 0] = current.split('.').map(Number);
   const [newMajor = 0, newMinor = 0] = candidate.split('.').map(Number);
   return curMajor === 0 ? curMajor === newMajor && curMinor === newMinor : curMajor === newMajor;
 }
 
-/**
- * No abbreviated-packument accept header here: that format applies to the full
- * document, and asking for it on /latest returns 406. With the header this
- * check never once succeeded, and reported "up to date" while failing.
- */
 async function fetchLatest(): Promise<string | null> {
   try {
     const res = await fetch(REGISTRY, { signal: AbortSignal.timeout(5000) });
@@ -95,13 +76,6 @@ export interface UpdateResult {
   reason?: string;
 }
 
-/**
- * Asks the registry, and installs when configured to.
- *
- * Only ever called from a detached process, never inline: the check is network
- * bound and `npm install -g` replaces the very files the hooks import, so
- * neither belongs anywhere near the prompt path.
- */
 export async function checkForUpdate(mode: 'auto' | 'notify' | 'off'): Promise<UpdateResult> {
   const current = packageVersion();
   if (mode === 'off') return { current, latest: null, installed: false, reason: 'disabled' };
@@ -110,8 +84,6 @@ export async function checkForUpdate(mode: 'auto' | 'notify' | 'off'): Promise<U
   const state: UpdateState = { ...readState(), checkedAt: Date.now() };
   if (latest) state.latest = latest;
 
-  // A failed check is not the same as being current, and saying so is what
-  // stops a broken updater from looking like a healthy one forever.
   if (!latest) {
     writeState(state);
     return { current, latest: null, installed: false, reason: 'could not reach the registry' };
@@ -142,18 +114,19 @@ export async function checkForUpdate(mode: 'auto' | 'notify' | 'off'): Promise<U
       current,
       latest,
       installed: false,
-      reason: error instanceof Error ? error.message.split('\n')[0] ?? 'install failed' : 'install failed',
+      reason:
+        error instanceof Error
+          ? (error.message.split('\n')[0] ?? 'install failed')
+          : 'install failed',
     };
   }
 }
 
-/** One line for the session banner, or null when there is nothing to say. */
 export function updateNotice(): string | null {
   const state = readState();
   const current = packageVersion();
 
   if (state.installed && compareVersions(state.installed, current) <= 0) {
-    // We are running it now, so say so once and forget it.
     const { installed: _done, ...rest } = state;
     writeState(rest);
     return `claude-db updated to ${current}.`;

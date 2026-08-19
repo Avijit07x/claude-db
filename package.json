@@ -1,6 +1,6 @@
 {
   "name": "claude-db",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Persistent memory for Claude Code. Captures why decisions were made, not just which files changed. Bring your own database: SQLite, MongoDB or Postgres. No cloud, no subscription.",
   "license": "Apache-2.0",
   "type": "module",
@@ -17,7 +17,9 @@
   "files": [
     "dist",
     "skills",
+    "docs",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
@@ -34,15 +36,24 @@
     "try": "node scripts/try.mjs",
     "bench": "node scripts/bench.mjs",
     "postinstall": "node -e \"const v=process.versions.node.split('.').map(Number); if(v[0]<22||(v[0]===22&&v[1]<5)){console.error('\\n  claude-db needs Node >= 22.5 (node:sqlite is builtin from there). You have '+process.versions.node+'.\\n');process.exit(1)}\"",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@ast-grep/lang-go": "^0.0.6",
+    "@ast-grep/lang-python": "^0.0.6",
+    "@ast-grep/lang-rust": "^0.0.7",
+    "@ast-grep/napi": "^0.45.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "graphology": "^0.26.0",
+    "graphology-shortest-path": "^2.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "prettier": "^3.8.0"
   },
   "keywords": [
     "claude",

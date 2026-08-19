@@ -20,3 +20,4 @@ CLAUDE.local.md
 # npm pack output
 *.tgz
 .mcp.json
+.claude
