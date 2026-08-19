@@ -29,7 +29,7 @@ export async function closeLandedWork(store: MemoryStore, project: string): Prom
 
   const open = await store.list({ project, status: 'open', limit: OPEN_LIMIT });
   const landed = open
-    .filter((obs) => obs.files.length > 0 && obs.files.every((file) => !dirty.has(file)))
+    .filter((obs) => obs.files.every((file) => !dirty.has(file)))
     .map((obs) => obs.id);
 
   return store.closeObservations(landed);

@@ -54,7 +54,7 @@ function buildObservation(
     sessionId,
     project,
     ...(author ? { author } : {}),
-    status: 'open',
+    status: files.length > 0 ? 'open' : 'done',
     kind: classifyTurn(turn),
     title: redact(buildTitle(turn, files)),
     body,

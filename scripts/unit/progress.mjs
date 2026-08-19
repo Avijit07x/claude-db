@@ -66,6 +66,14 @@ export default async function run() {
     (await openWork(store, repo)).length === 0,
   );
 
+  await store.insertObservations([{ ...obs('o4', 'ran a command, touched no files', [], 'open') }]);
+  await closeLandedWork(store, repo);
+  check(
+    'a turn that touched no files cannot stay open forever',
+    (await openWork(store, repo)).length === 0,
+    (await openWork(store, repo)).map((o) => o.title).join(','),
+  );
+
   const [stored] = await store.getObservations(['o1']);
   check('status round-trips through the store', stored?.status === 'done', stored?.status);
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.1
+
+### Fixed
+
+- **A turn that touched no files stayed open forever.** Work closes when every
+  file it touched has been committed, but a turn that only ran commands has no
+  files to land, so it could never close and sat in `status` and in the
+  SessionStart injection permanently. Those turns are now recorded as already
+  done, and a row with no outstanding files closes rather than being skipped.
+  Found by reading the list on a clean tree: four entries, none of them real
+  work
+
 ## 0.5.0
 
 `find_usages` could only ever answer "where does this string appear". It could
