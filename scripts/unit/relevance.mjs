@@ -3,7 +3,7 @@ import { e, now, day } from '../lib/fixtures.mjs';
 
 export default async function run() {
   {
-    const { isSearchable } = await import('../../dist/hooks/relevance.js');
+    const { isSearchable } = await import('../../dist/util/prompt.js');
     const foreign = ['修复登录接口的超时问题', 'ログイン画面のバグ', 'почему падает сборка'];
     check(
       'non-latin prompts reach search',

@@ -2,7 +2,8 @@
 import { flushSession } from '../capture/index.js';
 import { createContext } from '../context.js';
 import { emitContext, readPayload, runHook } from './payload.js';
-import { isSearchable, renderPromptContext } from './relevance.js';
+import { renderPromptContext } from './relevance.js';
+import { isSearchable } from '../util/prompt.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.5.2
+
+### Fixed
+
+- **A turn that answered a question was never stored.** Capture kept a turn only
+  if it edited a file or ran a command, so an entire session spent explaining a
+  design, weighing an approach, or answering "why is it like this" left nothing
+  behind — the reasoning most worth recalling was the reasoning most reliably
+  dropped. A turn with no files and no commands is now kept when the question
+  was a real one and the answer reports something concrete. Re-reading this
+  project's own transcripts recovers 66 observations that were silently
+  discarded; `claude-db flush` backfills them, since ids are content-derived and
+  a re-read rewrites rather than duplicates.
+- **A compaction summary was read as your prompt.** When a session is compacted,
+  Claude Code writes an 18,000-character recap into the transcript as a user
+  entry. Capture treated it as a real prompt, so every turn after a compaction
+  was filed under `Asked: This session is being continued from a previous
+  conversation…` and that recap was indexed as if it were a memory. Those
+  entries are now skipped by the flag the transcript already carries.
+- **`scan` was missing from `claude-db --help`.** The command shipped in 0.5.0
+  and worked, but nothing in the help text mentioned it, and the `usages` line
+  still described the old grep-only behaviour with no sign of `--mode`.
+- **Underscores were stripped out of titles.** Title generation treated `_` as
+  markdown emphasis, so `find_usages` was stored as `findusages` and every other
+  snake_case identifier was mangled. Snippets stopped doing this in 0.3.0;
+  titles now match.
+
 ## 0.5.1
 
 ### Fixed

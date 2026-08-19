@@ -152,4 +152,46 @@ export default async function run() {
     config,
   );
   check('turns that changed nothing are dropped', chatter.length === 0);
+
+  const answered = observationsFromTurns(
+    [
+      turn({
+        prompt: 'why does capture read the transcript instead of the tool hooks',
+        reasoning:
+          'A PostToolUse hook only sees a file path. The transcript in src/capture/transcript.ts holds the prompt and the reasoning, which is why capture reads it instead.',
+        files: [],
+        commands: [],
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check('an answered question is kept even though it changed no files', answered.length === 1);
+  check('and it is not left open, since it touched nothing', answered[0]?.status === 'done');
+
+  const acked = observationsFromTurns(
+    [turn({ prompt: 'ok', reasoning: 'Fixed src/a.ts in 3 places.', files: [], commands: [] })],
+    's1',
+    '/p',
+    config,
+  );
+  check('a bare acknowledgement is still not worth storing', acked.length === 0);
+
+  const named = observationsFromTurns(
+    [
+      turn({
+        reasoning:
+          'The find_usages tool reads src/usages/find.ts. It greps live, so the index never drifts.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    'identifiers survive title generation intact',
+    named[0]?.title.includes('find_usages'),
+    named[0]?.title,
+  );
 }

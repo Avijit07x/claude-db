@@ -20,6 +20,7 @@ export interface TranscriptRead {
 interface RawEntry {
   type?: string;
   timestamp?: string;
+  isCompactSummary?: boolean;
   message?: {
     content?: unknown;
   };
@@ -73,7 +74,7 @@ function groupIntoTurns(entries: { entry: RawEntry; offset: number }[]): Turn[] 
 
     if (entry.type === 'user') {
       const text = extractText(entry.message?.content);
-      if (!text || isSyntheticPrompt(text)) continue;
+      if (!text || entry.isCompactSummary || isSyntheticPrompt(text)) continue;
 
       if (current) turns.push(current);
       current = { prompt: text, reasoning: '', files: [], commands: [], timestamp, offset };

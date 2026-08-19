@@ -57,6 +57,21 @@ const rows = [
   {
     type: 'user',
     timestamp: at(6),
+    isCompactSummary: true,
+    message: {
+      content:
+        'This session is being continued from a previous conversation that ran out of context. Summary: we built the icon and argued about the origin point.',
+    },
+  },
+  {
+    type: 'assistant',
+    timestamp: at(6),
+    message: { content: [{ type: 'text', text: 'Picking the icon work back up.' }] },
+  },
+
+  {
+    type: 'user',
+    timestamp: at(6),
     message: { content: '<system-reminder>injected</system-reminder>' },
   },
   {
@@ -84,6 +99,10 @@ ck(
 );
 ck('ignores injected pseudo-prompts', !turns.some((t) => t.prompt.includes('system-reminder')));
 ck('ignores our own memory blocks', !turns.some((t) => t.prompt.includes('recalled-memory')));
+ck(
+  'a compaction summary is not mistaken for a prompt',
+  !turns.some((t) => t.prompt.includes('continued from a previous conversation')),
+);
 ck(
   'captures the user prompt',
   turns.some((t) => t.prompt === 'can you create one icon'),

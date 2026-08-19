@@ -17,8 +17,10 @@ export function usage(): void {
   stats                       What this project's memory is made of
   flush                       Re-ingest every transcript for this project
   seed --from-git [--limit n] Fill a cold memory from this repo's history
-  usages [--regex] <symbol>   Find real usages via git grep, current source only
-         [--context n] [--path <dir>] [--limit n]
+  scan [--force]              Map this repo's symbols and how they connect
+  usages [--mode m] <symbol>  Who uses a symbol; --mode usages|explain|path
+         [--target <symbol>]  ...the second symbol, for --mode path
+         [--regex] [--context n] [--path <dir>] [--limit n]
   export [--all] > out.jsonl  Dump memory as JSONL, for backup or migration
   import <file.jsonl>         Load a dump back in (safe to repeat)
   sync <url> [--yes]          Two-way merge with another database

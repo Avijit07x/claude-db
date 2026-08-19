@@ -5,7 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { createStore } from '../dist/store/index.js';
 import { SearchService } from '../dist/search/index.js';
 import { BuiltinEmbedder } from '../dist/embed/index.js';
-import { isSearchable, renderPromptContext } from '../dist/hooks/relevance.js';
+import { renderPromptContext } from '../dist/hooks/relevance.js';
+import { isSearchable } from '../dist/util/prompt.js';
 import { toShortId, partitionIds } from '../dist/util/shortid.js';
 
 let f = 0;

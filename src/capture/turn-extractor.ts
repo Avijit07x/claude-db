@@ -1,6 +1,7 @@
 import type { Config } from '../config/index.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { classifyCommand } from './command.js';
+import { isSearchable } from '../util/prompt.js';
 import { currentAuthor, observationId } from './identity.js';
 import type { Turn } from './transcript.js';
 
@@ -18,7 +19,13 @@ export function observationsFromTurns(
 function isSubstantive(turn: Turn, config: Config): boolean {
   const files = turn.files.filter((file) => !isExcluded(file, config.capture.exclude));
   const commands = turn.commands.filter((command) => classifyCommand(command) !== null);
-  return files.length > 0 || commands.length > 0;
+  if (files.length > 0 || commands.length > 0) return true;
+  return isSearchable(turn.prompt) && answers(turn.reasoning);
+}
+
+function answers(reasoning: string): boolean {
+  const scored = scoreSentences(stripMarkdown(redact(reasoning)));
+  return scored.length >= 2 && scored.some(([, score]) => score > 0);
 }
 
 function buildObservation(
@@ -97,10 +104,7 @@ function reports(sentence: string): number {
 function buildTitle(turn: Turn, files: string[]): string {
   const prose = stripMarkdown(redact(turn.reasoning));
 
-  const scored = sentences(prose)
-    .slice(0, 6)
-    .filter((sentence) => sentence.length >= 15)
-    .map((sentence) => [sentence, reports(sentence)] as const);
+  const scored = scoreSentences(prose);
 
   const best = scored.find(([, score]) => score > 0) ?? scored.find(([, score]) => score === 0);
   if (best) return headline(best[0]);
@@ -112,6 +116,13 @@ function buildTitle(turn: Turn, files: string[]): string {
   if (opening && opening.length >= 15) return headline(opening);
 
   return files.length > 0 ? `Changed ${shortPath(files[0] ?? '')}` : 'Session work';
+}
+
+function scoreSentences(prose: string): (readonly [string, number])[] {
+  return sentences(prose)
+    .slice(0, 6)
+    .filter((sentence) => sentence.length >= 15)
+    .map((sentence) => [sentence, reports(sentence)] as const);
 }
 
 function sentences(text: string): string[] {
@@ -181,7 +192,7 @@ function firstSentence(text: string): string {
 function stripMarkdown(text: string): string {
   return text
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/[*_`#]/g, '')
+    .replace(/[*`#]/g, '')
     .trim();
 }
 
