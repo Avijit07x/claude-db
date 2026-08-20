@@ -1,5 +1,6 @@
 import type { CodeEdge } from '../../types.js';
 import type { GraphAnswer } from './lookup.js';
+import { formatSuggestions } from './suggest.js';
 
 function tag(edge: CodeEdge): string {
   const score = edge.confidence === 'INFERRED' ? ` ${edge.score.toFixed(2)}` : '';
@@ -9,7 +10,10 @@ function tag(edge: CodeEdge): string {
 export function formatGraph(answer: GraphAnswer, root: string): string {
   if (answer.mode === 'path') {
     if (answer.path.length === 0) {
-      return `No path found from "${answer.symbol}" to "${answer.target ?? ''}".`;
+      return (
+        `No path found from "${answer.symbol}" to "${answer.target ?? ''}".` +
+        formatSuggestions(answer.suggestions)
+      );
     }
     return [
       `Shortest path (${answer.path.length - 1} hops):`,
@@ -17,7 +21,12 @@ export function formatGraph(answer: GraphAnswer, root: string): string {
     ].join('\n');
   }
 
-  if (answer.empty) return `No symbol "${answer.symbol}" in the graph for ${root}.`;
+  if (answer.empty) {
+    return (
+      `No symbol "${answer.symbol}" in the graph for ${root}.` +
+      formatSuggestions(answer.suggestions)
+    );
+  }
 
   const lines: string[] = [];
   for (const definition of answer.definitions) {

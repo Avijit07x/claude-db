@@ -21,9 +21,17 @@ import refresh from './unit/refresh.mjs';
 import adapters from './unit/adapters.mjs';
 import shown from './unit/shown.mjs';
 import injectDefaults from './unit/inject-defaults.mjs';
+import suggest from './unit/suggest.mjs';
+import preferUsages from './unit/prefer-usages.mjs';
+import stopwords from './unit/stopwords.mjs';
+import scanVersion from './unit/scan-version.mjs';
 import { report } from './lib/check.mjs';
 
 await ranking();
+await suggest();
+await stopwords();
+await scanVersion();
+await preferUsages();
 await capture();
 await classify();
 await summaries();

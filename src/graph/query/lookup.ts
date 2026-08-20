@@ -1,6 +1,7 @@
 import type { MemoryStore } from '../../store/adapter.js';
 import type { CodeEdge, CodeSymbol } from '../../types.js';
 import { shortestPath } from './path.js';
+import { suggestFor } from './suggest.js';
 
 export type GraphMode = 'usages' | 'explain' | 'path';
 
@@ -14,6 +15,7 @@ export interface GraphAnswer {
   path: string[];
   refreshed: string[];
   empty: boolean;
+  suggestions: string[];
 }
 
 export interface GraphQuery {
@@ -37,12 +39,14 @@ export async function queryGraph(
     path: [],
     refreshed: [],
     empty: false,
+    suggestions: [],
   };
 
   if (query.mode === 'path') {
     if (query.target) answer.target = query.target;
     answer.path = await shortestPath(store, project, query.symbol, query.target ?? '');
     answer.empty = answer.path.length === 0;
+    if (answer.empty) answer.suggestions = await suggestFor(store, project, query.symbol);
     return answer;
   }
 
@@ -64,5 +68,6 @@ export async function queryGraph(
     (edge) => ids.includes(edge.srcId) && edge.dstName !== query.symbol,
   );
   answer.empty = answer.definitions.length === 0 && answer.inbound.length === 0;
+  if (answer.empty) answer.suggestions = await suggestFor(store, project, query.symbol);
   return answer;
 }

@@ -25,6 +25,7 @@ const HOOKS: [event: string, file: string, matcher?: string][] = [
   ['SessionStart', 'session-start.js'],
   ['UserPromptSubmit', 'user-prompt.js'],
   ['SessionEnd', 'session-end.js'],
+  ['PreToolUse', 'prefer-usages.js', 'Bash|Grep'],
 ];
 
 export function assertStableLocation(distDir: string): void {

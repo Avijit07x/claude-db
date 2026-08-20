@@ -2,6 +2,7 @@ import type { RemoveFilter, SearchQuery } from '../../types.js';
 import { partitionIds } from '../../util/shortid.js';
 import { resolve } from 'node:path';
 import { scopeToken } from '../../util/scope.js';
+import { meaningfulTokens } from '../../search/stopwords.js';
 
 export function removeWhere(filter: RemoveFilter): { where: string; params: unknown[] } {
   const conditions: string[] = [];
@@ -71,14 +72,11 @@ export function appendScope(
 }
 
 export function toMatchExpression(text: string, project?: string): string | null {
-  const tokens = text
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}_]+/u)
-    .filter((token) => token.length > 1);
+  const tokens = meaningfulTokens(text);
 
   const scope = project ? `scope:${scopeToken(project)}` : null;
 
-  if (tokens.length === 0) return scope;
+  if (tokens.length === 0) return null;
 
   const terms = tokens.map((token) => `"${token}"`).join(' OR ');
   return scope ? `${scope} AND (${terms})` : terms;

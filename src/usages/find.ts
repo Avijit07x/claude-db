@@ -152,8 +152,13 @@ function isDefinitionLike(symbol: string, text: string): boolean {
   ).test(text);
 }
 
-export function formatUsages(result: UsagesResult): string {
-  if (result.matches.length === 0) return `No usages of that symbol found under ${result.root}.`;
+export function formatUsages(result: UsagesResult, suggestions: string[] = []): string {
+  if (result.matches.length === 0) {
+    return (
+      `No usages of that symbol found under ${result.root}.` +
+      (suggestions.length > 0 ? `\nDid you mean: ${suggestions.join(', ')}` : '')
+    );
+  }
   const rows = result.matches.map(
     (m) =>
       `${m.file}${m.isMatch ? ':' : '-'}${m.line}${m.isDefinition ? '  [definition?]' : ''}  ${m.text.trim()}`,

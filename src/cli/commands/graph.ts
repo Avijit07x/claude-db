@@ -6,8 +6,8 @@ import {
   queryGraph,
   refreshGraph,
   scanRepository,
+  suggestFor,
 } from '../../graph/index.js';
-import { join } from 'node:path';
 import { resolveProject } from '../../util/project.js';
 import { valueOf, withoutFlags } from '../args.js';
 
@@ -78,9 +78,8 @@ export async function cmdUsages(argv: (string | undefined)[]): Promise<void> {
   }
 
   if (mode === 'text') {
-    console.log(
-      formatUsages(findUsages({ symbol: words, regex, context, limit, ...(path ? { path } : {}) })),
-    );
+    const result = findUsages({ symbol: words, regex, context, limit, ...(path ? { path } : {}) });
+    console.log(formatUsages(result, await suggestionsOnMiss(result.matches.length, words)));
     return;
   }
   if (mode !== 'usages' && mode !== 'explain' && mode !== 'path') {
@@ -107,6 +106,16 @@ export async function cmdUsages(argv: (string | undefined)[]): Promise<void> {
     });
     answer.refreshed = refreshed;
     console.log(formatGraph(answer, root));
+  } finally {
+    await ctx.close();
+  }
+}
+
+async function suggestionsOnMiss(matches: number, symbol: string): Promise<string[]> {
+  if (matches > 0) return [];
+  const ctx = await createContext();
+  try {
+    return await suggestFor(ctx.store, resolveProject(undefined), symbol);
   } finally {
     await ctx.close();
   }

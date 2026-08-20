@@ -2,6 +2,7 @@ import type { Embedder } from '../embed/index.js';
 import type { MemoryStore } from '../store/adapter.js';
 import type { Observation, ObservationIndexEntry, SearchQuery, TimelineQuery } from '../types.js';
 import { applyRecencyBoost, fuse } from './rank.js';
+import { meaningfulTokens } from './stopwords.js';
 
 export class SearchService {
   constructor(
@@ -11,6 +12,8 @@ export class SearchService {
   ) {}
 
   async search(query: SearchQuery): Promise<ObservationIndexEntry[]> {
+    if (meaningfulTokens(query.text).length === 0) return [];
+
     const wide: SearchQuery = {
       ...query,
       limit: query.limit * 3,

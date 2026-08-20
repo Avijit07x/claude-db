@@ -1,5 +1,71 @@
 # Changelog
 
+## 0.6.0
+
+### Fixed
+
+- **`scan` served a stale graph after every upgrade.** The scan cache keyed on
+  file content hash alone, so when an extractor changed, users' files did not —
+  and `scan` reported `N unchanged, 0 parsed` while continuing to serve edges
+  built by the previous extractor. Fixes shipped in 0.5.3 never reached anyone
+  who upgraded; only `scan --force` surfaced them, and nothing told you to run
+  it. The cache key now mixes in a `SCAN_VERSION` and a fingerprint of the
+  language rules, so an upgrade reparses once, automatically, and a rule edit
+  invalidates the cache without anyone remembering to bump a constant.
+  Verified against a cache written by the old extractor: 240 files skipped
+  before, 204 reparsed after, and an unchanged file is still skipped on the
+  next scan.
+
+- **One common word in a query returned the whole corpus.** SQLite keyword
+  search ORs every token, so `"quantum entanglement recipes for sourdough"`
+  matched 30 rows on the strength of `for` alone, and an all-stopword query
+  matched everything. Postgres and Mongo were never affected — `plainto_tsquery`
+  and Mongo's `$text` strip stopwords already — so SQLite, the default backend,
+  was the only one exposed. Stopwords are now removed before the query is built,
+  and a query with no content words returns nothing instead of the corpus. The
+  filtering lives in `src/search`, not the adapter, so every backend behaves the
+  same. Note this could not be fixed after ranking: RRF discards score magnitude
+  by design, so the fused score is not a relevance measure and cannot be
+  thresholded.
+
+- **`get_observations` answered with an empty string.** An id that resolved to
+  nothing produced no output at all rather than saying so, which reads as a
+  broken tool. It now names the ids that did not resolve, and a partial batch
+  appends which ones were missing instead of silently dropping them.
+
+- **`timeline` could not tell a bad id from a quiet session.** Both produced
+  `No matching observations.`; the two now read differently.
+
+### Added
+
+- **A `PreToolUse` hook that answers symbol searches from the code graph.**
+  When a shell `grep` or the Grep tool searches for something shaped like a code
+  symbol, the hook runs the graph lookup and returns the definition and every
+  reference alongside the search — the grep still runs, so nothing is blocked and
+  no second call is needed. It stays silent for plain text, piped output
+  filtering, `-v`, regexes, lowercase words, and any project with no graph
+  scanned. `CLAUDE_DB_USAGES_HOOK=off` disables it. Registered by `install` and
+  removed by `uninstall` like the other hooks.
+
+- **`find_usages` suggests near names on a miss.** A miss used to end at
+  `No usages of that symbol found`, which is where people give up and go back to
+  grep. `embedObservation` now suggests `embedObservations`, `find_symbols`
+  suggests `findSymbols`, and a name with no near match still suggests nothing
+  rather than something incidental.
+
+### Changed
+
+- **Tool descriptions now say when to reach for the tool.** `search`, `timeline`
+  and `get_observations` opened with `Layer 1/2/3`, an internal concept that
+  never stated a trigger, and `find_usages` opened by describing itself as a live
+  `git grep`. They now lead with the condition that should make you call them,
+  and `search` explains what to try when nothing matches.
+
+- **`src/mcp/server.ts` split 303 lines into one module per tool group.**
+  `server.ts` is 37 lines of bootstrap; the tools live in `src/mcp/tools/`. The
+  tool logic is importable and unit-testable for the first time — previously
+  anything in `server.ts` self-started a stdio transport on import.
+
 ## 0.5.4
 
 ### Fixed
