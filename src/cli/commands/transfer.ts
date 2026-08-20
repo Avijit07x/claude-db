@@ -117,7 +117,8 @@ export async function cmdPrune(argv: (string | undefined)[]): Promise<void> {
   }
 }
 
-export async function cmdReembed(): Promise<void> {
+export async function cmdReembed(argv: (string | undefined)[] = []): Promise<void> {
+  const scoped = argv.includes('--project') || argv.includes('-p');
   const base = loadConfig();
   const ctx = await createContext({ embeddings: { ...base.embeddings, timeoutMs: 0 } });
 
@@ -130,7 +131,8 @@ export async function cmdReembed(): Promise<void> {
 
     let updated = 0;
     let skipped = 0;
-    const scanned = await eachObservation(ctx, {}, async (batch) => {
+    const filter = scoped ? { project: resolveProject(undefined) } : {};
+    const scanned = await eachObservation(ctx, filter, async (batch) => {
       const stale = batch.filter((obs) => obs.embedder !== embedder.id);
       skipped += batch.length - stale.length;
       if (stale.length === 0) return;

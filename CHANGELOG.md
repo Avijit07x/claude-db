@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.4
+
+### Fixed
+
+- **`reembed` could exhaust memory on a large database.** ([#7](https://github.com/Avijit07x/claude-db/issues/7))
+  Embedding walked the store 500 rows at a time and handed all 500 to a single
+  `embedder.embed()` call, which became one forward pass over 500 sequences in
+  the local model. Peak memory was set by that batch, so a database whose rows
+  were long enough went to swap and never came back. Embedding is now chunked by
+  `embeddings.batchSize`, so peak memory is a property of the chunk rather than
+  of the database: re-embedding 1,400 observations holds ~0.8 GB and takes the
+  same time per row as re-embedding 128. The chunking lives in
+  `embedObservations`, the one call every path routes through, so `flush`,
+  `seed` and `manual` capture are bounded by the same change — `seed` had the
+  identical ceiling and would have hit it on a large enough repo.
+
+### Added
+
+- **`embeddings.batchSize`, default 8.** Measured on `all-MiniLM-L6-v2` with
+  worst-case 512-token observations, peak RSS runs 0.8 GB at 8, 1.3 GB at 16,
+  2.4 GB at 32 and 4.5 GB at 64 — while wall-clock stays flat from 1 to 8,
+  because CPU inference is compute-bound and the token count is the same however
+  it is grouped. Batching buys no speed here and only costs memory, so the
+  default is deliberately small; lower it further if you are tight on RAM.
+
+- **`reembed --project`.** `reembed` re-embedded every project on the machine
+  with no way to narrow it. On a database holding several projects that is the
+  difference between minutes and seconds, and the work skipped is work that
+  never has to be bounded. Without the flag the behaviour is unchanged.
+
 ## 0.5.3
 
 ### Fixed

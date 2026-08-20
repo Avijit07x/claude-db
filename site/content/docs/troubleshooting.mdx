@@ -79,7 +79,23 @@ Existing rows are still stored at the old dimension. Re-embed them:
 claude-db reembed
 ```
 
+## reembed runs out of memory
+
+Embedding is chunked, so peak memory is set by the chunk, not by the size of the database. Measured
+on `all-MiniLM-L6-v2` with worst-case 512-token observations, re-embedding 1,400 rows holds ~0.8 GB
+and takes the same time as re-embedding 128.
+
+Raising `embeddings.batchSize` costs memory and buys no speed — wall-clock is flat from 1 to 8 while
+peak memory triples, because CPU inference is compute-bound and the token count is the same either
+way. Lower it if you are tight on RAM:
+
+```json
+{ "embeddings": { "batchSize": 4 } }
+```
+
+The default is 8.
+
 <Callout title="Nothing here deletes memory">
-`uninstall` removes the hooks and leaves your database alone. Only `forget`, `prune` and `reset`
-delete anything, and the last two are dry runs without `--yes`.
+  `uninstall` removes the hooks and leaves your database alone. Only `forget`, `prune` and `reset`
+  delete anything, and the last two are dry runs without `--yes`.
 </Callout>

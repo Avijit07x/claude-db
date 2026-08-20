@@ -25,7 +25,7 @@ export function usage(): void {
   import <file.jsonl>         Load a dump back in (safe to repeat)
   sync <url> [--yes]          Two-way merge with another database
   update                      Install a newer compatible release now
-  reembed                     Re-embed everything with the current model
+  reembed [--project]         Re-embed with the current model
   prune --older-than <days>   Delete old memory (dry run without --yes)
   reset [--project] --yes     Delete stored memory (dry run without --yes)
 

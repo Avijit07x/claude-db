@@ -60,7 +60,7 @@ async function run(): Promise<void> {
       await cmdPrune(args);
       break;
     case 'reembed':
-      await cmdReembed();
+      await cmdReembed(args);
       break;
     case 'stats':
       await cmdStats();

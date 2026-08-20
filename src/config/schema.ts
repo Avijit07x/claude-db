@@ -8,8 +8,9 @@ export const ConfigSchema = z.object({
       provider: z.enum(['auto', 'local', 'builtin', 'none']).default('auto'),
       maxScanCandidates: z.number().int().positive().default(25000),
       timeoutMs: z.number().int().nonnegative().default(3000),
+      batchSize: z.number().int().positive().default(8),
     })
-    .default({ provider: 'auto', maxScanCandidates: 25000, timeoutMs: 3000 }),
+    .prefault({}),
 
   updates: z.enum(['auto', 'notify', 'off']).default('notify'),
 

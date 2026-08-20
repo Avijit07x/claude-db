@@ -88,4 +88,30 @@ export default async function run() {
     tagged[0].tags.join(','),
   );
   check('root-level files do not become tags', !tagged[0].tags.includes('README.md'));
+
+  {
+    const { embedObservations } = await import('../../dist/capture/index.js');
+    const sizes = [];
+    const ctx = {
+      config: ConfigSchema.parse({ embeddings: { batchSize: 16 } }),
+      embedder: async () => ({
+        id: 'fake',
+        dimensions: 2,
+        minRelevance: 0,
+        embed: async (texts) => (sizes.push(texts.length), texts.map(() => [1, 0])),
+      }),
+    };
+    const many = Array.from({ length: 500 }, (_, i) => ({ title: `t${i}`, body: 'b' }));
+
+    await embedObservations(ctx, many);
+    check(
+      'embedding never hands the model more than one batch at a time',
+      Math.max(...sizes) === 16,
+      `max ${Math.max(...sizes)}`,
+    );
+    check(
+      'every observation still gets embedded',
+      many.every((obs) => obs.embedder === 'fake'),
+    );
+  }
 }
