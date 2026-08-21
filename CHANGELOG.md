@@ -20,9 +20,17 @@
   greps for `value` or `result` stay silent. Measured on the replay corpus:
   +9 fires, no regressions.
 
-- **`git grep` counts as searching the tree.** It is recursive by default,
-  but the hook required a `-r` flag or a path argument, so every
-  `git grep <symbol>` passed unseen — 33 commands in the replay corpus.
+- **`git grep` and `rg` count as searching the tree.** Both are recursive by
+  default, but the hook required a `-r` flag or a path argument, so every
+  `git grep <symbol>` and bare `rg <symbol>` passed unseen. A piped `rg` is
+  still treated as output filtering. Space-separated flag values
+  (`rg -t ts`, `grep -A 3`) no longer confuse pattern extraction.
+
+- **A preference's title is now the rule itself.** Titles were built from
+  the assistant's reasoning, so a turn that stated a standing rule while work
+  was in flight could be filed as a preference titled "140 checks pass" —
+  junk in the new session-start index. Preference titles now come from the
+  user's own words.
 
 - **The installed instructions speak in the first person.** "This project has
   persistent memory" reads as someone else's feature; "you have persistent
@@ -40,10 +48,17 @@
   `get_observations` — so recalling a standing rule becomes expanding a line
   already on screen instead of discovering whether one exists.
 
-- **`CLAUDE_DB_USAGES_HOOK=deny` blocks symbol greps outright.** Opt-in. The
-  blocked call carries the graph answer in the deny reason, so the agent
-  already holds what the grep would have returned and the block is not a dead
-  end. Unset keeps the directive text; `off` still disables the hook entirely.
+- **Symbol greps are blocked by default, with the graph answer in the deny
+  reason.** A blind A/B on a real task showed the block outperforms the
+  nudge: the agent pivots to `find_usages` immediately, loses no turn — the
+  answer it needed rides in the deny reason — and non-symbol greps pass
+  through untouched. `CLAUDE_DB_USAGES_HOOK=directive` keeps the softer
+  inject-only mode; `off` disables the hook entirely.
+
+- **`claude-db adoption` measures whether any of this works.** It reads the
+  project's transcripts and reports Bash commands vs greps vs hook fires vs
+  memory tool calls — the grep-to-memory ratio that motivated this release,
+  reproducible on any project with one command.
 
 ### Fixed
 
