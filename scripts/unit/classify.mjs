@@ -28,6 +28,23 @@ export default async function run() {
     notARule[0].kind,
   );
 
+  const ruleWhileWorking = observationsFromTurns(
+    [
+      turn({
+        prompt: 'never push directly to main in this repo',
+        reasoning: 'Fixed the pipeline. 140 checks pass, all green now.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    "a preference's title is the rule, not the work around it",
+    ruleWhileWorking[0].title.includes('never push directly to main'),
+    ruleWhileWorking[0].title,
+  );
+
   const explained = observationsFromTurns(
     [
       turn({
