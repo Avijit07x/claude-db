@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createContext } from '../context.js';
 import { formatGraph, queryGraph } from '../graph/index.js';
-import { isSymbol, isWord, symbolsGreppedIn } from './grep-symbols.js';
+import { DECLARED, isSymbol, isWord, symbolsGreppedIn } from './grep-symbols.js';
 import { readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
@@ -10,7 +10,6 @@ silenceSqliteWarning();
 
 const MAX_SYMBOLS = 2;
 const MAX_LINES = 14;
-const DECLARED = new Set(['function', 'method', 'class', 'interface', 'type', 'enum']);
 
 function requested(payload: {
   tool_name?: string;
@@ -34,7 +33,7 @@ function trim(answer: string): string {
 }
 
 await runHook(async () => {
-  const mode = process.env['CLAUDE_DB_USAGES_HOOK'];
+  const mode = process.env['CLAUDE_DB_USAGES_HOOK'] ?? 'deny';
   if (mode === 'off') return;
 
   const payload = await readPayload();
@@ -59,16 +58,16 @@ await runHook(async () => {
   if (blocks.length === 0) return;
 
   const names = named.map((s) => `\`${s}\``).join(', ');
-  if (mode === 'deny') {
+  if (mode === 'directive') {
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
-          permissionDecision: 'deny',
-          permissionDecisionReason:
-            `${names} is a declared symbol — use the \`find_usages\` MCP tool for symbol ` +
-            `lookups, not grep. Its answer for this search is already below; do not re-run ` +
-            `the grep:\n\n${blocks.join('\n\n')}`,
+          additionalContext:
+            `You are grepping the declared symbol(s) ${names}. Use the \`find_usages\` MCP ` +
+            `tool for symbol lookups — grep cannot tell a call from an import or show the ` +
+            `blast radius. The graph's answer for this search is below; read it instead of ` +
+            `the grep output, and call find_usages directly next time:\n\n${blocks.join('\n\n')}`,
         },
       }),
     );
@@ -79,11 +78,11 @@ await runHook(async () => {
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
-        additionalContext:
-          `You are grepping the declared symbol(s) ${names}. Use the \`find_usages\` MCP ` +
-          `tool for symbol lookups — grep cannot tell a call from an import or show the ` +
-          `blast radius. The graph's answer for this search is below; read it instead of ` +
-          `the grep output, and call find_usages directly next time:\n\n${blocks.join('\n\n')}`,
+        permissionDecision: 'deny',
+        permissionDecisionReason:
+          `Blocked: ${names} names a declared symbol — use the \`find_usages\` MCP tool ` +
+          `for symbol lookups, not grep. Its answer for this search is already below, so ` +
+          `nothing needs re-running:\n\n${blocks.join('\n\n')}`,
       },
     }),
   );
