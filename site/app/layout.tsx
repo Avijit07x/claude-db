@@ -48,6 +48,7 @@ export const metadata: Metadata = {
   authors: [{ name: 'Avijit Dey', url: 'https://github.com/Avijit07x' }],
   creator: 'Avijit Dey',
   alternates: { canonical: '/' },
+  verification: { google: 'GK-i-SrOMyVSmwQQuEQiEtKGzhiCA9f1AgZT-nB0TMw' },
   openGraph: {
     title: 'claude-db',
     description: 'Stop paying Claude to relearn your own repo.',
