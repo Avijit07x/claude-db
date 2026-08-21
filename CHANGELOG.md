@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.7.0
+
+### Changed
+
+- **The usages hook now directs instead of offering.** Replaying 1,871 Bash
+  commands from real transcripts showed the additive wording ("the grep below
+  still runs") produced 0% unprompted tool adoption — the graph answer arrived
+  and was ignored. The hook now names the grepped symbol and instructs the
+  agent to use `find_usages`, with the graph answer still inline so the
+  instruction is self-justifying.
+
+- **Plain lowercase words count as symbols when the graph holds a real
+  declaration.** The symbol filter only matched camelCase, PascalCase and
+  snake_case, so single-word names — `search`, `forget`, `timeline`, exactly
+  the vocabulary a project's public surface tends to use — could never fire
+  the hook. Words of four or more characters now qualify, gated on resolving
+  to a declared function, method or class rather than a local `const`, so
+  greps for `value` or `result` stay silent. Measured on the replay corpus:
+  +9 fires, no regressions.
+
+- **`git grep` counts as searching the tree.** It is recursive by default,
+  but the hook required a `-r` flag or a path argument, so every
+  `git grep <symbol>` passed unseen — 33 commands in the replay corpus.
+
+### Added
+
+- **`CLAUDE_DB_USAGES_HOOK=deny` blocks symbol greps outright.** Opt-in. The
+  blocked call carries the graph answer in the deny reason, so the agent
+  already holds what the grep would have returned and the block is not a dead
+  end. Unset keeps the directive text; `off` still disables the hook entirely.
+
+### Fixed
+
+- **`claude-db install` stacked duplicate hooks whenever the install path
+  changed.** Registration deduped by exact command string, so reinstalling
+  from a new location — a repo build vs the global install, or any node
+  upgrade under nvm moving the global path — appended a second registration
+  with the same matcher: two node processes and two database opens on every
+  Bash call. Install now replaces its own hook entries by file name wherever
+  they point, and uninstall removes them from any path, not just the one it
+  is run from.
+
+- **The graph could not answer for the MCP tool names themselves.**
+  `find_usages("forget")` returned nothing: tool names existed only as string
+  literals with anonymous handlers, so there was no declaration to index.
+  Handlers are now named functions matching their tools (`search`, `forget`,
+  `timeline`, `remember`, `get_observations`, `find_usages`), so the graph
+  answers questions about the project's own public surface.
+
 ## 0.6.0
 
 ### Fixed
