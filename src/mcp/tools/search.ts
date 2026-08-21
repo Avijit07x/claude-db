@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { RecallContext } from '../../context.js';
 import { z } from 'zod';
 import { KINDS } from './kinds.js';
@@ -33,20 +34,37 @@ export function register(server: McpServer, ctx: RecallContext): void {
         ),
       limit: z.number().int().min(1).max(50).default(10),
     },
-    async ({ query, project, kind, tag, limit }) => {
-      const entries = await ctx.search.search({
-        text: query,
-        limit,
-        ...(project === '*' ? {} : { project: resolveProject(project) }),
-        ...(kind ? { kind } : {}),
-        ...(tag ? { tag } : {}),
-      });
-      if (entries.length === 0) {
-        return { content: [{ type: 'text', text: await noMatches(ctx, project) }] };
-      }
-      return { content: [{ type: 'text', text: renderIndex(entries) }] };
-    },
+    (args) => search(ctx, args),
   );
+}
+
+async function search(
+  ctx: RecallContext,
+  {
+    query,
+    project,
+    kind,
+    tag,
+    limit,
+  }: {
+    query: string;
+    project?: string | undefined;
+    kind?: (typeof KINDS)[number] | undefined;
+    tag?: string | undefined;
+    limit: number;
+  },
+): Promise<CallToolResult> {
+  const entries = await ctx.search.search({
+    text: query,
+    limit,
+    ...(project === '*' ? {} : { project: resolveProject(project) }),
+    ...(kind ? { kind } : {}),
+    ...(tag ? { tag } : {}),
+  });
+  if (entries.length === 0) {
+    return { content: [{ type: 'text', text: await noMatches(ctx, project) }] };
+  }
+  return { content: [{ type: 'text', text: renderIndex(entries) }] };
 }
 
 async function noMatches(ctx: RecallContext, project: string | undefined): Promise<string> {
