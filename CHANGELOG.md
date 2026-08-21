@@ -1,5 +1,84 @@
 # Changelog
 
+## 0.7.0
+
+### Changed
+
+- **The usages hook now directs instead of offering.** Replaying 1,871 Bash
+  commands from real transcripts showed the additive wording ("the grep below
+  still runs") produced 0% unprompted tool adoption — the graph answer arrived
+  and was ignored. The hook now names the grepped symbol and instructs the
+  agent to use `find_usages`, with the graph answer still inline so the
+  instruction is self-justifying.
+
+- **Plain lowercase words count as symbols when the graph holds a real
+  declaration.** The symbol filter only matched camelCase, PascalCase and
+  snake_case, so single-word names — `search`, `forget`, `timeline`, exactly
+  the vocabulary a project's public surface tends to use — could never fire
+  the hook. Words of four or more characters now qualify, gated on resolving
+  to a declared function, method or class rather than a local `const`, so
+  greps for `value` or `result` stay silent. Measured on the replay corpus:
+  +9 fires, no regressions.
+
+- **`git grep` and `rg` count as searching the tree.** Both are recursive by
+  default, but the hook required a `-r` flag or a path argument, so every
+  `git grep <symbol>` and bare `rg <symbol>` passed unseen. A piped `rg` is
+  still treated as output filtering. Space-separated flag values
+  (`rg -t ts`, `grep -A 3`) no longer confuse pattern extraction.
+
+- **A preference's title is now the rule itself.** Titles were built from
+  the assistant's reasoning, so a turn that stated a standing rule while work
+  was in flight could be filed as a preference titled "140 checks pass" —
+  junk in the new session-start index. Preference titles now come from the
+  user's own words.
+
+- **The installed instructions speak in the first person.** "This project has
+  persistent memory" reads as someone else's feature; "you have persistent
+  memory of this project" reads as the model's own recall. The installed
+  block now uses the second framing, matching how the model treats memory it
+  actually uses. Already-installed projects pick the new text up automatically
+  at the next session start.
+
+### Added
+
+- **Session start injects a standing-rules index.** The model uses whatever is
+  already in its context and skips what costs a call, so memory it cannot see
+  is memory it does not use. The startup injection now lists the most recent
+  preference observations — one line each, with the id to expand via
+  `get_observations` — so recalling a standing rule becomes expanding a line
+  already on screen instead of discovering whether one exists. Rules recorded
+  explicitly with `remember` list ahead of auto-classified ones.
+
+- **Symbol greps are blocked by default, with the graph answer in the deny
+  reason.** A blind A/B on a real task showed the block outperforms the
+  nudge: the agent pivots to `find_usages` immediately, loses no turn — the
+  answer it needed rides in the deny reason — and non-symbol greps pass
+  through untouched. `CLAUDE_DB_USAGES_HOOK=directive` keeps the softer
+  inject-only mode; `off` disables the hook entirely.
+
+- **`claude-db adoption` measures whether any of this works.** It reads the
+  project's transcripts and reports Bash commands vs greps vs hook fires vs
+  memory tool calls — the grep-to-memory ratio that motivated this release,
+  reproducible on any project with one command.
+
+### Fixed
+
+- **`claude-db install` stacked duplicate hooks whenever the install path
+  changed.** Registration deduped by exact command string, so reinstalling
+  from a new location — a repo build vs the global install, or any node
+  upgrade under nvm moving the global path — appended a second registration
+  with the same matcher: two node processes and two database opens on every
+  Bash call. Install now replaces its own hook entries by file name wherever
+  they point, and uninstall removes them from any path, not just the one it
+  is run from.
+
+- **The graph could not answer for the MCP tool names themselves.**
+  `find_usages("forget")` returned nothing: tool names existed only as string
+  literals with anonymous handlers, so there was no declaration to index.
+  Handlers are now named functions matching their tools (`search`, `forget`,
+  `timeline`, `remember`, `get_observations`, `find_usages`), so the graph
+  answers questions about the project's own public surface.
+
 ## 0.6.0
 
 ### Fixed

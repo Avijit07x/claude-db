@@ -55,6 +55,7 @@ function buildObservation(
   );
 
   const author = currentAuthor();
+  const kind = classifyTurn(turn);
 
   return {
     id: observationId(sessionId, turn.timestamp, turn.prompt),
@@ -62,8 +63,8 @@ function buildObservation(
     project,
     ...(author ? { author } : {}),
     status: files.length > 0 ? 'open' : 'done',
-    kind: classifyTurn(turn),
-    title: redact(buildTitle(turn, files)),
+    kind,
+    title: redact(buildTitle(turn, files, kind)),
     body,
     files,
     tags: topLevelDirs(files, project),
@@ -101,7 +102,12 @@ function reports(sentence: string): number {
   return EVIDENCE.some((test) => test.test(text)) ? 1 : 0;
 }
 
-function buildTitle(turn: Turn, files: string[]): string {
+function buildTitle(turn: Turn, files: string[], kind: ObservationKind): string {
+  if (kind === 'preference') {
+    const rule = firstSentence(redact(turn.prompt));
+    if (rule) return headline(rule);
+  }
+
   const prose = stripMarkdown(redact(turn.reasoning));
 
   const scored = scoreSentences(prose);

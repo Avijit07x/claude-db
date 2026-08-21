@@ -15,6 +15,7 @@ export function usage(): void {
   projects                    List every project with memory in this database
   merge [<old-path>] [--yes]  Move memory from an old project path onto this one
   stats                       What this project's memory is made of
+  adoption                    How often sessions grep vs use the memory tools
   flush                       Re-ingest every transcript for this project
   seed --from-git [--limit n] Fill a cold memory from this repo's history
   scan [--force]              Map this repo's symbols and how they connect

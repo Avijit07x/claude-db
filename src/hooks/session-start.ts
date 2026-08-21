@@ -8,6 +8,7 @@ import { openWork } from '../capture/index.js';
 import type { MemoryStore } from '../store/index.js';
 import { emitContext, readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
+import { toShortId } from '../util/shortid.js';
 import { refreshInstalled } from '../cli/refresh.js';
 import { updateNotice } from '../update.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
@@ -80,6 +81,24 @@ await runHook(async () => {
       lines.push('Not committed yet, newest first:');
       for (const obs of open.slice(0, 3)) {
         lines.push(`- ${obs.title}`);
+      }
+    }
+
+    const rules = (await ctx.store.list({ project, kind: 'preference', limit: 100 }))
+      .sort((a, b) => {
+        const manual = Number(b.sessionId === 'manual') - Number(a.sessionId === 'manual');
+        return manual !== 0 ? manual : b.createdAt - a.createdAt;
+      })
+      .slice(0, 8);
+    if (rules.length > 0) {
+      lines.push('');
+      lines.push('Standing rules on record — expand any id with get_observations:');
+      for (const obs of rules) {
+        const when = new Date(obs.createdAt).toISOString().slice(0, 10);
+        const line = `- ${toShortId(obs.id)} [${when}] ${obs.title}`.slice(0, 140);
+        if (line.length > budget) break;
+        budget -= line.length;
+        lines.push(line);
       }
     }
 

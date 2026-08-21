@@ -1,7 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { RecallContext } from '../../context.js';
 import { z } from 'zod';
-import { findUsages, formatUsages, repoRootFor } from '../../usages/index.js';
+import { findUsages as textUsages, formatUsages, repoRootFor } from '../../usages/index.js';
 import { formatGraph, queryGraph, refreshGraph, suggestFor } from '../../graph/index.js';
 import { resolveProject } from '../../util/project.js';
 
@@ -67,27 +68,48 @@ export function register(server: McpServer, ctx: RecallContext): void {
         .default(100)
         .describe('Cap on matching lines returned; the result says how many more exist'),
     },
-    async ({ symbol, mode, target, path, regex, context, limit }) => {
-      if (mode === 'text') {
-        const result = findUsages({ symbol, regex, context, limit, ...(path ? { path } : {}) });
-        const missed =
-          result.matches.length === 0
-            ? await suggestFor(ctx.store, resolveProject(undefined), symbol)
-            : [];
-        return { content: [{ type: 'text', text: formatUsages(result, missed) }] };
-      }
-
-      const root = repoRootFor(path ?? process.cwd());
-      const project = resolveProject(undefined);
-      const refreshed = await refreshGraph(ctx.store, root, project);
-      const answer = await queryGraph(ctx.store, project, {
-        mode,
-        symbol,
-        ...(target ? { target } : {}),
-        limit,
-      });
-      answer.refreshed = refreshed;
-      return { content: [{ type: 'text', text: formatGraph(answer, root) }] };
-    },
+    (args) => find_usages(ctx, args),
   );
+}
+
+async function find_usages(
+  ctx: RecallContext,
+  {
+    symbol,
+    mode,
+    target,
+    path,
+    regex,
+    context,
+    limit,
+  }: {
+    symbol: string;
+    mode: 'text' | 'usages' | 'explain' | 'path';
+    target?: string | undefined;
+    path?: string | undefined;
+    regex: boolean;
+    context: number;
+    limit: number;
+  },
+): Promise<CallToolResult> {
+  if (mode === 'text') {
+    const result = textUsages({ symbol, regex, context, limit, ...(path ? { path } : {}) });
+    const missed =
+      result.matches.length === 0
+        ? await suggestFor(ctx.store, resolveProject(undefined), symbol)
+        : [];
+    return { content: [{ type: 'text', text: formatUsages(result, missed) }] };
+  }
+
+  const root = repoRootFor(path ?? process.cwd());
+  const project = resolveProject(undefined);
+  const refreshed = await refreshGraph(ctx.store, root, project);
+  const answer = await queryGraph(ctx.store, project, {
+    mode,
+    symbol,
+    ...(target ? { target } : {}),
+    limit,
+  });
+  answer.refreshed = refreshed;
+  return { content: [{ type: 'text', text: formatGraph(answer, root) }] };
 }

@@ -11,6 +11,7 @@ import { cmdMerge, cmdProjects, cmdStats } from './commands/insight.js';
 import { cmdFlush, cmdReset, cmdUpdate } from './commands/maintain.js';
 import { cmdScan, cmdUsages } from './commands/graph.js';
 import { cmdSeed } from './commands/seed.js';
+import { cmdAdoption } from './commands/adoption.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
@@ -64,6 +65,9 @@ async function run(): Promise<void> {
       break;
     case 'stats':
       await cmdStats();
+      break;
+    case 'adoption':
+      await cmdAdoption();
       break;
     case 'update':
       await cmdUpdate(args);
