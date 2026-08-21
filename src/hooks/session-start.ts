@@ -85,7 +85,10 @@ await runHook(async () => {
     }
 
     const rules = (await ctx.store.list({ project, kind: 'preference', limit: 100 }))
-      .sort((a, b) => b.createdAt - a.createdAt)
+      .sort((a, b) => {
+        const manual = Number(b.sessionId === 'manual') - Number(a.sessionId === 'manual');
+        return manual !== 0 ? manual : b.createdAt - a.createdAt;
+      })
       .slice(0, 8);
     if (rules.length > 0) {
       lines.push('');

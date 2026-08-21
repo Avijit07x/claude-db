@@ -46,7 +46,8 @@
   is memory it does not use. The startup injection now lists the most recent
   preference observations — one line each, with the id to expand via
   `get_observations` — so recalling a standing rule becomes expanding a line
-  already on screen instead of discovering whether one exists.
+  already on screen instead of discovering whether one exists. Rules recorded
+  explicitly with `remember` list ahead of auto-classified ones.
 
 - **Symbol greps are blocked by default, with the graph answer in the deny
   reason.** A blind A/B on a real task showed the block outperforms the
