@@ -49,6 +49,20 @@ export default async function run() {
     );
     check('install registers the mcp server', !!read('.mcp.json').mcpServers.memory);
 
+    install('/upgraded/node/claude-db/dist', 'project', repo);
+    const upgraded = read('.claude/settings.local.json');
+    check(
+      'reinstalling from a new path replaces hooks instead of stacking',
+      Object.values(upgraded.hooks).every((entries) => entries.length === 1),
+      Object.entries(upgraded.hooks)
+        .map(([k, v]) => `${k}=${v.length}`)
+        .join(' '),
+    );
+    check(
+      'the replacement points at the new path',
+      upgraded.hooks.SessionStart[0].hooks[0].command.includes('/upgraded/node/'),
+    );
+
     uninstall(dist, 'project', repo);
     check(
       'uninstall removes the mcp server even when it was the only one',

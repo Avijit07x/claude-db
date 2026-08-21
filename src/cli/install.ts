@@ -48,15 +48,17 @@ export function install(distDir: string, scope: Scope, project: string): string 
   const hooks = (settings['hooks'] ?? {}) as Record<string, HookMatcher[]>;
 
   for (const [event, file, matcher] of HOOKS) {
-    const command = hookCommand(distDir, file);
-    const existing = hooks[event] ?? [];
-    const present = existing.some((entry) => entry.hooks.some((hook) => hook.command === command));
-    if (present) continue;
-    existing.push({
+    const kept = (hooks[event] ?? [])
+      .map((entry) => ({
+        ...entry,
+        hooks: entry.hooks.filter((hook) => !isOurHook(hook.command)),
+      }))
+      .filter((entry) => entry.hooks.length > 0);
+    kept.push({
       ...(matcher ? { matcher } : {}),
-      hooks: [{ type: 'command', command }],
+      hooks: [{ type: 'command', command: hookCommand(distDir, file) }],
     });
-    hooks[event] = existing;
+    hooks[event] = kept;
   }
   settings['hooks'] = hooks;
   delete settings['mcpServers'];
@@ -97,14 +99,13 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
   const settings = readJson(path);
   if (Object.keys(settings).length === 0) return null;
 
-  const ours = new Set(HOOKS.map(([, file]) => hookCommand(distDir, file)));
   const hooks = (settings['hooks'] ?? {}) as Record<string, HookMatcher[]>;
 
   for (const [event, entries] of Object.entries(hooks)) {
     const kept = entries
       .map((entry) => ({
         ...entry,
-        hooks: entry.hooks.filter((hook) => !ours.has(hook.command)),
+        hooks: entry.hooks.filter((hook) => !isOurHook(hook.command)),
       }))
       .filter((entry) => entry.hooks.length > 0);
 
@@ -137,4 +138,9 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
 
 function hookCommand(distDir: string, file: string): string {
   return `node ${resolve(distDir, 'hooks', file)}`;
+}
+
+function isOurHook(command: string): boolean {
+  const path = command.replace(/\\/g, '/');
+  return HOOKS.some(([, file]) => path.endsWith(`/hooks/${file}`));
 }
