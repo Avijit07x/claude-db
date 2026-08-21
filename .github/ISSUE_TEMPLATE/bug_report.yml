@@ -1,0 +1,86 @@
+name: Bug report
+description: Something does not work the way it should
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. The output of
+        `claude-db doctor` answers most of the environment questions below in
+        one go, so paste it if you can.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I ran `claude-db scan` on a Rails project and it reported
+        "7093 not a supported language", so `usages` finds nothing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How to reproduce
+      description: The smallest sequence that shows the problem.
+      placeholder: |
+        1. cd into a project of this kind
+        2. claude-db install --project
+        3. claude-db scan
+        4. claude-db usages --mode usages SomeSymbol
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `claude-db doctor`
+      description: >-
+        This prints the version, adapter, reachability and embedder. Redact the
+        database URL if it carries credentials.
+      render: console
+    validations:
+      required: false
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Database backend
+      options:
+        - SQLite (the default)
+        - MongoDB
+        - Postgres
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: claude-db version, Node version, and OS.
+      placeholder: 'claude-db 0.7.0, Node 24.14.1, macOS 15.5'
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: >-
+        Logs, a stack trace, the project's language, or whether it started
+        after an upgrade.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I am on the latest version, or I said above why I cannot be
+          required: true
+        - label: I searched existing issues
+          required: true

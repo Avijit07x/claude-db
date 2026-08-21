@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest something claude-db should do
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The project stays deliberately small: no daemon, no hosted service, few
+        dependencies. Proposals that fit inside those constraints are much
+        easier to accept, so it helps to say how yours does.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What are you trying to do, and where does claude-db get in the way
+        today? Describe the situation rather than the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+      description: The behaviour you want, and what it would look like to use.
+      placeholder: |
+        `claude-db <command>` would ... so that ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: >-
+        Existing commands, config, or workarounds you already attempted, and
+        why they fell short.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Fit
+      description: Tick whichever apply. None are required.
+      options:
+        - label: This needs no new runtime dependency
+        - label: This needs no background process or network service
+        - label: I would be willing to open a pull request for it

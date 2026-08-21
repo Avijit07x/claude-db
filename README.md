@@ -163,6 +163,10 @@ npm version patch
 git push --follow-tags
 ```
 
+[CONTRIBUTING.md](./CONTRIBUTING.md) has the conventions, the test setup, and
+how to add a language to the code graph. Security reports go through
+[SECURITY.md](./SECURITY.md), privately.
+
 ## License
 
 Apache-2.0

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://claude-db.vercel.app/docs
+    about: Quick start, CLI reference, and how the pieces fit together.
+  - name: Report a security vulnerability
+    url: https://github.com/Avijit07x/claude-db/security/advisories/new
+    about: Please report privately rather than in a public issue.
