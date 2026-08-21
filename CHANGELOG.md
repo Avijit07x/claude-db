@@ -24,7 +24,21 @@
   but the hook required a `-r` flag or a path argument, so every
   `git grep <symbol>` passed unseen — 33 commands in the replay corpus.
 
+- **The installed instructions speak in the first person.** "This project has
+  persistent memory" reads as someone else's feature; "you have persistent
+  memory of this project" reads as the model's own recall. The installed
+  block now uses the second framing, matching how the model treats memory it
+  actually uses. Already-installed projects pick the new text up automatically
+  at the next session start.
+
 ### Added
+
+- **Session start injects a standing-rules index.** The model uses whatever is
+  already in its context and skips what costs a call, so memory it cannot see
+  is memory it does not use. The startup injection now lists the most recent
+  preference observations — one line each, with the id to expand via
+  `get_observations` — so recalling a standing rule becomes expanding a line
+  already on screen instead of discovering whether one exists.
 
 - **`CLAUDE_DB_USAGES_HOOK=deny` blocks symbol greps outright.** Opt-in. The
   blocked call carries the graph answer in the deny reason, so the agent
