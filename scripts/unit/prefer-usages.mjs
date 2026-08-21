@@ -15,6 +15,9 @@ export default async function run() {
   check('a command without grep is ignored', !caught('ls -la && cat package.json'));
   check('git grep searches the tree without -r or a path', caught('git grep -n "findUsages"'));
   check('a piped grep after git is still output filtering', !caught('git log | grep memory'));
+  check('bare rg searches the tree by default', caught('rg closeObservations'));
+  check('rg with a type filter searches the tree', caught('rg -t ts closeObservations'));
+  check('piped rg is output filtering', !caught('npm test 2>&1 | rg closeObservations'));
   check(
     'every symbol in one command is reported',
     symbolsGreppedIn('grep -rn "cmdReembed" src/ && grep -rn "eachObservation" src/').join(',') ===
