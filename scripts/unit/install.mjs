@@ -47,6 +47,12 @@ export default async function run() {
         .map(([k, v]) => `${k}=${v.length}`)
         .join(' '),
     );
+    check(
+      'hook commands use forward slashes so they are compatible with a shell on Windows',
+      Object.values(settings.hooks).every((entries) =>
+        entries.every((entry) => entry.hooks.every((h) => !h.command.includes('\\'))),
+      ),
+    );
     check('install registers the mcp server', !!read('.mcp.json').mcpServers.memory);
 
     install('/upgraded/node/claude-db/dist', 'project', repo);
