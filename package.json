@@ -29,6 +29,7 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "dev": "tsc -w -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "node scripts/lint.mjs",
     "test": "node scripts/unit.mjs && node scripts/local.mjs && node scripts/filter.mjs && node scripts/transcript.mjs && node scripts/inject.mjs && node scripts/smoke.mjs",
     "smoke": "node scripts/smoke.mjs",
     "unit": "node scripts/unit.mjs",

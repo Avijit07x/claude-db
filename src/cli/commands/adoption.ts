@@ -54,7 +54,11 @@ export async function cmdAdoption(): Promise<void> {
       for (const symbol of symbols.slice(0, 2)) {
         let fired = cache.get(symbol);
         if (fired === undefined) {
-          const answer = await queryGraph(ctx.store, project, { mode: 'usages', symbol, limit: 20 });
+          const answer = await queryGraph(ctx.store, project, {
+            mode: 'usages',
+            symbol,
+            limit: 20,
+          });
           fired =
             !answer.empty &&
             (isSymbol(symbol) || answer.definitions.some((d) => DECLARED.has(d.kind)));
@@ -80,7 +84,10 @@ export async function cmdAdoption(): Promise<void> {
     console.log(`    ${tool.padEnd(18)}  ${count}`);
   }
   if (greps.length > 0) {
-    const ratio = memoryTotal === 0 ? 'no memory calls yet' : `${(greps.length / memoryTotal).toFixed(1)} greps per memory call`;
+    const ratio =
+      memoryTotal === 0
+        ? 'no memory calls yet'
+        : `${(greps.length / memoryTotal).toFixed(1)} greps per memory call`;
     console.log(`\n  ${ratio}`);
   }
 }
