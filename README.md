@@ -61,8 +61,10 @@ Claude then gets four modes through MCP: `text` (a live grep, works with no
 scan at all), `usages`, `explain` and `path`. Re-running `scan` is cheap: it
 hashes files and re-parses only what changed.
 
-Works out of the box on TypeScript, TSX, JavaScript, Python, Go and Rust. The
-parser ships with the package, so there is nothing else to install.
+TypeScript, TSX, JavaScript, Python, Go, Rust and Ruby are parsed properly, and
+every other language — Java, C, C++, C#, Swift, Kotlin, PHP, Elixir, shell and
+twenty more — is read by pattern, which finds declarations and name-matched
+references tagged `INFERRED`. Nothing else to install either way.
 
 ## Use another database
 
@@ -110,6 +112,7 @@ including the symbols where plain grep wins.
 | `claude-db scan [--force]`               | Build the code graph for this repo                     |
 | `claude-db usages [--mode <m>] <symbol>` | What uses a symbol: live `git grep`, or the code graph |
 | `claude-db use <url>`                    | Switch database and verify it                          |
+| `claude-db view`                         | See this project's memory live in the browser          |
 
 Every other command, including `search`, `remember`, `seed`, `sync`, `export`,
 `prune` and `reset`, is in the [CLI reference](https://claude-db.vercel.app/docs/cli).
@@ -151,7 +154,8 @@ including the symbols where plain grep wins. Releases are in the
 ```bash
 npm install
 npm run build
-npm test      # 326 checks
+npm test      # 415 checks
+npm run lint  # house rules: no comments, no any, import extensions
 npm run try   # simulate a session, touches nothing
 npm run format
 ```
