@@ -29,6 +29,7 @@ export interface MemoryStore {
   upsertSession(session: Session): Promise<void>;
   getSession(id: string): Promise<Session | null>;
   recentSessions(project: string, limit: number): Promise<Session[]>;
+  clearSummary(id: string): Promise<boolean>;
 
   insertObservations(observations: Observation[]): Promise<void>;
   getObservations(ids: string[]): Promise<Observation[]>;

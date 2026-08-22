@@ -12,6 +12,7 @@ export function usage(): void {
   remember [--kind k] <text>  Record something outright, e.g. a house rule
            [--key <name>]     ...under a stable name, replacing any earlier one
   forget <id> [id...]         Delete specific observations by id
+         --session <id>       ...or clear one session's summary, so it stops being injected
   projects                    List every project with memory in this database
   merge [<old-path>] [--yes]  Move memory from an old project path onto this one
   stats                       What this project's memory is made of

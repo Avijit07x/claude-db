@@ -12,13 +12,15 @@ import {
 } from '../capture/index.js';
 import { isDue, readState } from '../update.js';
 import { createContext } from '../context.js';
-import { readPayload, runHook } from './payload.js';
+import { capturingDisabled, readPayload, runHook } from './payload.js';
+import { loadConfig } from '../config/index.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
 
 await runHook(async () => {
+  if (capturingDisabled(loadConfig().capture.scripted)) return;
   const payload = await readPayload();
   const sessionId = payload.session_id;
   if (!sessionId) return;

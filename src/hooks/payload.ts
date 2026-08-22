@@ -9,6 +9,11 @@ export interface HookPayload {
   prompt?: string;
 }
 
+export function capturingDisabled(scripted: boolean): boolean {
+  if (process.env['CLAUDE_DB_CAPTURE'] === 'off') return true;
+  return process.env['CLAUDE_CODE_ENTRYPOINT'] === 'sdk-cli' && !scripted;
+}
+
 export async function readPayload(): Promise<HookPayload> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));

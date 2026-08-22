@@ -128,6 +128,10 @@ export class PostgresStore implements MemoryStore {
     return sessionsOps.recentSessions(this.pool, project, limit);
   }
 
+  async clearSummary(id: string): Promise<boolean> {
+    return sessionsOps.clearSummary(this.pool, id);
+  }
+
   async insertObservations(observations: Observation[]): Promise<void> {
     return insertOps.insertObservations(
       this.pool,

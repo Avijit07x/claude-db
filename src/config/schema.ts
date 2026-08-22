@@ -19,6 +19,7 @@ export const ConfigSchema = z.object({
       tools: z.array(z.string()).default(['Edit', 'Write', 'Bash', 'NotebookEdit']),
       exclude: z.array(z.string()).default(['.env', 'secrets', 'node_modules', '.git/']),
       maxBodyChars: z.number().int().positive().default(4000),
+      scripted: z.boolean().default(false),
       summarize: z.enum(['off', 'on']).default('off'),
       summarizeModel: z.enum(['opus', 'sonnet', 'haiku']).default('opus'),
     })

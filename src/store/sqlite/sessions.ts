@@ -20,6 +20,13 @@ export async function upsertSession(db: DatabaseSync, session: Session): Promise
   );
 }
 
+export async function clearSummary(db: DatabaseSync, id: string): Promise<boolean> {
+  const result = db
+    .prepare('UPDATE sessions SET summary = NULL WHERE id = ? AND summary IS NOT NULL')
+    .run(id);
+  return Number(result.changes) > 0;
+}
+
 export async function getSession(db: DatabaseSync, id: string): Promise<Session | null> {
   const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Row | undefined;
   return row ? toSession(row) : null;

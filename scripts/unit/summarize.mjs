@@ -36,6 +36,29 @@ export default async function run() {
 
     check('summarize defaults to off', ConfigSchema.parse({}).capture.summarize === 'off');
     check(
+      'scripted sessions are not captured by default',
+      ConfigSchema.parse({}).capture.scripted === false,
+    );
+
+    const { capturingDisabled } = await import('../../dist/hooks/payload.js');
+    const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT;
+    const optout = process.env.CLAUDE_DB_CAPTURE;
+    try {
+      delete process.env.CLAUDE_DB_CAPTURE;
+      process.env.CLAUDE_CODE_ENTRYPOINT = 'sdk-cli';
+      check('a headless sdk-cli session is skipped', capturingDisabled(false));
+      check('unless the user asks for it', !capturingDisabled(true));
+      process.env.CLAUDE_CODE_ENTRYPOINT = 'cli';
+      check('an interactive session is captured', !capturingDisabled(false));
+      process.env.CLAUDE_DB_CAPTURE = 'off';
+      check('and the explicit opt-out always wins', capturingDisabled(true));
+    } finally {
+      if (entrypoint === undefined) delete process.env.CLAUDE_CODE_ENTRYPOINT;
+      else process.env.CLAUDE_CODE_ENTRYPOINT = entrypoint;
+      if (optout === undefined) delete process.env.CLAUDE_DB_CAPTURE;
+      else process.env.CLAUDE_DB_CAPTURE = optout;
+    }
+    check(
       'the summary model defaults to opus',
       ConfigSchema.parse({}).capture.summarizeModel === 'opus',
     );

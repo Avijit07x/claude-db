@@ -63,9 +63,13 @@ export async function cmdRemember(argv: (string | undefined)[]): Promise<void> {
 }
 
 export async function cmdForget(argv: (string | undefined)[]): Promise<void> {
-  const ids = argv.filter((arg): arg is string => typeof arg === 'string' && arg.length > 0);
+  const args = argv.filter((arg): arg is string => typeof arg === 'string' && arg.length > 0);
+  const sessionAt = args.indexOf('--session');
+  const ids = sessionAt >= 0 ? [] : args;
+  if (sessionAt >= 0) return forgetSummary(args[sessionAt + 1]);
   if (ids.length === 0) {
     console.error('Usage: claude-db forget <id> [id...]');
+    console.error('       claude-db forget --session <session-id>');
     process.exit(1);
   }
 
@@ -77,6 +81,24 @@ export async function cmdForget(argv: (string | undefined)[]): Promise<void> {
     }
     const deleted = await ctx.store.remove({ ids });
     console.log(deleted > 0 ? `Forgot ${deleted} observation(s).` : 'No match.');
+  } finally {
+    await ctx.close();
+  }
+}
+
+async function forgetSummary(sessionId: string | undefined): Promise<void> {
+  if (!sessionId) {
+    console.error('Usage: claude-db forget --session <session-id>');
+    process.exit(1);
+  }
+  const ctx = await createContext();
+  try {
+    const cleared = await ctx.store.clearSummary(sessionId);
+    console.log(
+      cleared
+        ? `Cleared the summary for session ${sessionId}. It will no longer be injected.`
+        : `No session ${sessionId}, or it had no summary.`,
+    );
   } finally {
     await ctx.close();
   }

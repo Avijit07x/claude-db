@@ -26,6 +26,14 @@ export async function getSession(pool: Pool, id: string): Promise<Session | null
   return row ? toSession(row) : null;
 }
 
+export async function clearSummary(pool: Pool, id: string): Promise<boolean> {
+  const result = await pool.query(
+    'UPDATE sessions SET summary = NULL WHERE id = $1 AND summary IS NOT NULL',
+    [id],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function recentSessions(
   pool: Pool,
   project: string,

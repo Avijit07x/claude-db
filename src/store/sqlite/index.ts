@@ -92,6 +92,10 @@ export class SqliteStore implements MemoryStore {
     return sessionsOps.recentSessions(this.db, project, limit);
   }
 
+  async clearSummary(id: string): Promise<boolean> {
+    return sessionsOps.clearSummary(this.db, id);
+  }
+
   async insertObservations(observations: Observation[]): Promise<void> {
     return observationsOps.insertObservations(this.db, observations);
   }

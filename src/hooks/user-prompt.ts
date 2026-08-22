@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { flushSession } from '../capture/index.js';
 import { createContext } from '../context.js';
-import { emitContext, readPayload, runHook } from './payload.js';
+import { capturingDisabled, emitContext, readPayload, runHook } from './payload.js';
+import { loadConfig } from '../config/index.js';
 import { markShown, readShown } from './shown.js';
 import { overlapCount, renderPromptContext } from './relevance.js';
 import { isSearchable } from '../util/prompt.js';
@@ -11,6 +12,7 @@ import { silenceSqliteWarning } from '../util/warnings.js';
 silenceSqliteWarning();
 
 await runHook(async () => {
+  if (capturingDisabled(loadConfig().capture.scripted)) return;
   const payload = await readPayload();
   const sessionId = payload.session_id;
   if (!sessionId) return;

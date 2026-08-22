@@ -25,6 +25,13 @@ export async function getSession(
   return doc ? toSession(doc) : null;
 }
 
+export async function clearSummary(sessions: Collection<SessionDoc>, id: string): Promise<boolean> {
+  const result = (await sessions.updateOne({ _id: id }, { $unset: { summary: '' } })) as {
+    modifiedCount?: number;
+  };
+  return (result.modifiedCount ?? 0) > 0;
+}
+
 export async function recentSessions(
   sessions: Collection<SessionDoc>,
   project: string,

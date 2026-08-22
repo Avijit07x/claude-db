@@ -35,6 +35,18 @@ export default async function run(
   const recent = await store.recentSessions(project, 5);
   check('session summary round-trips', recent.length === 1 && !!recent[0].summary);
   check('forgetting and pruning left the session record alone', recent.length === 1);
+
+  check(
+    'a summary that should never have been written can be cleared',
+    await store.clearSummary(sessionId),
+  );
+  check(
+    'and a cleared summary stops being served',
+    (await store.recentSessions(project, 5)).length === 0,
+  );
+  check('clearing a summary twice is a no-op', !(await store.clearSummary(sessionId)));
+  check('clearing an unknown session is a no-op', !(await store.clearSummary('no-such-session')));
+  await store.upsertSession({ id: sessionId, project, startedAt: Date.now(), summary: 'restored' });
   {
     const openObs = {
       id: 'status-open',
