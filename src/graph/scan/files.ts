@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { LANGUAGES, languageFor } from '../languages/index.js';
+import { BASIC_FINGERPRINT, LANGUAGES, languageFor } from '../languages/index.js';
 import type { LanguageSpec } from '../languages/index.js';
 
 const MAX_BUFFER = 64 * 1024 * 1024;
@@ -15,10 +15,11 @@ export interface SourceFile {
   hash: string;
 }
 
-export const SCAN_VERSION = 2;
+export const SCAN_VERSION = 3;
 
 const RULES_FINGERPRINT = createHash('sha256')
   .update(JSON.stringify(LANGUAGES))
+  .update(BASIC_FINGERPRINT)
   .digest('hex')
   .slice(0, 12);
 

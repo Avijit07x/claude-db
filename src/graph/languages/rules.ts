@@ -18,4 +18,5 @@ export interface LanguageSpec {
   extensions: string[];
   definitions: DefinitionRule[];
   references: ReferenceRule[];
+  basic?: boolean;
 }

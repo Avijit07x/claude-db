@@ -3,15 +3,12 @@ import type { MemoryStore } from '../../store/adapter.js';
 const CANDIDATES = 5000;
 
 function tokens(name: string): string[] {
-  return (
-    name
-      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-      .split(/[^A-Za-z0-9]+/)
-      .filter(Boolean)
-      .map((part) => part.toLowerCase())
-      // Stem the plural: "hooks" and "hook" are the same misremembered name.
-      .map((part) => (part.length > 3 && part.endsWith('s') ? part.slice(0, -1) : part))
-  );
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.toLowerCase())
+    .map((part) => (part.length > 3 && part.endsWith('s') ? part.slice(0, -1) : part));
 }
 
 function score(candidate: string, query: string): number {
@@ -19,8 +16,6 @@ function score(candidate: string, query: string): number {
   const right = query.toLowerCase();
   if (left === right) return 100;
 
-  // Ratios are taken against the LONGER name: without that, one-letter locals
-  // score as well as the real symbol, because everything contains "e".
   const longest = Math.max(left.length, right.length);
 
   let prefix = 0;
@@ -40,15 +35,11 @@ function score(candidate: string, query: string): number {
   return Math.max(byPrefix, byToken, byContains);
 }
 
-/** Names closest to `symbol`, best first. A miss that names no alternative is where people quit. */
 export function nearest(names: Iterable<string>, symbol: string, limit = 5): string[] {
   const scored = new Map<string, number>();
   for (const name of names) {
-    // Two-character locals are never what someone misremembered.
     if (name === symbol || name.length < 3) continue;
     const value = score(name, symbol);
-    // Below this, matches are incidental ("widget" contains "get") and a wrong
-    // suggestion costs more than none: it sends you looking for the wrong thing.
     if (value >= 40) scored.set(name, Math.max(scored.get(name) ?? 0, value));
   }
 

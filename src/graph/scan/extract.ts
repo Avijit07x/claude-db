@@ -1,6 +1,7 @@
 import type { CodeSymbol, EdgeRelation } from '../../types.js';
 import { observationId } from '../../capture/identity.js';
 import { redact } from '../../capture/turn-extractor.js';
+import { callsIn, declarationsIn } from '../languages/index.js';
 import { languageHandle, loadParser } from '../parser.js';
 import type { AstNode } from '../parser.js';
 import type { SourceFile } from './files.js';
@@ -11,6 +12,7 @@ export interface Reference {
   relation: EdgeRelation;
   line: number;
   from: CodeSymbol | null;
+  weak?: boolean;
 }
 
 export interface Extraction {
@@ -25,10 +27,51 @@ interface Span {
 }
 
 const CALLABLE = new Set(['function', 'method', 'class']);
-const IDENTIFIER = /^[\w$]+$/;
+const IDENTIFIER = /^[\w$]+[?!]?$/;
 
 export function symbolId(project: string, file: string, name: string, kind: string): string {
   return observationId('graph', 0, `${project}\0${file}\0${name}\0${kind}`);
+}
+
+function extractByPattern(file: SourceFile, project: string): Extraction {
+  const lines = file.source.split('\n');
+  const symbols: CodeSymbol[] = [];
+  const spans: Span[] = [];
+
+  for (const declaration of declarationsIn(file.source)) {
+    const symbol: CodeSymbol = {
+      id: symbolId(project, file.path, declaration.name, declaration.kind),
+      project,
+      name: declaration.name,
+      kind: declaration.kind,
+      file: file.path,
+      line: declaration.line,
+      lang: file.spec.label,
+      signature: redact((lines[declaration.line - 1] ?? '').trim()).slice(0, 200),
+    };
+    symbols.push(symbol);
+    spans.push({ start: declaration.line, end: declaration.line, symbol });
+  }
+
+  const references: Reference[] = callsIn(file.source).map((call) => ({
+    file: file.path,
+    name: call.name,
+    relation: 'calls' as EdgeRelation,
+    line: call.line,
+    from: nearestAbove(call.line, spans),
+    weak: true,
+  }));
+
+  return { symbols, references };
+}
+
+function nearestAbove(line: number, spans: Span[]): CodeSymbol | null {
+  let best: Span | null = null;
+  for (const span of spans) {
+    if (span.start > line) continue;
+    if (!best || span.start > best.start) best = span;
+  }
+  return best?.symbol ?? null;
 }
 
 function resolveField(node: AstNode, path: string[]): AstNode | null {
@@ -41,7 +84,7 @@ function resolveField(node: AstNode, path: string[]): AstNode | null {
 }
 
 function unquote(text: string): string {
-  return text.replace(/^['"`]|['"`]$/g, '');
+  return text.replace(/^['"`]|['"`]$/g, '').replace(/^[<(:\s]+|[)\s]+$/g, '');
 }
 
 function enclosing(line: number, spans: Span[]): CodeSymbol | null {
@@ -61,6 +104,8 @@ function enclosing(line: number, spans: Span[]): CodeSymbol | null {
 }
 
 export function extractFile(file: SourceFile, project: string): Extraction {
+  if (file.spec.basic) return extractByPattern(file, project);
+
   const parser = loadParser();
   const root = parser.parse(languageHandle(parser, file.spec.id), file.source).root();
   const lines = file.source.split('\n');
