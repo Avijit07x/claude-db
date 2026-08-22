@@ -25,12 +25,18 @@ import suggest from './unit/suggest.mjs';
 import preferUsages from './unit/prefer-usages.mjs';
 import stopwords from './unit/stopwords.mjs';
 import scanVersion from './unit/scan-version.mjs';
+import extract from './unit/extract.mjs';
+import view from './unit/view.mjs';
+import summarize from './unit/summarize.mjs';
 import { report } from './lib/check.mjs';
 
 await ranking();
 await suggest();
 await stopwords();
 await scanVersion();
+await extract();
+await view();
+await summarize();
 await preferUsages();
 await capture();
 await classify();

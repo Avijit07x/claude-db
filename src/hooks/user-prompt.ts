@@ -3,7 +3,7 @@ import { flushSession } from '../capture/index.js';
 import { createContext } from '../context.js';
 import { emitContext, readPayload, runHook } from './payload.js';
 import { markShown, readShown } from './shown.js';
-import { renderPromptContext } from './relevance.js';
+import { overlapCount, renderPromptContext } from './relevance.js';
 import { isSearchable } from '../util/prompt.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
@@ -33,7 +33,10 @@ await runHook(async () => {
       limit: ctx.config.inject.promptResults,
     });
 
-    const entries = found.filter((entry) => !shown.has(entry.id));
+    const floor = ctx.config.inject.minOverlap;
+    const entries = found
+      .filter((entry) => !shown.has(entry.id))
+      .filter((entry) => floor === 0 || overlapCount(prompt, entry) >= floor);
     if (entries.length === 0) return;
 
     const toExpand = entries.slice(0, ctx.config.inject.expandTop);
@@ -53,7 +56,7 @@ await runHook(async () => {
       sessionId,
       entries.map((entry) => entry.id),
     );
-    emitContext(`${block}\n`);
+    emitContext(`${block}\n(context ≈ ${Math.round(block.length / 4)} tokens)\n`);
   } finally {
     await ctx.close();
   }

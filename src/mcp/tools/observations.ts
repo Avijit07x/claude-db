@@ -45,11 +45,7 @@ export function register(server: McpServer, ctx: RecallContext): void {
 
 async function timeline(
   ctx: RecallContext,
-  {
-    observation_id,
-    before,
-    after,
-  }: { observation_id: string; before: number; after: number },
+  { observation_id, before, after }: { observation_id: string; before: number; after: number },
 ): Promise<CallToolResult> {
   const entries = await ctx.search.timeline({ observationId: observation_id, before, after });
   if (entries.length === 0) {

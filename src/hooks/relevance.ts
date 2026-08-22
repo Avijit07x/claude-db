@@ -1,5 +1,17 @@
 import type { Observation, ObservationIndexEntry } from '../types.js';
+import { meaningfulTokens } from '../search/stopwords.js';
 import { toShortId } from '../util/shortid.js';
+
+export function overlapCount(
+  prompt: string,
+  entry: { title: string; snippet?: string | undefined },
+): number {
+  const wanted = new Set(meaningfulTokens(prompt.toLowerCase()));
+  const offered = new Set(meaningfulTokens(`${entry.title} ${entry.snippet ?? ''}`.toLowerCase()));
+  let shared = 0;
+  for (const word of wanted) if (offered.has(word)) shared++;
+  return shared;
+}
 
 export function renderPromptContext(
   entries: ObservationIndexEntry[],

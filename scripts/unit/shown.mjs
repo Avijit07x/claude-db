@@ -37,7 +37,7 @@ export default async function run() {
   const hook = readFileSync('src/hooks/user-prompt.ts', 'utf8');
   check(
     'the prompt hook filters what it already injected',
-    /found\.filter\(\(entry\) => !shown\.has\(entry\.id\)\)/.test(hook),
+    /\.filter\(\(entry\) => !shown\.has\(entry\.id\)\)/.test(hook),
   );
   check(
     'and injects nothing when every match is already in context',

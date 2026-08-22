@@ -59,10 +59,6 @@ export async function embedObservations(
     const embedder = await ctx.embedder();
     if (embedder.dimensions === 0) return;
 
-    // ponytail: chunked because peak memory scales with the batch handed to one
-    // forward pass, not with the database. Measured on all-MiniLM-L6-v2, 512-token
-    // bodies: 8 -> 0.8GB, 16 -> 1.3GB, 32 -> 2.4GB, 64 -> 4.5GB, all at identical
-    // wall-clock. Batching buys nothing on CPU, so keep it small.
     const size = ctx.config.embeddings.batchSize;
     for (let start = 0; start < observations.length; start += size) {
       const chunk = observations.slice(start, start + size);

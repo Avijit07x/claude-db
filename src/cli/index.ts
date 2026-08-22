@@ -12,6 +12,7 @@ import { cmdFlush, cmdReset, cmdUpdate } from './commands/maintain.js';
 import { cmdScan, cmdUsages } from './commands/graph.js';
 import { cmdSeed } from './commands/seed.js';
 import { cmdAdoption } from './commands/adoption.js';
+import { cmdView } from './commands/view.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
 silenceSqliteWarning();
@@ -68,6 +69,9 @@ async function run(): Promise<void> {
       break;
     case 'adoption':
       await cmdAdoption();
+      break;
+    case 'view':
+      await cmdView(args);
       break;
     case 'update':
       await cmdUpdate(args);

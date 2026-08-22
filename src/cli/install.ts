@@ -7,7 +7,7 @@ import { rmSync } from 'node:fs';
 
 interface HookMatcher {
   matcher?: string;
-  hooks: { type: 'command'; command: string }[];
+  hooks: { type: 'command'; command: string; timeout?: number }[];
 }
 
 function writeSkill(distDir: string, scope: Scope, project: string): void {
@@ -21,11 +21,11 @@ function removeSkill(scope: Scope, project: string): void {
   rmSync(dirname(path), { recursive: true, force: true });
 }
 
-const HOOKS: [event: string, file: string, matcher?: string][] = [
+const HOOKS: [event: string, file: string, matcher?: string, timeout?: number][] = [
   ['SessionStart', 'session-start.js'],
   ['UserPromptSubmit', 'user-prompt.js'],
   ['SessionEnd', 'session-end.js'],
-  ['PreToolUse', 'prefer-usages.js', 'Bash|Grep'],
+  ['PreToolUse', 'prefer-usages.js', 'Bash|Grep', 10],
 ];
 
 export function assertStableLocation(distDir: string): void {
@@ -47,7 +47,7 @@ export function install(distDir: string, scope: Scope, project: string): string 
   const settings = readJson(path);
   const hooks = (settings['hooks'] ?? {}) as Record<string, HookMatcher[]>;
 
-  for (const [event, file, matcher] of HOOKS) {
+  for (const [event, file, matcher, timeout] of HOOKS) {
     const kept = (hooks[event] ?? [])
       .map((entry) => ({
         ...entry,
@@ -56,7 +56,13 @@ export function install(distDir: string, scope: Scope, project: string): string 
       .filter((entry) => entry.hooks.length > 0);
     kept.push({
       ...(matcher ? { matcher } : {}),
-      hooks: [{ type: 'command', command: hookCommand(distDir, file) }],
+      hooks: [
+        {
+          type: 'command',
+          command: hookCommand(distDir, file),
+          ...(timeout ? { timeout } : {}),
+        },
+      ],
     });
     hooks[event] = kept;
   }

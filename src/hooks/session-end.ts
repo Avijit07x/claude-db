@@ -2,7 +2,14 @@
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { clearCursor, flushSession } from '../capture/index.js';
+import {
+  aiSummary,
+  clearCursor,
+  flushSession,
+  observationsFromTurns,
+  readTranscript,
+  transcriptPathFor,
+} from '../capture/index.js';
 import { isDue, readState } from '../update.js';
 import { createContext } from '../context.js';
 import { readPayload, runHook } from './payload.js';
@@ -22,12 +29,24 @@ await runHook(async () => {
   try {
     const result = await flushSession(ctx, sessionId, project, payload.transcript_path);
 
+    let summary = result.summary;
+    if (ctx.config.capture.summarize === 'on') {
+      const path = payload.transcript_path ?? transcriptPathFor(project, sessionId);
+      const { turns } = readTranscript(path, 0);
+      const observations = observationsFromTurns(turns, sessionId, project, ctx.config);
+      const ai = await aiSummary(
+        observations.map((obs) => `${obs.title}\n${obs.body}`).join('\n\n'),
+        ctx.config.capture.summarizeModel,
+      );
+      if (ai) summary = `AI: ${ai}`;
+    }
+
     await ctx.store.upsertSession({
       id: sessionId,
       project,
       startedAt: Date.now(),
       endedAt: Date.now(),
-      ...(result.summary ? { summary: result.summary } : {}),
+      ...(summary ? { summary } : {}),
     });
 
     clearCursor(sessionId);

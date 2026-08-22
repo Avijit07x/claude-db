@@ -58,6 +58,17 @@ code, making the shortest path a route nothing can actually take.
 
 ## Languages
 
-TypeScript, TSX, JavaScript, Python, Go and Rust. The parser is ast-grep, which ships with the
-package as a prebuilt binary per platform, so nothing compiles at install and nothing else has to be
-installed.
+Two tiers, and the graph always says which one an answer came from.
+
+**Parsed** — TypeScript, TSX, JavaScript, Python, Go, Rust and Ruby. The parser is ast-grep, which
+ships with the package as a prebuilt binary per platform, so nothing compiles at install and nothing
+else has to be installed. These languages get real syntax: definitions read literally from the tree,
+and `calls`, `imports`, `extends` and `implements` told apart.
+
+**Read by pattern** — Java, C, C++, C#, Objective-C, Swift, Kotlin, Scala, PHP, Perl, Lua, R, Julia,
+Dart, Elixir, Erlang, Clojure, Haskell, OCaml, F#, Groovy, shell, PowerShell, SQL, Zig, Nim, Crystal,
+Solidity and Vala. A shared table of declaration patterns finds classes, modules, functions and
+methods, and references are matched by name, so every edge from this tier is tagged `INFERRED` with a
+score. A reference that matches no declaration anywhere in the repository produces no edge at all,
+rather than a guess. It is less precise than a real parse and is meant to be: the alternative for
+these languages is nothing.

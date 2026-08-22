@@ -133,7 +133,7 @@ ck('title stays scannable', o.title.length <= 80, String(o.title.length));
 ck('body records intent', o.body.includes('Asked: can you create one icon'));
 ck('body records reasoning', o.body.includes('centre-origin looked wrong'));
 ck('body records the command', o.body.includes('Test run'));
-ck('classified as a decision', o.kind === 'decision', o.kind);
+ck('classified as file-backed work, not a decision', o.kind === 'pattern', o.kind);
 
 {
   const { observationId } = await import('../dist/capture/index.js');

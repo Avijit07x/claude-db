@@ -21,3 +21,4 @@ export {
 } from './flush.js';
 export type { FlushResult } from './flush.js';
 export { closeLandedWork, openWork } from './progress.js';
+export { aiSummary, buildSummaryPrompt, validateSummary } from './summarize.js';

@@ -12,8 +12,14 @@ export function observationsFromTurns(
   config: Config,
 ): Observation[] {
   return turns
+    .map(withoutPrivate)
     .filter((turn) => isSubstantive(turn, config))
     .map((turn) => buildObservation(turn, sessionId, project, config));
+}
+
+function withoutPrivate(turn: Turn): Turn {
+  const strip = (text: string) => text.replace(/<private>[\s\S]*?<\/private>/gi, '[private]');
+  return { ...turn, prompt: strip(turn.prompt), reasoning: strip(turn.reasoning) };
 }
 
 function isSubstantive(turn: Turn, config: Config): boolean {
@@ -163,21 +169,26 @@ export function topLevelDirs(files: string[], project: string): string[] {
   return [...tags].slice(0, 3);
 }
 
+const PREFERENCE_PROMPT_MAX = 600;
+
 export function classifyTurn(turn: Turn): ObservationKind {
+  const prompt = turn.prompt.toLowerCase();
   const text = `${turn.prompt} ${turn.reasoning}`.toLowerCase();
 
   if (
-    /\b(from now on|going forward|remember to|prefer)\b/.test(turn.prompt.toLowerCase()) ||
-    /\b(always|never)\s+(use|run|do|add|write|call|put|name|commit|push|import|install)\b/.test(
-      turn.prompt.toLowerCase(),
-    )
+    prompt.length <= PREFERENCE_PROMPT_MAX &&
+    (/\b(from now on|going forward|remember to|prefer)\b/.test(prompt) ||
+      /\b(always|never)\s+(use|run|do|add|write|call|put|name|commit|push|import|install)\b/.test(
+        prompt,
+      ))
   ) {
     return 'preference';
   }
   if (
-    /\b(instead of|rather than|in favou?r of|opted for|went with|chose|decided|trade-?off|why we)\b/.test(
+    /\b(opted for|went with|chose|settled on|decided?|decision|trade-?off|in favou?r of|why (did |do |does )?(we|i))\b/.test(
       text,
-    )
+    ) ||
+    /\b(instead of|rather than)\b/.test(prompt)
   ) {
     return 'decision';
   }

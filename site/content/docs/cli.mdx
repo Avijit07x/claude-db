@@ -20,6 +20,13 @@ recall are hooks, and Claude reaches the rest over MCP.
 | `claude-db seed --from-git`                       | Fill a cold memory from this repo's history         |
 | `claude-db stats`                                 | What this project's memory is made of               |
 | `claude-db projects`                              | Every project with memory stored                    |
+| `claude-db view [--export <file>]`                | See this project's memory live in the browser       |
+| `claude-db adoption`                              | How often sessions grep vs use the memory tools     |
+
+`view` starts a local server only while you are looking at it, opens the browser, and stops on
+Ctrl+C — no background process is left running. `--export` writes a standalone HTML snapshot
+instead. `adoption` reads this project's transcripts and reports Bash commands, greps, hook fires and
+memory-tool calls, so whether any of this is working is a number rather than a feeling.
 
 ## Code graph
 
@@ -51,4 +58,19 @@ one answers.
 | `claude-db reset [--project] --yes`    | Delete memory (dry run without `--yes`)       |
 
 `reembed` is what you run after installing `@xenova/transformers`, so existing rows are searchable at
-the new dimension rather than only new ones.
+the new dimension rather than only new ones. `flush` is what you run after upgrading claude-db, since
+it re-ingests transcripts through the current extractor and updates observations in place.
+
+## Configuration
+
+`~/.claude-memory/config.json` holds the settings. Every key has a working default, so the file is
+optional.
+
+| Key                     | Default | What it does                                                            |
+| ----------------------- | ------- | ----------------------------------------------------------------------- |
+| `embeddings.provider`   | `auto`  | `auto` uses the real model when installed, else the built-in embedder    |
+| `inject.perPrompt`      | `true`  | Inject matching memory above each prompt                                |
+| `inject.minOverlap`     | `1`     | Content words a memory must share with the prompt to be injected; `0` off |
+| `capture.summarize`     | `off`   | `on` writes session summaries with your own Claude CLI; costs tokens     |
+| `capture.summarizeModel`| `opus`  | Model for those summaries: `opus`, `sonnet` or `haiku`, always low effort |
+| `updates`               | `notify`| Update checks: `auto`, `notify` or `off`                                |

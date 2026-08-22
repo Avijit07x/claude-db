@@ -27,6 +27,7 @@ export function resolveEdges(
     const candidates = byName.get(reference.name) ?? [];
     const local = candidates.find((candidate) => candidate.file === reference.file);
     const target = local ?? candidates[0];
+    if (!target && reference.weak) continue;
 
     let confidence: CodeEdge['confidence'] = 'EXTRACTED';
     let score = SAME_FILE;

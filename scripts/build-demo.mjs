@@ -19,7 +19,8 @@ function sh(cmd, args) {
 }
 
 const cli = (args) => sh(process.execPath, [join(ROOT, 'dist', 'cli', 'index.js'), ...args]);
-const grep = (symbol) => sh('git', ['grep', '-n', '-w', '-I', '--untracked', '-e', symbol, '--', ...CODE_ONLY]);
+const grep = (symbol) =>
+  sh('git', ['grep', '-n', '-w', '-I', '--untracked', '-e', symbol, '--', ...CODE_ONLY]);
 const filesFor = (symbol) =>
   sh('git', ['grep', '-l', '-w', '-I', '--untracked', '-e', symbol, '--', ...CODE_ONLY])
     .split('\n')
@@ -62,7 +63,10 @@ function explainScenario(symbol) {
       foot: `${reads.length} files opened to work out which hits were definitions.`,
       lines: [
         { text: `grep -rn "${symbol}" src/`, tone: 'cmd' },
-        { text: `${hits.split('\n').filter(Boolean).length} hits across ${files.length} files`, tone: 'dim' },
+        {
+          text: `${hits.split('\n').filter(Boolean).length} hits across ${files.length} files`,
+          tone: 'dim',
+        },
         ...reads.map((file) => ({ text: `read ${file}`, tone: 'file' })),
         { text: '', tone: 'dim' },
         {
@@ -101,7 +105,8 @@ function pathScenario(from, to) {
 
   const hops = chain.split(' --> ');
   const opened = [...new Set(hops.flatMap((hop) => filesFor(hop).slice(0, 1)))];
-  const hand = hops.reduce((n, hop) => n + grep(hop).length, 0) + opened.reduce((n, f) => n + bytes(f), 0);
+  const hand =
+    hops.reduce((n, hop) => n + grep(hop).length, 0) + opened.reduce((n, f) => n + bytes(f), 0);
 
   return {
     id: 'path',
@@ -153,5 +158,7 @@ writeFileSync(OUT, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 
 console.log(`wrote ${OUT}`);
 for (const scenario of data.scenarios) {
-  console.log(`  ${scenario.id}: ${scenario.without.tokens} by hand, ${scenario.with.tokens} with the graph`);
+  console.log(
+    `  ${scenario.id}: ${scenario.without.tokens} by hand, ${scenario.with.tokens} with the graph`,
+  );
 }

@@ -23,6 +23,7 @@ export async function cmdInstall(scope: Scope): Promise<void> {
 
   const settingsPath = install(DIST_DIR, scope, project);
   const ctx = await createContext();
+  const embedder = await ctx.embedder();
   await ctx.close();
 
   console.log(
@@ -33,6 +34,13 @@ export async function cmdInstall(scope: Scope): Promise<void> {
   console.log(`Skill    : ${skillPathFor(scope, project)} (/cdb-scan)`);
   console.log(`Config   : ${CONFIG_PATH}`);
   console.log(`Database : ${ctx.config.database}`);
+  if (embedder.id === 'builtin-hashing') {
+    console.log('Search   : keyword + basic vectors');
+    console.log('           for semantic search: npm i -g @xenova/transformers');
+    console.log('           then: claude-db reembed');
+  } else {
+    console.log(`Search   : keyword + semantic vectors (${embedder.id})`);
+  }
   console.log('\nRestart Claude Code to activate.');
 
   if (scope === 'project') {
@@ -105,6 +113,7 @@ export async function cmdStatus(): Promise<void> {
     const saved = (await ctx.store.listProjects()).find((entry) => entry.project === project);
     const lastSaved = saved?.lastActive ?? 0;
     const worked = workedAt(project);
+    console.log(`worked   : ${worked.last > 0 ? ago(worked.last) : 'never'}`);
     console.log(`recorded : ${lastSaved > 0 ? ago(lastSaved) : 'never'}`);
 
     await closeLandedWork(ctx.store, project);

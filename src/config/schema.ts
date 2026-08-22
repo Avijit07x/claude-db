@@ -19,6 +19,8 @@ export const ConfigSchema = z.object({
       tools: z.array(z.string()).default(['Edit', 'Write', 'Bash', 'NotebookEdit']),
       exclude: z.array(z.string()).default(['.env', 'secrets', 'node_modules', '.git/']),
       maxBodyChars: z.number().int().positive().default(4000),
+      summarize: z.enum(['off', 'on']).default('off'),
+      summarizeModel: z.enum(['opus', 'sonnet', 'haiku']).default('opus'),
     })
     .prefault({}),
 
@@ -29,6 +31,7 @@ export const ConfigSchema = z.object({
 
       perPrompt: z.boolean().default(true),
       promptResults: z.number().int().positive().max(10).default(4),
+      minOverlap: z.number().int().min(0).default(1),
       promptMaxChars: z.number().int().positive().default(700),
       expandTop: z.number().int().min(0).max(3).default(0),
       expandMaxChars: z.number().int().positive().default(900),

@@ -45,6 +45,24 @@ export default async function run() {
     ruleWhileWorking[0].title,
   );
 
+  const secret = observationsFromTurns(
+    [
+      turn({
+        prompt: 'always use pnpm here. <private>my api key is sk-12345</private>',
+        reasoning: 'Noted the rule. <private>internal detail</private> Done.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    'private-tagged content never reaches the observation',
+    !JSON.stringify(secret[0]).includes('sk-12345') &&
+      !JSON.stringify(secret[0]).includes('internal detail'),
+    secret[0].title,
+  );
+
   const explained = observationsFromTurns(
     [
       turn({
@@ -74,6 +92,105 @@ export default async function run() {
     config,
   );
   check('a weighed alternative still is', weighed[0].kind === 'decision', weighed[0].kind);
+
+  const narrationTic = observationsFromTurns(
+    [
+      turn({
+        prompt: 'ok now commit it also',
+        reasoning:
+          'Committed as 30daa92. No trailer - the attribution setting took effect, so it is off automatically now rather than needing a manual strip.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    '"rather than" as narration tic in reasoning is not a decision',
+    narrationTic[0].kind !== 'decision',
+    narrationTic[0].kind,
+  );
+
+  const userFramed = observationsFromTurns(
+    [
+      turn({
+        prompt: 'shell out to claude mcp add instead of rewriting the json, do this',
+        reasoning: 'Wired the merge command through the CLI. 12 checks pass.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    'the user weighing "instead of" in the prompt is a decision',
+    userFramed[0].kind === 'decision',
+    userFramed[0].kind,
+  );
+
+  const committed = observationsFromTurns(
+    [
+      turn({
+        prompt: 'which store should be the default',
+        reasoning: 'Chose SQLite over Postgres for the default store since it needs no server.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    'a committed choice is still a decision',
+    committed[0].kind === 'decision',
+    committed[0].kind,
+  );
+
+  const recalled = observationsFromTurns(
+    [
+      turn({
+        prompt: 'what did we decide about CLAUDE.local.md vs CLAUDE.md, and why?',
+        reasoning: 'The decision: install writes to CLAUDE.local.md so the block stays private.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check('a recalled decision keeps its kind', recalled[0].kind === 'decision', recalled[0].kind);
+
+  const pastedRule = observationsFromTurns(
+    [
+      turn({
+        prompt: `# Update Config Skill\n\n${'Modify configuration by updating settings files. '.repeat(16)}Always run tests after code changes.`,
+        reasoning: 'Read the pasted skill and applied the settings change to config.json.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    'a rule-phrase buried in a long pasted prompt is not a preference',
+    pastedRule[0].kind !== 'preference',
+    pastedRule[0].kind,
+  );
+
+  const midPromptRule = observationsFromTurns(
+    [
+      turn({
+        prompt: 'ok ship the fix, and never push directly to main in this repo',
+        reasoning: 'Shipped on a branch. 14 checks pass.',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    'a rule arriving mid-prompt is still a preference',
+    midPromptRule[0].kind === 'preference',
+    midPromptRule[0].kind,
+  );
 
   const narrated = observationsFromTurns(
     [

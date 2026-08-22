@@ -14,6 +14,12 @@ export default async function run() {
   check('a regex is not a symbol', !caught('grep -rnE "^FAIL|passed" src/'));
   check('a command without grep is ignored', !caught('ls -la && cat package.json'));
   check('git grep searches the tree without -r or a path', caught('git grep -n "findUsages"'));
+  check(
+    'prose that merely mentions grep is not a grep',
+    !caught('git commit -m "the symbol-grep hook fires on every call"'),
+  );
+  check('a grep after && is still a grep', caught('npm run build && grep -rn "cmdReembed" src/'));
+  check('a grep inside a subshell is still a grep', caught('echo $(grep -rn "cmdReembed" src/)'));
   check('a piped grep after git is still output filtering', !caught('git log | grep memory'));
   check('bare rg searches the tree by default', caught('rg closeObservations'));
   check('rg with a type filter searches the tree', caught('rg -t ts closeObservations'));
