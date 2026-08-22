@@ -1,5 +1,102 @@
 # Changelog
 
+## 0.8.0
+
+### Added
+
+- **Every language now reaches the code graph.** Ruby is parsed properly, which
+  closes the gap a Rails user reported: `scan` skipped `.rb` files entirely, so
+  `usages` could not answer anything about a Rails codebase. Beyond that, 29
+  more languages — Java, C, C++, C#, Objective-C, Swift, Kotlin, Scala, PHP,
+  Perl, Lua, R, Julia, Dart, Elixir, Erlang, Clojure, Haskell, OCaml, F#,
+  Groovy, shell, PowerShell, SQL, Zig, Nim, Crystal, Solidity and Vala — are
+  read by a shared table of declaration patterns. That tier finds classes,
+  modules, functions and methods, matches references by name, and tags every
+  edge it produces `INFERRED`. A reference matching no declaration anywhere in
+  the repository produces no edge at all rather than a guess. It is less
+  precise than a real parse deliberately: the alternative for those languages
+  was nothing. Measured against ast-grep on this repository's TypeScript, the
+  pattern tier recovers 29% of symbols, which is why the seven parsed
+  languages keep their grammars.
+
+- **`claude-db view` shows your memory in the browser.** A local page with the
+  memory stream, standing rules, recent sessions and live search. The server
+  runs only while the page is open and stops with Ctrl+C — no daemon, no
+  background process, nothing added to the install. `--export <file>` writes a
+  standalone HTML snapshot instead.
+
+- **Session start offers `claude-db scan`** when a project has no code graph
+  yet, since `find_usages` and the symbol-grep hook are inert until it has run
+  and nothing said so.
+
+- **Opt-in AI session summaries.** `capture.summarize: "on"` in
+  `~/.claude-memory/config.json` writes the end-of-session summary with your
+  own Claude Code CLI — no API key, no new dependency — and stores it prefixed
+  with `AI: ` so it is distinguishable from extracted text. It runs Opus at low
+  effort, which measured faster than the smaller models on this one-shot task
+  because nothing here needs reasoning; `capture.summarizeModel` accepts
+  `sonnet` or `haiku` instead. Default is `off`: capture stays deterministic
+  and free unless you ask otherwise, and any failure, timeout, refusal or
+  missing CLI silently keeps the deterministic summary.
+
+- **House-rule linting.** `npm run lint` enforces what this codebase actually
+  requires and no general linter knows about: no comments in `src`, no `any`,
+  relative imports ending in `.js`, no leftover TODO markers, files under 250
+  lines, and no `console.log` in hooks, whose stdout is a protocol. It has no
+  dependencies. CI now runs it alongside a formatting check, which was never
+  enforced before.
+
+### Changed
+
+- **Injected memory has to be relevant.** Search always returned its top
+  matches, so a prompt with no real match still got memory pasted above it —
+  measured at one useful injection in nine. Entries must now share at least
+  one content word with the prompt, which drops 16% of injections on a replay
+  of real sessions while keeping every match a person would call related.
+  Tunable with `inject.minOverlap`, `0` to switch it off. The fused search
+  score could not be used for this: rank fusion discards magnitude by design.
+
+- **`decision` no longer means everything.** It covered 57% of stored
+  observations, which makes filtering by it pointless. Instrumenting the
+  classifier showed the cause was not user language but the assistant's own
+  narration — "verify rather than guess" — with `rather than` alone firing on
+  130 of 184 decisions. Comparative phrases now only count in the user's
+  prompt; committed language like "chose" or "trade-off" still counts
+  anywhere. Measured on 321 real observations: 57% to 36%, with no true
+  decision reclassified. A rule buried in a long pasted prompt is also no
+  longer filed as a preference. Run `claude-db flush` to reclassify existing
+  memory in place.
+
+- **Both injections state their cost**, ending with an approximate token
+  count, so the standing price of recall is visible rather than assumed.
+
+- **`status` prints when this project was last worked in** next to when memory
+  last recorded something. Capture failing silently is the failure mode this
+  project keeps hitting; two dates side by side make it obvious.
+
+- **`doctor` checks the wiring itself** — duplicate hook registrations and
+  hooks pointing at an install that no longer exists — and says when search is
+  running on the built-in embedder, with the two commands that upgrade it.
+  `install` reports the same thing, so the better option is discoverable at
+  the moment it is easiest to act on.
+
+### Fixed
+
+- **Inherited symbols were mangled for every language.** A superclass arrived
+  wrapped in its own syntax, so Python recorded a class named `(Base)` and no
+  `extends` edge resolved. Ruby exposed it; the fix is shared.
+
+- **Method names ending in `?` or `!`** are now valid symbols, which Ruby needs
+  and no other language minds.
+
+- **AI summaries could be killed at the finish line.** The model call's timeout
+  matched the harness hook timeout exactly, so a slow one was terminated at the
+  moment it would have completed, wasting the call. It now runs with headroom.
+  Found before release; the feature ships opt-in either way.
+
+- **`prettier --check` failed on committed code**, and nothing noticed because
+  CI never ran it. Fixed, and now enforced.
+
 ## 0.7.0
 
 ### Changed
