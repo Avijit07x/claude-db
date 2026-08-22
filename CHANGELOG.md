@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.8.1
+
+### Fixed
+
+- **A wrong session summary could not be corrected, and kept teaching itself.**
+  Summaries are injected at every session start, but nothing could delete one:
+  the upsert coalesces a null summary to the existing value, so a summary was
+  write-once in practice. One carrying a false claim was therefore re-injected
+  into every new session, restated as fact, and captured back as fresh
+  observations that outranked the correction — memory records what was said,
+  not what is true, so a wrong statement gains credibility by being repeated.
+  `claude-db forget --session <id>` now clears one, on all three backends,
+  after which it stops being served. Clearing reports whether anything actually
+  changed, so the adapters agree rather than SQLite and Postgres counting a
+  matched row where MongoDB counted a change.
+
+- **Scripted sessions are no longer captured by default.** A headless run —
+  a test harness, a cron job, anything driving `claude -p` — writes memory that
+  looks like your work but is not, and a fabricated test fixture becoming
+  project knowledge is exactly how the summary above was poisoned. Claude Code
+  identifies those sessions as `sdk-cli`, and they are now skipped.
+  `capture.scripted: true` captures them anyway, for anyone whose real work
+  runs through the SDK.
+
+  Detection has one blind spot worth stating: a `claude -p` spawned from inside
+  another Claude session inherits the parent's entrypoint and is
+  indistinguishable from it. `CLAUDE_DB_CAPTURE=off` covers that case and any
+  other session that should stay unrecorded, while leaving recall working.
+
 ## 0.8.0
 
 ### Added

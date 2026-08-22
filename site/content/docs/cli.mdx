@@ -17,6 +17,7 @@ recall are hooks, and Claude reaches the rest over MCP.
 | `claude-db search [--all] [--tag <name>] <query>` | Search this project's memory, or every project      |
 | `claude-db remember [--key <name>] <text>`        | Record a rule outright, e.g. "always use pnpm here" |
 | `claude-db forget <id>`                           | Delete specific observations by id                  |
+| `claude-db forget --session <id>`                 | Clear one session's summary, so it stops being injected |
 | `claude-db seed --from-git`                       | Fill a cold memory from this repo's history         |
 | `claude-db stats`                                 | What this project's memory is made of               |
 | `claude-db projects`                              | Every project with memory stored                    |
@@ -71,6 +72,7 @@ optional.
 | `embeddings.provider`   | `auto`  | `auto` uses the real model when installed, else the built-in embedder    |
 | `inject.perPrompt`      | `true`  | Inject matching memory above each prompt                                |
 | `inject.minOverlap`     | `1`     | Content words a memory must share with the prompt to be injected; `0` off |
+| `capture.scripted`      | `false` | Capture headless `claude -p` / SDK sessions too                          |
 | `capture.summarize`     | `off`   | `on` writes session summaries with your own Claude CLI; costs tokens     |
 | `capture.summarizeModel`| `opus`  | Model for those summaries: `opus`, `sonnet` or `haiku`, always low effort |
 | `updates`               | `notify`| Update checks: `auto`, `notify` or `off`                                |
