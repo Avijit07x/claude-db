@@ -5,6 +5,8 @@ import { packageVersion } from '../../update.js';
 import { randomUUID } from 'node:crypto';
 import { remember } from '../../capture/index.js';
 import { resolveProject } from '../../util/project.js';
+import { settingsPathFor } from '../paths.js';
+import { existsSync, readFileSync } from 'node:fs';
 import { toShortId } from '../../util/shortid.js';
 
 export async function cmdDoctor(argv: (string | undefined)[]): Promise<void> {
@@ -27,11 +29,49 @@ export async function cmdDoctor(argv: (string | undefined)[]): Promise<void> {
   console.log(
     `search   : ${vectors.startsWith('working') ? 'hybrid (keyword + vector)' : 'keyword only'}`,
   );
+  if (embedder.id === 'builtin-hashing') {
+    console.log('hint     : builtin embeddings are keyword-grade. For semantic vectors:');
+    console.log('           npm i -g @xenova/transformers && claude-db reembed');
+  }
+  checkWiring(resolveProject(undefined));
 
   const healthy = argv.includes('--deep') ? await deepCheck(ctx) : true;
 
   await ctx.close();
   process.exit(reachable && healthy ? 0 : 1);
+}
+
+function checkWiring(project: string): void {
+  const problems: string[] = [];
+  for (const scope of ['project', 'global'] as const) {
+    const path = settingsPathFor(scope, project);
+    let settings: { hooks?: Record<string, { hooks: { command: string }[] }[]> };
+    try {
+      settings = JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      continue;
+    }
+    for (const [event, entries] of Object.entries(settings.hooks ?? {})) {
+      const ours = entries
+        .flatMap((entry) => entry.hooks.map((hook) => hook.command))
+        .filter((command) =>
+          /[\\/]hooks[\\/](session-start|session-end|user-prompt|prefer-usages)\.js$/.test(
+            command.replace(/\\/g, '/'),
+          ),
+        );
+      if (ours.length > 1) problems.push(`${event} registered ${ours.length}x in ${path}`);
+      for (const command of ours) {
+        const file = command.replace(/^node\s+/, '');
+        if (!existsSync(file)) problems.push(`${event} points at missing ${file}`);
+      }
+    }
+  }
+  if (problems.length === 0) {
+    console.log('wiring   : ok');
+    return;
+  }
+  for (const problem of problems) console.log(`wiring   : PROBLEM — ${problem}`);
+  console.log('           fix with: claude-db install (it replaces its own entries)');
 }
 
 async function deepCheck(ctx: RecallContext): Promise<boolean> {

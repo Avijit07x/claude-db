@@ -55,11 +55,16 @@ await runHook(async () => {
   const ctx = await createContext();
   try {
     const sessions = await ctx.store.recentSessions(project, ctx.config.inject.sessions);
+    const scanned = (await ctx.store.scannedFiles(project)).length;
+    const scanHint =
+      'Code graph not built yet — run `claude-db scan` once to enable ' +
+      'find_usages and the symbol-grep hook.';
 
     if (sessions.length === 0) {
       emitContext(
         '<project-memory>none yet for this project; ' +
-          'it is recorded as you work</project-memory>\n',
+          'it is recorded as you work</project-memory>\n' +
+          (scanned === 0 ? `${scanHint}\n` : ''),
       );
       return;
     }
@@ -109,11 +114,13 @@ await runHook(async () => {
           'asking the user to re-explain prior decisions.',
       );
     }
+    if (scanned === 0) lines.push(scanHint);
 
     const notice = ctx.config.updates === 'off' ? null : updateNotice();
     if (notice) lines.push(notice);
 
-    emitContext(`${lines.join('\n')}\n`);
+    const body = lines.join('\n');
+    emitContext(`${body}\n(context ≈ ${Math.round(body.length / 4)} tokens)\n`);
     await refreshGraphQuietly(ctx.store, project);
   } finally {
     await ctx.close();
