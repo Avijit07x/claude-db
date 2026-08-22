@@ -4,7 +4,7 @@ const WORD = /^[a-z][a-z0-9]{3,}$/;
 
 export const DECLARED = new Set(['function', 'method', 'class', 'interface', 'type', 'enum']);
 const GREP =
-  /\b(?:grep|rg)\b((?:\s+(?:-[ABC]\s?\d+|-[tTg]\s\S+|-{1,2}[\w-]+(?:=\S+)?))*)\s+(?:(['"])(.+?)\2|(\S+))([^;&|]*)/g;
+  /(?:^|[;&|(`]|\$\(|\bdo\s+|\bthen\s+|\belse\s+|\bxargs\s+|\bgit\s+|\bsudo\s+|\btime\s+|-exec\s+)\s*(?:grep|rg)\b((?:\s+(?:-[ABC]\s?\d+|-[tTg]\s\S+|-{1,2}[\w-]+(?:=\S+)?))*)\s+(?:(['"])(.+?)\2|(\S+))([^;&|]*)/gm;
 
 export function isSymbol(pattern: string): boolean {
   return SYMBOL.test(pattern);
@@ -14,7 +14,6 @@ export function isWord(pattern: string): boolean {
   return WORD.test(pattern);
 }
 
-/** Symbols a shell command searches the tree for, which the code graph also answers. */
 export function symbolsGreppedIn(command: string): string[] {
   const found = new Set<string>();
   for (const match of command.matchAll(GREP)) {
@@ -23,12 +22,13 @@ export function symbolsGreppedIn(command: string): string[] {
     const rest = match[5] ?? '';
     if (!SYMBOL.test(pattern) && !WORD.test(pattern)) continue;
     if (/-\w*v/.test(flags)) continue;
-    const before = command.slice(0, match.index);
+    const invocation = match[0];
+    const piped = /^\s*\|/.test(invocation);
     const searchesTree =
       /-\w*[rR]\b|--recursive/.test(flags) ||
       /^\s+[^-|;&>][^\s|;&>]*/.test(rest) ||
-      /\bgit\s+$/.test(before) ||
-      (match[0].startsWith('rg') && !/\|\s*$/.test(before));
+      /\bgit\s+(?:grep|rg)\b/.test(invocation) ||
+      (/(?:^|[\s;&|(])rg\b/.test(invocation) && !piped);
     if (searchesTree) found.add(pattern);
   }
   return [...found].sort();
