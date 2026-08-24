@@ -53,6 +53,31 @@ export default async function run() {
         entries.every((entry) => entry.hooks.every((h) => !h.command.includes('\\'))),
       ),
     );
+
+    const windows = mkdtempSync(join(tmpdir(), 'install-win-'));
+    install('C:\\Users\\Me\\node_modules\\claude-db\\dist', 'project', windows);
+    const winSettings = JSON.parse(
+      readFileSync(join(windows, '.claude/settings.local.json'), 'utf8'),
+    );
+    const winCommands = Object.values(winSettings.hooks).flatMap((entries) =>
+      entries.flatMap((entry) => entry.hooks.map((h) => h.command)),
+    );
+    check(
+      'a windows-style install path is written without backslashes, whatever the platform',
+      winCommands.every((command) => !command.includes('\\')),
+      winCommands[0],
+    );
+    check(
+      'and those hooks are still recognised as ours on uninstall',
+      (() => {
+        uninstall('C:\\Users\\Me\\node_modules\\claude-db\\dist', 'project', windows);
+        const after = JSON.parse(
+          readFileSync(join(windows, '.claude/settings.local.json'), 'utf8'),
+        );
+        return !after.hooks;
+      })(),
+    );
+    rmSync(windows, { recursive: true, force: true });
     check('install registers the mcp server', !!read('.mcp.json').mcpServers.memory);
 
     install('/upgraded/node/claude-db/dist', 'project', repo);

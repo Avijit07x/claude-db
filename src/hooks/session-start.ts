@@ -8,6 +8,7 @@ import { openWork } from '../capture/index.js';
 import type { MemoryStore } from '../store/index.js';
 import { emitContext, readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
+import { mentionsPath } from '../util/paths.js';
 import { toShortId } from '../util/shortid.js';
 import { refreshInstalled } from '../cli/refresh.js';
 import { updateNotice } from '../update.js';
@@ -39,7 +40,7 @@ function refreshInstalledQuietly(project: string): void {
 function mcpRegistered(project: string): boolean {
   return [join(project, '.mcp.json'), join(homedir(), '.claude.json')].some((path) => {
     try {
-      return readFileSync(path, 'utf8').includes(SERVER);
+      return mentionsPath(readFileSync(path, 'utf8'), SERVER);
     } catch {
       return false;
     }

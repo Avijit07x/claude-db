@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { readJson, readText, writeAtomic, writeJson } from './files.js';
 import { removeInstructions, writeInstructions } from './instructions.js';
 import { rmSync } from 'node:fs';
+import { toPosix } from '../util/paths.js';
 
 interface HookMatcher {
   matcher?: string;
@@ -30,7 +31,7 @@ const HOOKS: [event: string, file: string, matcher?: string, timeout?: number][]
 
 export function assertStableLocation(distDir: string): void {
   const ephemeral = ['_npx', '_cacache'];
-  const segments = distDir.split('/');
+  const segments = toPosix(distDir).split('/');
   if (!ephemeral.some((name) => segments.includes(name))) return;
 
   throw new Error(
@@ -143,11 +144,10 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
 }
 
 function hookCommand(distDir: string, file: string): string {
-  const scriptPath = resolve(distDir, 'hooks', file).replace(/\\/g, '/');
-  return `node ${scriptPath}`;
+  return `node ${toPosix(resolve(distDir, 'hooks', file))}`;
 }
 
 function isOurHook(command: string): boolean {
-  const path = command.replace(/\\/g, '/');
+  const path = toPosix(command);
   return HOOKS.some(([, file]) => path.endsWith(`/hooks/${file}`));
 }

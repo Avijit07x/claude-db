@@ -9,6 +9,7 @@ import { createContext } from '../../context.js';
 import { join, resolve } from 'node:path';
 import { readFileSync, statSync } from 'node:fs';
 import { resolveProject } from '../../util/project.js';
+import { mentionsPath } from '../../util/paths.js';
 import { transcriptsFor } from '../../capture/index.js';
 
 export async function cmdInstall(scope: Scope): Promise<void> {
@@ -182,7 +183,7 @@ function isInstalled(settingsPath: string): boolean {
 
 function fileMentions(path: string, needle: string): boolean {
   try {
-    return readFileSync(path, 'utf8').includes(needle);
+    return mentionsPath(readFileSync(path, 'utf8'), needle);
   } catch {
     return false;
   }
