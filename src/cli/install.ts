@@ -143,7 +143,8 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
 }
 
 function hookCommand(distDir: string, file: string): string {
-  return `node ${resolve(distDir, 'hooks', file)}`;
+  const scriptPath = resolve(distDir, 'hooks', file).replace(/\\/g, '/');
+  return `node ${scriptPath}`;
 }
 
 function isOurHook(command: string): boolean {

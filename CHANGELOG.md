@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Hooks failed on Windows with MODULE_NOT_FOUND.** claude-db registered its hooks
+with backslash Windows paths, but Claude Code runs command hooks through bash when
+Git Bash is available. In bash, backslashes are escape characters, so an unquoted
+`C:\Users\...\hooks\session-end.js` collapses to `C:UsersAppData...hookssession-end.js`.
+Hook commands now use forward-slash paths, which Node accepts on Windows and bash leaves alone.
+
 ## 0.8.1
 
 ### Fixed
