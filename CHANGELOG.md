@@ -1,14 +1,28 @@
 # Changelog
 
-## Unreleased
+## 0.8.2
 
 ### Fixed
 
-- **Hooks failed on Windows with MODULE_NOT_FOUND.** claude-db registered its hooks
-with backslash Windows paths, but Claude Code runs command hooks through bash when
-Git Bash is available. In bash, backslashes are escape characters, so an unquoted
-`C:\Users\...\hooks\session-end.js` collapses to `C:UsersAppData...hookssession-end.js`.
-Hook commands now use forward-slash paths, which Node accepts on Windows and bash leaves alone.
+- **Hooks failed on Windows with MODULE_NOT_FOUND.** Hook commands were written
+  with backslash paths, but Claude Code runs them through bash whenever Git Bash
+  is present, and there a backslash is an escape character: an unquoted
+  `C:\Users\...\hooks\session-end.js` collapses to
+  `C:UsersAppData...hookssession-end.js`, which Node then resolves against the
+  project directory. Every hook failed. Paths are now written with forward
+  slashes, which Node accepts on Windows and bash leaves alone. The MCP server
+  was never affected, because its path is passed as an argument rather than
+  inside a command string. Reported and fixed by @bspangler21 (#10, #12).
+
+- **`status` claimed claude-db was not installed on Windows**, and session start
+  never found the MCP server there. Both compared a path built with the
+  platform separator against a file that stores it differently — with forward
+  slashes now, and JSON-escaped backslashes before that — so the comparison
+  could not match. Path comparisons are now separator-insensitive.
+
+- **The temporary-install guard did not work on Windows.** It split the install
+  path on forward slashes to look for `_npx`, so on a backslash path it found
+  nothing and let an install proceed from a directory that npx would delete.
 
 ## 0.8.1
 
