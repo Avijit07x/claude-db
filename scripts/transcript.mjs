@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readTranscript, observationsFromTurns } from '../dist/capture/index.js';
+import { readTranscript, observationsFromTurns, transcriptPathFor } from '../dist/capture/index.js';
 import { ConfigSchema } from '../dist/config/index.js';
 
 let f = 0;
@@ -170,6 +170,20 @@ ck('classified as file-backed work, not a decision', o.kind === 'pattern', o.kin
     `${elapsed.toFixed(0)}ms`,
   );
   ck('offset read returns a sane cursor', tail.nextOffset > 0);
+}
+
+{
+  const slugOf = (project) => transcriptPathFor(project, 's').split('/').at(-2);
+  ck(
+    'underscores in a project path become dashes, like Claude Code writes them',
+    slugOf('/home/f/work/epiclin_2') === '-home-f-work-epiclin-2',
+    slugOf('/home/f/work/epiclin_2'),
+  );
+  ck(
+    'every non-alphanumeric becomes one dash, dashes kept',
+    slugOf('/private/tmp/claude-501/probe_dir.x \u00fc/sub') === '-private-tmp-claude-501-probe-dir-x---sub',
+    slugOf('/private/tmp/claude-501/probe_dir.x \u00fc/sub'),
+  );
 }
 
 rmSync(dir, { recursive: true, force: true });

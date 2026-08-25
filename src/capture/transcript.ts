@@ -142,14 +142,17 @@ function isSyntheticPrompt(text: string): boolean {
   );
 }
 
+function projectSlug(project: string): string {
+  return project.replace(/[^a-zA-Z0-9]/g, '-');
+}
+
 export function transcriptPathFor(project: string, sessionId: string): string {
-  const slug = project.replace(/[/.]/g, '-');
-  return join(homedir(), '.claude', 'projects', slug, `${sessionId}.jsonl`);
+  return join(homedir(), '.claude', 'projects', projectSlug(project), `${sessionId}.jsonl`);
 }
 
 export function transcriptsFor(project: string): string[] {
   const root = join(homedir(), '.claude', 'projects');
-  const slug = project.replace(/[/.]/g, '-');
+  const slug = projectSlug(project);
 
   let candidates: string[];
   try {
