@@ -181,7 +181,8 @@ ck('classified as file-backed work, not a decision', o.kind === 'pattern', o.kin
   );
   ck(
     'every non-alphanumeric becomes one dash, dashes kept',
-    slugOf('/private/tmp/claude-501/probe_dir.x \u00fc/sub') === '-private-tmp-claude-501-probe-dir-x---sub',
+    slugOf('/private/tmp/claude-501/probe_dir.x \u00fc/sub') ===
+      '-private-tmp-claude-501-probe-dir-x---sub',
     slugOf('/private/tmp/claude-501/probe_dir.x \u00fc/sub'),
   );
 }
