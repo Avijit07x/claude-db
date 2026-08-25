@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.3
+
+### Fixed
+
+- **No transcripts were found for a project whose path contained an underscore,
+  a space or any non-ASCII character.**
+  ([#13](https://github.com/Avijit07x/claude-db/issues/13))
+  The transcript directory name was built by replacing only `/` and `.` with
+  `-`, but Claude Code replaces every non-alphanumeric character. A project at
+  `/home/f/work/epiclin_2` was looked up under `-home-f-work-epiclin_2` while
+  its transcripts sat in `-home-f-work-epiclin-2`, so `flush`, `adoption` and
+  `setup` all reported nothing to ingest. The name is now derived the same way
+  Claude Code writes it — one dash per non-alphanumeric character — which also
+  covers paths with spaces, `@`, `~` or accented characters.
+
 ## 0.8.2
 
 ### Fixed
