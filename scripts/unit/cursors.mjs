@@ -6,7 +6,8 @@ export default async function run() {
     const { execFileSync } = await import('node:child_process');
     const { mkdtempSync, mkdirSync, writeFileSync, realpathSync, rmSync } = await import('node:fs');
     const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
+    const { basename, dirname, join } = await import('node:path');
+    const { transcriptPathFor } = await import('../../dist/capture/index.js');
 
     const home = realpathSync(mkdtempSync(join(tmpdir(), 'home-')));
     mkdirSync(join(home, '.git'));
@@ -16,7 +17,7 @@ export default async function run() {
     mkdirSync(join(extra, '.git'), { recursive: true });
     mkdirSync(join(repo, '.git'), { recursive: true });
 
-    const slug = (path) => path.replace(/[/.]/g, '-');
+    const slug = (path) => basename(dirname(transcriptPathFor(path, 'x')));
     const transcript = (dir, name, cwd) => {
       mkdirSync(join(home, '.claude', 'projects', dir), { recursive: true });
       writeFileSync(
