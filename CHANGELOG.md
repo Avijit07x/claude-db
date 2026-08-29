@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Postgres: changing embedding dimensions permanently disabled vector search,
+  and `reembed` could not repair it.**
+  ([#14](https://github.com/Avijit07x/claude-db/issues/14))
+  Installing `@xenova/transformers` — which `doctor` recommends — moves `auto`
+  from the 256d builtin embedder to 384d MiniLM. `ensureVectorColumn` only ever
+  created the `embedding` column, never widened an existing one, so every write
+  was rejected for width and `searchVector` returned nothing on every query.
+  Rows were still stamped with the new `embedder`, and `reembed` skipped any row
+  whose label already matched, so the corpus could not recover: on one 455-row
+  database, 291 rows kept stale 256d vectors, 164 had none, and search silently
+  ran keyword-only for weeks. `reembed` now rebuilds the column at the new width
+  and re-embeds every row, `embedder` is only written when the vector is stored,
+  and rows missing a vector are treated as stale. The Postgres adapter also
+  hydrates `embedding` on read, as SQLite and MongoDB already did.
+
 ## 0.8.3
 
 ### Fixed

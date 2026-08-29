@@ -129,11 +129,16 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
       process.exit(1);
     }
 
+    let migrated = false;
+    if (!scoped && ctx.store.migrateVectorDims) {
+      migrated = await ctx.store.migrateVectorDims(embedder.dimensions);
+    }
+
     let updated = 0;
     let skipped = 0;
     const filter = scoped ? { project: resolveProject(undefined) } : {};
     const scanned = await eachObservation(ctx, filter, async (batch) => {
-      const stale = batch.filter((obs) => obs.embedder !== embedder.id);
+      const stale = batch.filter((obs) => obs.embedder !== embedder.id || !obs.embedding?.length);
       skipped += batch.length - stale.length;
       if (stale.length === 0) return;
 
@@ -144,6 +149,9 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
     });
 
     process.stderr.write('\r');
+    if (migrated) {
+      console.log(`Rebuilt vector storage at ${embedder.dimensions}d.`);
+    }
     console.log(
       `Scanned ${scanned}, re-embedded ${updated} with ${embedder.id}` +
         `${skipped > 0 ? `, ${skipped} already current` : ''}.`,
