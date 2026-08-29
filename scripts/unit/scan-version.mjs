@@ -14,6 +14,11 @@ export default async function run() {
   const bytes = readFileSync(join(repo, 'a.ts'));
   check('the scan version is exposed', typeof SCAN_VERSION === 'number' && SCAN_VERSION >= 1);
   check(
+    'the cache key sees inside a rule pattern',
+    JSON.stringify({ p: /^[A-Z]/ }, (_k, v) => (v instanceof RegExp ? v.source : v)) !==
+      JSON.stringify({ p: /^[A-Z][a-z]/ }, (_k, v) => (v instanceof RegExp ? v.source : v)),
+  );
+  check(
     'the cache key is not a bare content hash',
     hashOf(bytes) !== createHash('sha256').update(bytes).digest('hex').slice(0, 32),
   );

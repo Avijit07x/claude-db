@@ -165,6 +165,7 @@ export function extractFile(file: SourceFile, project: string): Extraction {
       const name = unquote(raw.trim());
       if (!name || /\s/.test(name)) continue;
       if (rule.relation === 'references' && name.includes('.')) continue;
+      if (rule.namePattern && !rule.namePattern.test(name)) continue;
 
       const line = target.range().start.line + 1;
       references.push({

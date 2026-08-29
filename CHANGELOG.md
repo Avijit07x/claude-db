@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Rendering a component in `.tsx` now produces a graph edge.**
+  ([#19](https://github.com/Avijit07x/claude-db/issues/19))
+  The TSX spec was TypeScript with a different label, and JSX has no rule, so
+  `<Card />` matched nothing: a presentational component had no inbound edges at
+  all and `find_usages` reported it as unused. `jsx_opening_element` and
+  `jsx_self_closing_element` are now reference rules, filtered to capitalised
+  names via a new optional `namePattern` on `ReferenceRule` so host elements
+  like `div` and `span` are not mistaken for components. On a 639-file React
+  Native repo this adds 7,904 edges, 3,477 of them resolving to a symbol in the
+  repo, for 0.2s of extra parse time.
+
 ## 0.8.3
 
 ### Fixed
