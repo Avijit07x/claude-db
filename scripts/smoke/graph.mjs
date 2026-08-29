@@ -1,4 +1,4 @@
-export default async function run({ store, project }, check) {
+export default async function run({ store, project, expected }, check) {
   const symbols = [
     {
       id: 'sym-widget',
@@ -117,4 +117,68 @@ export default async function run({ store, project }, check) {
       (await store.findEdges({ project })).length === 0 &&
       (await store.scannedFiles(project)).length === 0,
   );
+
+  if (expected !== 'postgres') return;
+
+  const bulk = Array.from({ length: 1200 }, (_, i) => ({
+    id: `bulk-sym-${i}`,
+    project,
+    name: `bulk${i}`,
+    kind: 'function',
+    file: `src/bulk${i}.ts`,
+    line: i + 1,
+    lang: 'typescript',
+    signature: `export function bulk${i}() {`,
+  }));
+
+  const connect = store.pool.connect.bind(store.pool);
+  let statements = 0;
+  store.pool.connect = async () => {
+    const client = await connect();
+    const query = client.query.bind(client);
+    client.query = (...args) => {
+      statements += 1;
+      return query(...args);
+    };
+    return client;
+  };
+  await store.upsertGraph({ symbols: bulk, edges: [], files: [] });
+  store.pool.connect = connect;
+
+  check(
+    'graph: symbols are written in batches, not one statement per row',
+    statements < bulk.length / 10,
+    `${statements} statements for ${bulk.length} symbols`,
+  );
+  check(
+    'graph: every batched symbol landed',
+    (await store.findSymbols({ project, limit: 5000 })).filter((s) => s.id.startsWith('bulk-sym-'))
+      .length === bulk.length,
+  );
+
+  const duplicated = [
+    { ...bulk[0], signature: 'first' },
+    { ...bulk[0], signature: 'last' },
+  ];
+  let duplicateError = null;
+  try {
+    await store.upsertGraph({ symbols: duplicated, edges: [], files: [] });
+  } catch (error) {
+    duplicateError = error;
+  }
+  check(
+    'graph: duplicate ids within one batch do not fail the write',
+    duplicateError === null,
+    duplicateError ? String(duplicateError.message).slice(0, 60) : '',
+  );
+  const [deduped] = (await store.findSymbols({ project, limit: 5000 })).filter(
+    (s) => s.id === bulk[0].id,
+  );
+  check(
+    'graph: the last duplicate wins, as the row-by-row writer did',
+    deduped?.signature === 'last',
+    deduped?.signature,
+  );
+
+  await store.removeGraph(project);
 }

@@ -2,6 +2,39 @@ import type { Pool } from './driver.js';
 import type { CodeEdge, CodeSymbol, EdgeFilter, ScannedFile, SymbolFilter } from '../../types.js';
 import { toEdge, toSymbol } from './rows.js';
 
+const CHUNK = 500;
+
+function lastById<T>(rows: T[], key: (row: T) => string): T[] {
+  const byId = new Map<string, T>();
+  for (const row of rows) byId.set(key(row), row);
+  return [...byId.values()];
+}
+
+function placeholders(count: number, width: number): string {
+  const groups: string[] = [];
+  for (let row = 0; row < count; row += 1) {
+    const holes: string[] = [];
+    for (let col = 1; col <= width; col += 1) holes.push(`$${row * width + col}`);
+    groups.push(`(${holes.join(', ')})`);
+  }
+  return groups.join(', ');
+}
+
+async function upsertChunked<T>(
+  client: { query: (text: string, values: unknown[]) => Promise<unknown> },
+  rows: T[],
+  width: number,
+  sql: (values: string) => string,
+  columns: (row: T) => unknown[],
+): Promise<void> {
+  for (let start = 0; start < rows.length; start += CHUNK) {
+    const slice = rows.slice(start, start + CHUNK);
+    const values: unknown[] = [];
+    for (const row of slice) values.push(...columns(row));
+    await client.query(sql(placeholders(slice.length, width)), values);
+  }
+}
+
 export async function upsertGraph(
   pool: Pool,
   scan: {
@@ -13,50 +46,57 @@ export async function upsertGraph(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    for (const s of scan.symbols) {
-      await client.query(
-        `INSERT INTO symbols (id, project, name, kind, file, line, lang, signature)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+
+    await upsertChunked(
+      client,
+      lastById(scan.symbols, (s) => s.id),
+      8,
+      (values) => `INSERT INTO symbols (id, project, name, kind, file, line, lang, signature)
+           VALUES ${values}
            ON CONFLICT (id) DO UPDATE SET
              name = EXCLUDED.name, kind = EXCLUDED.kind, file = EXCLUDED.file,
              line = EXCLUDED.line, lang = EXCLUDED.lang,
              signature = EXCLUDED.signature`,
-        [s.id, s.project, s.name, s.kind, s.file, s.line, s.lang, s.signature],
-      );
-    }
-    for (const e of scan.edges) {
-      await client.query(
-        `INSERT INTO symbol_edges (id, project, src_id, src_name, dst_id, dst_name,
+      (s) => [s.id, s.project, s.name, s.kind, s.file, s.line, s.lang, s.signature],
+    );
+
+    await upsertChunked(
+      client,
+      lastById(scan.edges, (e) => e.id),
+      11,
+      (values) => `INSERT INTO symbol_edges (id, project, src_id, src_name, dst_id, dst_name,
                                      relation, confidence, score, file, line)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           VALUES ${values}
            ON CONFLICT (id) DO UPDATE SET
              dst_id = EXCLUDED.dst_id, dst_name = EXCLUDED.dst_name,
              relation = EXCLUDED.relation, confidence = EXCLUDED.confidence,
              score = EXCLUDED.score, file = EXCLUDED.file, line = EXCLUDED.line`,
-        [
-          e.id,
-          e.project,
-          e.srcId,
-          e.srcName,
-          e.dstId,
-          e.dstName,
-          e.relation,
-          e.confidence,
-          e.score,
-          e.file,
-          e.line,
-        ],
-      );
-    }
-    for (const f of scan.files) {
-      await client.query(
-        `INSERT INTO scanned_files (project, path, hash, scanned_at)
-           VALUES ($1, $2, $3, $4)
+      (e) => [
+        e.id,
+        e.project,
+        e.srcId,
+        e.srcName,
+        e.dstId,
+        e.dstName,
+        e.relation,
+        e.confidence,
+        e.score,
+        e.file,
+        e.line,
+      ],
+    );
+
+    await upsertChunked(
+      client,
+      lastById(scan.files, (f) => `${f.project}\u0000${f.path}`),
+      4,
+      (values) => `INSERT INTO scanned_files (project, path, hash, scanned_at)
+           VALUES ${values}
            ON CONFLICT (project, path) DO UPDATE SET
              hash = EXCLUDED.hash, scanned_at = EXCLUDED.scanned_at`,
-        [f.project, f.path, f.hash, f.scannedAt],
-      );
-    }
+      (f) => [f.project, f.path, f.hash, f.scannedAt],
+    );
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

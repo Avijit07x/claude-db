@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Postgres: `scan` issued one round-trip per symbol and per edge, making it
+  unusable against a hosted database.**
+  ([#16](https://github.com/Avijit07x/claude-db/issues/16))
+  `upsertGraph` looped over `scan.symbols`, `scan.edges` and `scan.files`, and
+  awaited a separate `INSERT` for each row. Parsing a 639-file React Native repo
+  takes 1.5s and produces 50,353 rows; against a Neon instance with a 100ms
+  round-trip that is 84 minutes of pure network wait, and the scan never
+  completed. Rows are now written 500 per statement, which takes the same repo
+  to 20s end to end. SQLite used a prepared statement and MongoDB used
+  `bulkWrite` already; only Postgres wrote row by row.
+
 ## 0.8.3
 
 ### Fixed
