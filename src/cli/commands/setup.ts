@@ -1,5 +1,5 @@
 import { toShortId } from '../../util/shortid.js';
-import { closeLandedWork, openWork } from '../../capture/index.js';
+import { closeLandedWork, openWork, redact } from '../../capture/index.js';
 import type { Scope } from '../paths.js';
 import { CONFIG_PATH } from '../../config/index.js';
 import { DIST_DIR } from '../constants.js';
@@ -34,7 +34,7 @@ export async function cmdInstall(scope: Scope): Promise<void> {
   console.log(`Guidance : ${instructionsPathFor(scope, project)}`);
   console.log(`Skill    : ${skillPathFor(scope, project)} (/cdb-scan)`);
   console.log(`Config   : ${CONFIG_PATH}`);
-  console.log(`Database : ${ctx.config.database}`);
+  console.log(`Database : ${redact(ctx.config.database)}`);
   if (embedder.id === 'builtin-hashing') {
     console.log('Search   : keyword + basic vectors');
     console.log('           for semantic search: npm i -g @xenova/transformers');
@@ -99,7 +99,7 @@ export async function cmdStatus(): Promise<void> {
     const active = wiring.filter((entry) => entry.installed);
 
     console.log(`project  : ${project}`);
-    console.log(`database : ${ctx.config.database}`);
+    console.log(`database : ${redact(ctx.config.database)}`);
     console.log(
       `hooks    : ${
         active.length > 0 ? active.map((entry) => entry.label).join(' + ') : 'NOT INSTALLED'

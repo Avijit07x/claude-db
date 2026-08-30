@@ -3,6 +3,7 @@ import { createContext } from '../../context.js';
 import { eachObservation } from '../commands/transfer.js';
 import { resolve } from 'node:path';
 import { resolveProject } from '../../util/project.js';
+import { redact } from '../../capture/turn-extractor.js';
 
 export async function cmdStats(): Promise<void> {
   const project = resolveProject(undefined);
@@ -61,7 +62,7 @@ export async function cmdProjects(): Promise<void> {
       return;
     }
 
-    console.log(`database: ${ctx.config.database}\n`);
+    console.log(`database: ${redact(ctx.config.database)}\n`);
     for (const entry of projects) {
       const marker = entry.project === here ? '*' : ' ';
       const date = new Date(entry.lastActive).toISOString().slice(0, 10);

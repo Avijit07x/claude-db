@@ -3,7 +3,7 @@ import { createContext } from '../../context.js';
 import { loadConfig } from '../../config/index.js';
 import { packageVersion } from '../../update.js';
 import { randomUUID } from 'node:crypto';
-import { remember } from '../../capture/index.js';
+import { redact, remember } from '../../capture/index.js';
 import { resolveProject } from '../../util/project.js';
 import { settingsPathFor } from '../paths.js';
 import { existsSync, readFileSync } from 'node:fs';
@@ -20,7 +20,7 @@ export async function cmdDoctor(argv: (string | undefined)[]): Promise<void> {
   const vectors = await probeEmbedder(embedder);
 
   console.log(`version  : ${packageVersion()}`);
-  console.log(`database : ${ctx.config.database}`);
+  console.log(`database : ${redact(ctx.config.database)}`);
   console.log(`adapter  : ${ctx.store.kind}`);
   console.log(`reachable: ${reachable ? 'yes' : 'no'}`);
   console.log(`requested: embeddings.provider = ${ctx.config.embeddings.provider}`);

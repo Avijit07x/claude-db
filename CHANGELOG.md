@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Commands printed database passwords in plain output.**
+  ([#21](https://github.com/Avijit07x/claude-db/pull/21))
+  `status`, `doctor`, `install`, `projects` and `reset` interpolated
+  `config.database` verbatim, and `view --export` wrote it into the generated
+  HTML, so a hosted Postgres or Mongo URL showed its password on screen and in
+  any file or bug report built from that output. SECURITY.md already stated
+  that these credentials are masked in command output; six call sites were not.
+  They now go through the existing `redact()`, as `use` already did, which
+  leaves the host readable and a SQLite path untouched. A new lint rule,
+  `no-raw-database-url`, fails the build on any future interpolation of
+  `config.database` without it.
+
 ## 0.9.0
 
 A correctness release. Everything below was found by reviewing the whole

@@ -7,6 +7,7 @@ import type { RecallContext } from '../../context.js';
 import { resolveProject } from '../../util/project.js';
 import { toShortId } from '../../util/shortid.js';
 import { renderPage } from './view-page.js';
+import { redact } from '../../capture/turn-extractor.js';
 
 export interface ViewData {
   project: string;
@@ -41,7 +42,7 @@ async function collect(ctx: RecallContext, project: string): Promise<ViewData> {
 
   return {
     project,
-    database: ctx.config.database,
+    database: redact(ctx.config.database),
     scannedFiles: (await ctx.store.scannedFiles(project)).length,
     kinds,
     rules,
