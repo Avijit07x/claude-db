@@ -2,7 +2,7 @@ import { extractFile } from '../../dist/graph/scan/extract.js';
 import { languageFor } from '../../dist/graph/languages/index.js';
 import { ruby } from '../../dist/graph/languages/ruby.js';
 import { python } from '../../dist/graph/languages/python.js';
-import { tsx } from '../../dist/graph/languages/ecmascript.js';
+import { javascript, tsx } from '../../dist/graph/languages/ecmascript.js';
 import { check } from '../lib/check.mjs';
 
 export default async function run() {
@@ -145,6 +145,20 @@ export function Screen() {
     jsx.references.find((r) => r.name === 'Card')?.from?.name === 'Screen',
   );
   check('calls in a tsx file still extract', !!jsx.references.find((r) => r.name === 'title'));
+
+  const jsxFile = extractFile(
+    { path: 'src/Screen.jsx', spec: javascript, source: screen, hash: 'x' },
+    '/p',
+  );
+  check(
+    'a component rendered in a .jsx file is an edge too',
+    !!jsxFile.references.find((r) => r.name === 'Card' && r.relation === 'references'),
+    JSON.stringify(jsxFile.references.map((r) => r.name)),
+  );
+  check(
+    '.jsx resolves to the spec that carries the jsx rules',
+    languageFor('a.jsx') === javascript,
+  );
 
   check('an unknown extension stays unsupported', languageFor('notes.txt') === null);
 }

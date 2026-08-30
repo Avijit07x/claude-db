@@ -70,5 +70,9 @@ export const javascript: LanguageSpec = {
     ...SHARED_DEFINITIONS,
     { kind: 'class_declaration', field: ['name'], symbol: 'class' },
   ],
-  references: [...SHARED_REFERENCES, { kind: 'class_heritage', field: [], relation: 'extends' }],
+  references: [
+    ...SHARED_REFERENCES,
+    { kind: 'class_heritage', field: [], relation: 'extends' },
+    ...JSX_REFERENCES,
+  ],
 };
