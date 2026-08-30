@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.5
+
+### Added
+
+- **Using a type now produces a graph edge.**
+  ([#19](https://github.com/Avijit07x/claude-db/issues/19))
+  A type in argument, return, annotation or type-argument position matched no
+  rule, so all 985 interfaces and type aliases on one 214k-line repo had zero
+  inbound edges and `find_usages` reported every one of them as unused.
+  `type_identifier` is now a reference rule. Matching it directly would also
+  hit declaration sites and emit a self-edge for each, so `ReferenceRule` takes
+  an optional `excludeParents`, and the rule skips the seven parents that mean
+  a type is being declared rather than used. Measured on this repo: 2,387
+  reference edges and zero self-edges. This completes the second half of the
+  issue; rendering a component shipped in 0.8.4.
+
+### Fixed
+
+- **Two declarations sharing a name and kind in one file collapsed into one
+  symbol.** ([#18](https://github.com/Avijit07x/claude-db/issues/18))
+  `symbolId` hashed project, file, name and kind with nothing positional, so
+  any two functions in a file that each declared `const total` produced a
+  single symbol and one of them was lost. On claude-db's own source that was 89
+  colliding groups and 115 symbols never stored. The id now carries the
+  occurrence index of the name within its file. The first occurrence keeps the
+  id it always had, so existing graphs do not churn; only the second and later
+  duplicates gain new ids. `SCAN_VERSION` is bumped so stored graphs rebuild.
+
 ## 0.8.4
 
 ### Fixed
