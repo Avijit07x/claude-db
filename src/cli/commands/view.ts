@@ -19,7 +19,7 @@ export interface ViewData {
 }
 
 async function collect(ctx: RecallContext, project: string): Promise<ViewData> {
-  const all = (await ctx.store.list({ project, limit: 500 })).sort(
+  const all = (await ctx.store.list({ project, limit: 500, newest: true })).sort(
     (a, b) => b.createdAt - a.createdAt,
   );
   const kinds: Record<string, number> = {};
