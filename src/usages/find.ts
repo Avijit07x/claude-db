@@ -89,8 +89,7 @@ function buildArgs({ symbol, regex }: FindUsagesInput): string[] {
 function withContext(root: string, matches: UsageMatch[], context: number): UsageMatch[] {
   const fileLines = new Map<string, string[] | null>();
   const out: UsageMatch[] = [];
-  let lastFile = '';
-  let lastLineShown = 0;
+  const emitted = new Map<string, number>();
 
   for (const m of matches) {
     let lines = fileLines.get(m.file);
@@ -109,8 +108,13 @@ function withContext(root: string, matches: UsageMatch[], context: number): Usag
 
     const from = Math.max(1, m.line - context);
     const to = Math.min(lines.length, m.line + context);
-    const start = m.file === lastFile ? Math.max(from, lastLineShown + 1) : from;
-    for (let n = start; n <= to; n += 1) {
+    for (let n = from; n <= to; n += 1) {
+      const key = `${m.file}\0${n}`;
+      const at = emitted.get(key);
+      if (at !== undefined) {
+        if (n === m.line) out[at] = m;
+        continue;
+      }
       out.push(
         n === m.line
           ? m
@@ -122,9 +126,8 @@ function withContext(root: string, matches: UsageMatch[], context: number): Usag
               isMatch: false,
             },
       );
+      emitted.set(key, out.length - 1);
     }
-    lastFile = m.file;
-    lastLineShown = to;
   }
   return out;
 }

@@ -59,14 +59,18 @@ export async function queryGraph(
   const ids = answer.definitions.map((symbol) => symbol.id);
   const edges = await store.findEdges({
     project,
-    ...(ids.length > 0 ? { srcIds: ids, dstIds: ids } : {}),
+    ...(ids.length > 0 ? { srcIds: ids, dstIds: ids } : { dstName: query.symbol }),
     limit: Math.max(query.limit * 10, 500),
   });
 
-  answer.inbound = edges.filter((edge) => edge.dstName === query.symbol);
-  answer.outbound = edges.filter(
-    (edge) => ids.includes(edge.srcId) && edge.dstName !== query.symbol,
-  );
+  const idSet = new Set(ids);
+  const pointsAtSymbol = (edge: (typeof edges)[number]): boolean =>
+    edge.dstName === query.symbol ||
+    edge.dstName.endsWith(`.${query.symbol}`) ||
+    (edge.dstId !== '' && idSet.has(edge.dstId));
+
+  answer.inbound = edges.filter(pointsAtSymbol);
+  answer.outbound = edges.filter((edge) => idSet.has(edge.srcId) && !pointsAtSymbol(edge));
   answer.empty = answer.definitions.length === 0 && answer.inbound.length === 0;
   if (answer.empty) answer.suggestions = await suggestFor(store, project, query.symbol);
   return answer;
