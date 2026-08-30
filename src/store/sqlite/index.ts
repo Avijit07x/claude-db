@@ -116,6 +116,10 @@ export class SqliteStore implements MemoryStore {
     return observationsOps.listProjects(this.db);
   }
 
+  async sessionProjects(): Promise<string[]> {
+    return sessionsOps.sessionProjects(this.db);
+  }
+
   async inventory(): Promise<string[]> {
     return observationsOps.inventory(this.db);
   }

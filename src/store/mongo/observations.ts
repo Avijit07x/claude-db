@@ -98,11 +98,19 @@ export async function list(
   if (filter.project) query['project'] = filter.project;
   if (filter.kind) query['kind'] = filter.kind;
   if (filter.status) query['status'] = filter.status;
-  if (filter.after !== undefined) query['createdAt'] = { $gt: filter.after };
+  if (filter.after !== undefined) {
+    if (filter.afterId === undefined) query['createdAt'] = { $gt: filter.after };
+    else
+      query['$or'] = [
+        { createdAt: { $gt: filter.after } },
+        { createdAt: filter.after, _id: { $gt: filter.afterId } },
+      ];
+  }
 
+  const direction = filter.newest ? -1 : 1;
   const docs = await observations
     .find(query as Doc)
-    .sort({ createdAt: 1 })
+    .sort({ createdAt: direction, _id: direction })
     .limit(filter.limit ?? 1000)
     .toArray();
   return docs.map(toObservation);

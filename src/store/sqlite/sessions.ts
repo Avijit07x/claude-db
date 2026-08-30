@@ -46,3 +46,8 @@ export async function recentSessions(
     .all(project, limit) as Row[];
   return rows.map(toSession);
 }
+
+export async function sessionProjects(db: DatabaseSync): Promise<string[]> {
+  const rows = db.prepare('SELECT DISTINCT project FROM sessions').all() as Row[];
+  return rows.map((row) => String(row['project'] ?? '')).filter((project) => project.length > 0);
+}

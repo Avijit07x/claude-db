@@ -90,11 +90,15 @@ export async function findEdges(db: DatabaseSync, filter: EdgeFilter): Promise<C
     sides.push(`${column} IN (${ids.map(() => '?').join(',')})`);
     params.push(...ids);
   }
-  const where = sides.length > 0 ? ` AND (${sides.join(' OR ')})` : '';
+  let where = sides.length > 0 ? ` AND (${sides.join(' OR ')})` : '';
+  if (filter.dstName !== undefined) {
+    where += ' AND (dst_name = ? OR dst_name LIKE ?)';
+    params.push(filter.dstName, `%.${filter.dstName}`);
+  }
   params.push(filter.limit ?? 2000);
 
   const rows = db
-    .prepare(`SELECT * FROM symbol_edges WHERE project = ?${where} LIMIT ?`)
+    .prepare(`SELECT * FROM symbol_edges WHERE project = ?${where} ORDER BY file, line, id LIMIT ?`)
     .all(...(params as never[])) as Row[];
   return rows.map(toEdge);
 }

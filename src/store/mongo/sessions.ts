@@ -7,14 +7,15 @@ export async function upsertSession(
   sessions: Collection<SessionDoc>,
   session: Session,
 ): Promise<void> {
-  const set: Partial<SessionDoc> = {
-    project: session.project,
-    startedAt: session.startedAt,
-  };
+  const set: Partial<SessionDoc> = { project: session.project };
   if (session.endedAt !== undefined) set.endedAt = session.endedAt;
   if (session.summary !== undefined) set.summary = session.summary;
 
-  await sessions.updateOne({ _id: session.id }, { $set: set }, { upsert: true });
+  await sessions.updateOne(
+    { _id: session.id },
+    { $set: set, $setOnInsert: { startedAt: session.startedAt } },
+    { upsert: true },
+  );
 }
 
 export async function getSession(
@@ -43,4 +44,11 @@ export async function recentSessions(
     .limit(limit)
     .toArray();
   return docs.map(toSession);
+}
+
+export async function sessionProjects(sessions: Collection<SessionDoc>): Promise<string[]> {
+  const rows = await sessions
+    .aggregate<{ _id: string }>([{ $group: { _id: '$project' } }])
+    .toArray();
+  return rows.map((row) => String(row._id ?? '')).filter((project) => project.length > 0);
 }

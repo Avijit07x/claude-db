@@ -61,7 +61,9 @@ export interface ListFilter {
   kind?: ObservationKind;
   status?: ObservationStatus;
   after?: number;
+  afterId?: string;
   limit?: number;
+  newest?: boolean;
 }
 
 export interface TimelineQuery {
@@ -113,6 +115,7 @@ export interface EdgeFilter {
   project: string;
   srcIds?: string[];
   dstIds?: string[];
+  dstName?: string;
   limit?: number;
 }
 

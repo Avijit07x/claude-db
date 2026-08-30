@@ -47,3 +47,8 @@ export async function recentSessions(
   );
   return res.rows.map(toSession);
 }
+
+export async function sessionProjects(pool: Pool): Promise<string[]> {
+  const res = await pool.query('SELECT DISTINCT project FROM sessions');
+  return res.rows.map((row) => String(row['project'] ?? '')).filter((p) => p.length > 0);
+}

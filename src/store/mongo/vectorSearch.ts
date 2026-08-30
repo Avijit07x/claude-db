@@ -48,7 +48,7 @@ export async function searchVector(
         },
       ])
       .toArray();
-    return docs.map((doc) => toIndexEntry(doc, doc.score));
+    return docs.map((doc) => toIndexEntry(doc, Number(doc.score) * 2 - 1));
   }
 
   const docs = await observations

@@ -106,15 +106,23 @@ export async function list(pool: Pool, filter: ListFilter): Promise<Observation[
     conditions.push(`status = $${values.length}`);
   }
   if (filter.after !== undefined) {
-    values.push(filter.after);
-    conditions.push(`created_at > $${values.length}`);
+    if (filter.afterId === undefined) {
+      values.push(filter.after);
+      conditions.push(`created_at > $${values.length}`);
+    } else {
+      values.push(filter.after, filter.after, filter.afterId);
+      conditions.push(
+        `(created_at > $${values.length - 2} OR (created_at = $${values.length - 1} AND id > $${values.length}))`,
+      );
+    }
   }
   values.push(filter.limit ?? 1000);
 
+  const direction = filter.newest ? 'DESC' : 'ASC';
   const res = await pool.query(
     `SELECT * FROM observations
        ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}
-       ORDER BY created_at ASC LIMIT $${values.length}`,
+       ORDER BY created_at ${direction}, id ${direction} LIMIT $${values.length}`,
     values,
   );
   return res.rows.map(toObservation);

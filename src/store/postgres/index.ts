@@ -142,6 +142,10 @@ export class PostgresStore implements MemoryStore {
     return sessionsOps.getSession(this.pool, id);
   }
 
+  async sessionProjects(): Promise<string[]> {
+    return sessionsOps.sessionProjects(this.pool);
+  }
+
   async recentSessions(project: string, limit: number): Promise<Session[]> {
     return sessionsOps.recentSessions(this.pool, project, limit);
   }
@@ -155,6 +159,7 @@ export class PostgresStore implements MemoryStore {
       this.pool,
       (dims) => this.ensureVectorColumn(dims),
       observations,
+      this.vectorDims !== null,
     );
   }
 
