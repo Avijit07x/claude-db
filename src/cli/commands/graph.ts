@@ -23,8 +23,16 @@ export async function cmdScan(argv: (string | undefined)[]): Promise<void> {
       ? new Map<string, string>()
       : new Map((await ctx.store.scannedFiles(project)).map((f) => [f.path, f.hash]));
 
+    const existing = force ? [] : await ctx.store.findSymbols({ project, limit: 200000 });
+
     const started = Date.now();
-    const scan = scanRepository({ root, project, known, ...(force ? { force } : {}) });
+    const scan = scanRepository({
+      root,
+      project,
+      known,
+      ...(force ? { force } : {}),
+      ...(existing.length > 0 ? { existing } : {}),
+    });
 
     if (force) await ctx.store.removeGraph(project);
     else if (scan.changed.length > 0) await ctx.store.removeGraph(project, scan.changed);
@@ -56,7 +64,8 @@ export async function cmdUsages(argv: (string | undefined)[]): Promise<void> {
   const context = Number(valueOf(argv, '--context') ?? 0);
   const limit = Number(valueOf(argv, '--limit') ?? 100);
   const mode = valueOf(argv, '--mode') ?? 'text';
-  const words = withoutFlags(argv, ['--path', '--context', '--limit', '--mode'])
+  const targetFlag = valueOf(argv, '--target');
+  const words = withoutFlags(argv, ['--path', '--context', '--limit', '--mode', '--target'])
     .filter((arg) => arg !== '--regex')
     .join(' ')
     .trim();
@@ -87,7 +96,8 @@ export async function cmdUsages(argv: (string | undefined)[]): Promise<void> {
     process.exit(1);
   }
 
-  const [symbol, target] = words.split(/\s+/);
+  const [symbol, positional] = words.split(/\s+/);
+  const target = targetFlag ?? positional;
   if (mode === 'path' && !target) {
     console.error('--mode path needs two symbols: claude-db usages --mode path <from> <to>');
     process.exit(1);

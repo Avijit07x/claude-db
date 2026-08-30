@@ -5,6 +5,7 @@ export async function insertObservations(
   pool: Pool,
   ensureVectorColumn: (dims: number) => Promise<boolean>,
   observations: Observation[],
+  hasVectorColumn = false,
 ): Promise<void> {
   if (observations.length === 0) return;
 
@@ -52,6 +53,7 @@ export async function insertObservations(
       const updates = columns
         .slice(1)
         .map((column) => `${column} = EXCLUDED.${column}`)
+        .concat(!vectorStored && (hasVectorColumn || vectors) ? ['embedding = NULL'] : [])
         .join(', ');
       await client.query(
         `INSERT INTO observations (${columns.join(', ')}) VALUES (${holes})

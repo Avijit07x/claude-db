@@ -138,11 +138,16 @@ export async function findEdges(pool: Pool, filter: EdgeFilter): Promise<CodeEdg
     values.push(ids);
     sides.push(`${column} = ANY($${values.length}::text[])`);
   }
-  const where = sides.length > 0 ? ` AND (${sides.join(' OR ')})` : '';
+  let where = sides.length > 0 ? ` AND (${sides.join(' OR ')})` : '';
+  if (filter.dstName !== undefined) {
+    values.push(filter.dstName, `%.${filter.dstName}`);
+    where += ` AND (dst_name = $${values.length - 1} OR dst_name LIKE $${values.length})`;
+  }
   values.push(filter.limit ?? 2000);
 
   const res = await pool.query(
-    `SELECT * FROM symbol_edges WHERE project = $1${where} LIMIT $${values.length}`,
+    `SELECT * FROM symbol_edges WHERE project = $1${where}
+       ORDER BY file, line, id LIMIT $${values.length}`,
     values,
   );
   return res.rows.map(toEdge);

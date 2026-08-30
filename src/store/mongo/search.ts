@@ -49,11 +49,13 @@ export async function timeline(
       .sort({ createdAt: -1 })
       .limit(query.before + 1)
       .toArray(),
-    observations
-      .find({ project: anchor.project, createdAt: { $gt: anchor.createdAt } }, { projection })
-      .sort({ createdAt: 1 })
-      .limit(query.after)
-      .toArray(),
+    query.after <= 0
+      ? Promise.resolve([])
+      : observations
+          .find({ project: anchor.project, createdAt: { $gt: anchor.createdAt } }, { projection })
+          .sort({ createdAt: 1 })
+          .limit(query.after)
+          .toArray(),
   ]);
 
   return [...before.reverse(), ...after].map((doc) => toIndexEntry(doc, 0));

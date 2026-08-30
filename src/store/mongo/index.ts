@@ -109,6 +109,10 @@ export class MongoStore implements MemoryStore {
     return sessionsOps.recentSessions(this.sessions, project, limit);
   }
 
+  async sessionProjects(): Promise<string[]> {
+    return sessionsOps.sessionProjects(this.sessions);
+  }
+
   async clearSummary(id: string): Promise<boolean> {
     return sessionsOps.clearSummary(this.sessions, id);
   }

@@ -18,6 +18,7 @@ export function renderPromptContext(
   maxChars: number,
   expanded: Observation[] = [],
   expandMaxChars = 900,
+  shown: string[] = [],
 ): string | null {
   if (entries.length === 0) return null;
 
@@ -29,6 +30,7 @@ export function renderPromptContext(
     sections.push(
       `${toShortId(obs.id)} ${obs.kind} ${date} ${obs.title}\n` + clip(obs.body, expandMaxChars),
     );
+    shown.push(obs.id);
   }
 
   const lines: string[] = [];
@@ -41,6 +43,7 @@ export function renderPromptContext(
     if (line.length > budget) break;
     budget -= line.length + 1;
     lines.push(line);
+    shown.push(entry.id);
   }
 
   if (sections.length === 0 && lines.length === 0) return null;

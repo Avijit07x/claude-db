@@ -116,6 +116,11 @@ export const BASIC_FINGERPRINT = [
   CALLABLE.source,
   CALL.source,
   Object.keys(LABELS).join(','),
+  Object.entries(KEYWORDS)
+    .map(([word, kind]) => `${word}:${kind}`)
+    .sort()
+    .join(','),
+  [...NOT_A_CALL].sort().join(','),
 ].join('|');
 
 export const BASIC_LANGUAGES: LanguageSpec[] = Object.entries(LABELS).map(

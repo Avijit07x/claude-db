@@ -6,8 +6,20 @@ const SAME_FILE = 1;
 const SINGLE_MATCH = 0.95;
 const AMBIGUOUS_MATCH = 0.85;
 
-function edgeId(project: string, file: string, line: number, from: string, to: string): string {
-  return observationId('graph', 0, `${project}\0${file}\0${line}\0${from}\0${to}`);
+function edgeId(
+  project: string,
+  file: string,
+  line: number,
+  from: string,
+  to: string,
+  relation: string,
+  origin: string,
+): string {
+  return observationId(
+    'graph',
+    0,
+    `${project}\0${file}\0${line}\0${from}\0${to}\0${relation}\0${origin}`,
+  );
 }
 
 export function resolveEdges(
@@ -23,9 +35,13 @@ export function resolveEdges(
   }
 
   const edges: CodeEdge[] = [];
+  const origins = new Map<string, string>();
   for (const reference of references) {
     const candidates = byName.get(reference.name) ?? [];
-    const local = candidates.find((candidate) => candidate.file === reference.file);
+    const exact = reference.to
+      ? candidates.find((candidate) => candidate.id === reference.to)
+      : undefined;
+    const local = exact ?? candidates.find((candidate) => candidate.file === reference.file);
     const target = local ?? candidates[0];
     if (!target && reference.weak) continue;
 
@@ -41,7 +57,15 @@ export function resolveEdges(
 
     const fromName = reference.from?.name ?? reference.file;
     edges.push({
-      id: edgeId(project, reference.file, reference.line, fromName, reference.name),
+      id: edgeId(
+        project,
+        reference.file,
+        reference.line,
+        fromName,
+        reference.name,
+        reference.relation,
+        reference.origin ?? '',
+      ),
       project,
       srcId: reference.from?.id ?? '',
       srcName: fromName,
@@ -53,11 +77,13 @@ export function resolveEdges(
       file: reference.file,
       line: reference.line,
     });
+    const added = edges[edges.length - 1];
+    if (added && reference.origin !== undefined) origins.set(added.id, reference.origin);
   }
-  return mergeMemberCalls(edges);
+  return mergeMemberCalls(edges, origins);
 }
 
-function mergeMemberCalls(edges: CodeEdge[]): CodeEdge[] {
+function mergeMemberCalls(edges: CodeEdge[], origins: Map<string, string>): CodeEdge[] {
   const byLine = new Map<string, CodeEdge[]>();
   for (const edge of edges) {
     const key = `${edge.file}\0${edge.line}`;
@@ -75,6 +101,9 @@ function mergeMemberCalls(edges: CodeEdge[]): CodeEdge[] {
       for (const bare of bucket) {
         if (bare === qualified) continue;
         if (bare.dstName !== tail || bare.relation !== qualified.relation) continue;
+        const from = origins.get(qualified.id);
+        const to = origins.get(bare.id);
+        if (from === undefined || to === undefined || from !== to) continue;
         if (!qualified.dstId && bare.dstId) {
           qualified.dstId = bare.dstId;
           qualified.confidence = bare.confidence;

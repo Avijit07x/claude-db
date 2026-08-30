@@ -87,16 +87,22 @@ async function eachRemoteObservation(
   store: MemoryStore,
   visit: (batch: Observation[]) => Promise<void> | void,
 ): Promise<void> {
-  let after = 0;
+  let after: number | undefined;
+  let afterId: string | undefined;
   for (;;) {
-    const batch = await store.list({ after, limit: BATCH });
+    const batch = await store.list({
+      ...(after === undefined ? {} : { after }),
+      ...(afterId === undefined ? {} : { afterId }),
+      limit: BATCH,
+    });
     if (batch.length === 0) return;
 
     await visit(batch);
 
     const last = batch[batch.length - 1];
     if (!last) return;
-    after = last.createdAt === after ? after + 1 : last.createdAt;
+    after = last.createdAt;
+    afterId = last.id;
     if (batch.length < BATCH) return;
   }
 }

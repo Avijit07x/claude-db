@@ -1,4 +1,5 @@
 import ranking from './unit/ranking.mjs';
+import reviewFixes from './unit/review-fixes.mjs';
 import capture from './unit/capture.mjs';
 import classify from './unit/classify.mjs';
 import summaries from './unit/summaries.mjs';
@@ -31,6 +32,7 @@ import summarize from './unit/summarize.mjs';
 import { report } from './lib/check.mjs';
 
 await ranking();
+await reviewFixes();
 await suggest();
 await stopwords();
 await scanVersion();

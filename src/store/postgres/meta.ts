@@ -30,14 +30,24 @@ export async function ensureTagsIndexed(pool: Pool): Promise<void> {
        WHERE d.adrelid = 'observations'::regclass AND a.attname = 'tsv'`,
   );
   const expr = String(res.rows[0]?.['expr'] ?? '');
-  if (expr.length === 0 || expr.includes('tags')) return;
+  if (expr.includes('tags')) return;
 
-  await pool.query('ALTER TABLE observations DROP COLUMN tsv');
-  await pool.query(
-    `ALTER TABLE observations
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('ALTER TABLE observations DROP COLUMN IF EXISTS tsv');
+    await client.query(
+      `ALTER TABLE observations
          ADD COLUMN tsv TSVECTOR GENERATED ALWAYS AS (${TSV_EXPRESSION}) STORED`,
-  );
-  await pool.query('CREATE INDEX IF NOT EXISTS idx_obs_tsv ON observations USING GIN(tsv)');
+    );
+    await client.query('CREATE INDEX IF NOT EXISTS idx_obs_tsv ON observations USING GIN(tsv)');
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function readVectorDims(pool: Pool): Promise<number | null> {

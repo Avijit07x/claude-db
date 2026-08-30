@@ -9,13 +9,14 @@ const MAX_BUFFER = 64 * 1024 * 1024;
 const MAX_FILE_BYTES = 1024 * 1024;
 
 export interface SourceFile {
+  unreadable?: boolean;
   path: string;
   spec: LanguageSpec;
   source: string;
   hash: string;
 }
 
-export const SCAN_VERSION = 4;
+export const SCAN_VERSION = 5;
 
 const RULES_FINGERPRINT = createHash('sha256')
   .update(
@@ -59,7 +60,9 @@ export function readSource(root: string, path: string): SourceFile | null {
   } catch {
     return null;
   }
-  if (bytes.length > MAX_FILE_BYTES || bytes.includes(0)) return null;
+  if (bytes.length > MAX_FILE_BYTES || bytes.includes(0)) {
+    return { path, spec, source: '', hash: hashOf(bytes), unreadable: true };
+  }
 
   return { path, spec, source: bytes.toString('utf8'), hash: hashOf(bytes) };
 }

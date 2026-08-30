@@ -119,16 +119,22 @@ export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observ
     params.push(filter.status);
   }
   if (filter.after !== undefined) {
-    conditions.push('created_at > ?');
-    params.push(filter.after);
+    if (filter.afterId === undefined) {
+      conditions.push('created_at > ?');
+      params.push(filter.after);
+    } else {
+      conditions.push('(created_at > ? OR (created_at = ? AND id > ?))');
+      params.push(filter.after, filter.after, filter.afterId);
+    }
   }
   params.push(filter.limit ?? 1000);
 
+  const direction = filter.newest ? 'DESC' : 'ASC';
   const rows = db
     .prepare(
       `SELECT * FROM observations
          ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}
-         ORDER BY created_at ASC LIMIT ?`,
+         ORDER BY created_at ${direction}, id ${direction} LIMIT ?`,
     )
     .all(...(params as never[])) as Row[];
   return rows.map(toObservation);

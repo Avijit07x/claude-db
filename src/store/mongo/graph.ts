@@ -2,6 +2,7 @@ import type { Collection, Doc } from './driver.js';
 import type { CodeEdge, CodeSymbol, EdgeFilter, ScannedFile, SymbolFilter } from '../../types.js';
 import type { EdgeDoc, ScannedFileDoc, SymbolDoc } from './docs.js';
 import { toEdge, toSymbol, upsertsOf } from './docs.js';
+import { escapeRegex } from './helpers.js';
 
 export async function upsertGraph(
   symbols: Collection<SymbolDoc>,
@@ -66,9 +67,15 @@ export async function findEdges(
     alternatives.push({ dstId: { $in: filter.dstIds } });
   }
   if (alternatives.length > 0) query['$or'] = alternatives;
+  if (filter.dstName !== undefined) {
+    query['dstName'] = {
+      $in: [filter.dstName, new RegExp(`\\.${escapeRegex(filter.dstName)}$`)],
+    };
+  }
 
   const docs = await edges
     .find(query as Doc)
+    .sort({ file: 1, line: 1, _id: 1 })
     .limit(filter.limit ?? 2000)
     .toArray();
   return docs.map(toEdge);

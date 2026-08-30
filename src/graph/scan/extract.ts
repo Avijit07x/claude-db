@@ -13,6 +13,8 @@ export interface Reference {
   line: number;
   from: CodeSymbol | null;
   weak?: boolean;
+  to?: string;
+  origin?: string;
 }
 
 export interface Extraction {
@@ -127,6 +129,18 @@ function enclosing(line: number, spans: Span[]): CodeSymbol | null {
   return (best ?? fallback)?.symbol ?? null;
 }
 
+function namedTargets(node: AstNode): AstNode[] {
+  if (!/\s/.test(node.text().trim())) return [node];
+
+  const inner: AstNode[] = [];
+  for (const kind of ['type_identifier', 'identifier']) {
+    try {
+      inner.push(...node.findAll({ rule: { kind } }));
+    } catch {}
+  }
+  return inner.length > 0 ? inner : [node];
+}
+
 export function extractFile(file: SourceFile, project: string): Extraction {
   if (file.spec.basic) return extractByPattern(file, project);
 
@@ -178,29 +192,37 @@ export function extractFile(file: SourceFile, project: string): Extraction {
       relation: 'defines',
       line: span.start,
       from: owner,
+      to: span.symbol.id,
     });
   }
 
   for (const rule of file.spec.references) {
     for (const node of root.findAll({ rule: { kind: rule.kind } })) {
-      const target = rule.field.length === 0 ? node : resolveField(node, rule.field);
-      const raw = target?.text();
-      if (!target || !raw) continue;
+      const matched = rule.field.length === 0 ? node : resolveField(node, rule.field);
+      if (!matched) continue;
 
-      const name = unquote(raw.trim());
-      if (!name || /\s/.test(name)) continue;
-      if (rule.relation === 'references' && name.includes('.')) continue;
-      if (rule.namePattern && !rule.namePattern.test(name)) continue;
-      if (rule.excludeParents?.includes(node.parent()?.kind() ?? '')) continue;
+      const targets = rule.field.length === 0 ? namedTargets(matched) : [matched];
+      for (const target of targets) {
+        const raw = target.text();
+        if (!raw) continue;
 
-      const line = target.range().start.line + 1;
-      references.push({
-        file: file.path,
-        name,
-        relation: rule.relation,
-        line,
-        from: enclosing(line, spans),
-      });
+        const name = unquote(raw.trim());
+        if (!name || /\s/.test(name)) continue;
+        if (rule.relation === 'references' && name.includes('.')) continue;
+        if (rule.namePattern && !rule.namePattern.test(name)) continue;
+        if (rule.excludeParents?.includes(node.parent()?.kind() ?? '')) continue;
+
+        const line = target.range().start.line + 1;
+        const span = node.range();
+        references.push({
+          file: file.path,
+          name,
+          relation: rule.relation,
+          line,
+          from: enclosing(line, spans),
+          origin: `${span.start.line}:${span.start.column}-${span.end.line}:${span.end.column}`,
+        });
+      }
     }
   }
 

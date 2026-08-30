@@ -56,8 +56,12 @@ export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
       } catch {}
     }
 
+    const lastNewline = raw.lastIndexOf('\n');
+    const complete =
+      lastNewline < 0 ? start : start + Buffer.byteLength(raw.slice(0, lastNewline + 1), 'utf8');
+
     const turns = groupIntoTurns(entries);
-    const nextOffset = turns.length > 0 ? (turns[turns.length - 1]?.offset ?? size) : size;
+    const nextOffset = turns.length > 0 ? (turns[turns.length - 1]?.offset ?? complete) : complete;
 
     return { turns, nextOffset };
   } finally {
@@ -68,9 +72,12 @@ export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
 function groupIntoTurns(entries: { entry: RawEntry; offset: number }[]): Turn[] {
   const turns: Turn[] = [];
   let current: Turn | null = null;
+  let lastKnown = 0;
 
   for (const { entry, offset } of entries) {
-    const timestamp = Date.parse(entry.timestamp ?? '') || Date.now();
+    const parsed = Date.parse(entry.timestamp ?? '');
+    const timestamp = Number.isNaN(parsed) ? lastKnown : parsed;
+    if (!Number.isNaN(parsed)) lastKnown = parsed;
 
     if (entry.type === 'user') {
       const text = extractText(entry.message?.content);

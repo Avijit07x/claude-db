@@ -13,6 +13,7 @@ export interface ScanOptions {
   project: string;
   known: Map<string, string>;
   force?: boolean;
+  existing?: CodeSymbol[];
 }
 
 export interface ScanResult {
@@ -51,6 +52,13 @@ export function scanRepository(options: ScanOptions): ScanResult {
       continue;
     }
 
+    if (file.unreadable) {
+      result.unsupported += 1;
+      result.changed.push(path);
+      result.files.push({ project, path, hash: file.hash, scannedAt });
+      continue;
+    }
+
     let extracted;
     try {
       extracted = extractFile(file, project);
@@ -65,6 +73,12 @@ export function scanRepository(options: ScanOptions): ScanResult {
     result.files.push({ project, path, hash: file.hash, scannedAt });
   }
 
-  result.edges = resolveEdges(project, result.symbols, references);
+  const rescanned = new Set(result.changed);
+  const resolvable =
+    options.existing === undefined
+      ? result.symbols
+      : [...result.symbols, ...options.existing.filter((s) => !rescanned.has(s.file))];
+
+  result.edges = resolveEdges(project, resolvable, references);
   return result;
 }
