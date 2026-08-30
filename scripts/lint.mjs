@@ -70,6 +70,17 @@ function checkFile(file) {
     if (relative && relative[1] && !relative[1].endsWith('.js') && !relative[1].endsWith('.json')) {
       fail(file, number, 'import-extension', `${relative[1]} must end in .js`);
     }
+    const shows =
+      /\$\{[^}]*\bconfig\.database\b[^}]*\}/.test(raw) ||
+      /\bdatabase:\s*[\w.]*\bconfig\.database\b/.test(raw);
+    if (shows && !/\bredact\(/.test(raw)) {
+      fail(
+        file,
+        number,
+        'no-raw-database-url',
+        'connection strings carry passwords; wrap in redact()',
+      );
+    }
     if (
       file.startsWith('src/hooks/') &&
       !HOOK_STDOUT_OWNERS.has(file.split('/').pop()) &&

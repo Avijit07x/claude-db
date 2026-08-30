@@ -2,7 +2,13 @@ import { CONFIG_DIR, loadConfig } from '../../config/index.js';
 import { basename, join } from 'node:path';
 import { checkForUpdate } from '../../update.js';
 import { createContext } from '../../context.js';
-import { flushSession, resetCursor, sweepCursors, transcriptsFor } from '../../capture/index.js';
+import {
+  flushSession,
+  redact,
+  resetCursor,
+  sweepCursors,
+  transcriptsFor,
+} from '../../capture/index.js';
 import { resolveProject } from '../../util/project.js';
 import { rmSync } from 'node:fs';
 
@@ -13,7 +19,7 @@ export async function cmdReset(argv: (string | undefined)[]): Promise<void> {
 
   const ctx = await createContext();
   try {
-    const target = scoped ? project : ctx.config.database;
+    const target = scoped ? project : redact(ctx.config.database);
 
     if (!confirmed) {
       console.log(`This would delete ${scoped ? "this project's" : 'ALL'} memory from:`);
