@@ -37,11 +37,29 @@ export const typescript: LanguageSpec = {
   references: [...SHARED_REFERENCES, ...TYPED_REFERENCES],
 };
 
+const COMPONENT_NAME = /^[A-Z]/;
+
+const JSX_REFERENCES: ReferenceRule[] = [
+  {
+    kind: 'jsx_opening_element',
+    field: ['name'],
+    relation: 'references',
+    namePattern: COMPONENT_NAME,
+  },
+  {
+    kind: 'jsx_self_closing_element',
+    field: ['name'],
+    relation: 'references',
+    namePattern: COMPONENT_NAME,
+  },
+];
+
 export const tsx: LanguageSpec = {
   ...typescript,
   id: 'Tsx',
   label: 'tsx',
   extensions: ['.tsx'],
+  references: [...SHARED_REFERENCES, ...TYPED_REFERENCES, ...JSX_REFERENCES],
 };
 
 export const javascript: LanguageSpec = {

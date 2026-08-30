@@ -18,7 +18,9 @@ export interface SourceFile {
 export const SCAN_VERSION = 3;
 
 const RULES_FINGERPRINT = createHash('sha256')
-  .update(JSON.stringify(LANGUAGES))
+  .update(
+    JSON.stringify(LANGUAGES, (_key, value) => (value instanceof RegExp ? String(value) : value)),
+  )
   .update(BASIC_FINGERPRINT)
   .digest('hex')
   .slice(0, 12);

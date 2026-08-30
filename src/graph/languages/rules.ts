@@ -10,6 +10,7 @@ export interface ReferenceRule {
   kind: string;
   field: string[];
   relation: EdgeRelation;
+  namePattern?: RegExp;
 }
 
 export interface LanguageSpec {

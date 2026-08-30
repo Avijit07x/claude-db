@@ -2,6 +2,7 @@ import { extractFile } from '../../dist/graph/scan/extract.js';
 import { languageFor } from '../../dist/graph/languages/index.js';
 import { ruby } from '../../dist/graph/languages/ruby.js';
 import { python } from '../../dist/graph/languages/python.js';
+import { tsx } from '../../dist/graph/languages/ecmascript.js';
 import { check } from '../lib/check.mjs';
 
 export default async function run() {
@@ -113,6 +114,37 @@ end
     !named(anonymous, 'struct'),
     JSON.stringify(anonymous.symbols.map((s) => s.name)),
   );
+
+  const screen = `import { Card } from './Card';
+
+export function Screen() {
+  const label = title();
+  return (
+    <div className="page">
+      <Card>
+        <Button onPress={save} />
+      </Card>
+      <span>{label}</span>
+    </div>
+  );
+}
+`;
+  const jsx = extractFile({ path: 'src/Screen.tsx', spec: tsx, source: screen, hash: 'x' }, '/p');
+  const rendered = (name) =>
+    jsx.references.find((r) => r.name === name && r.relation === 'references');
+
+  check('a rendered component with children is an edge', !!rendered('Card'));
+  check('a self-closing component is an edge', !!rendered('Button'));
+  check(
+    'host elements are not mistaken for components',
+    !rendered('div') && !rendered('span'),
+    JSON.stringify(jsx.references.filter((r) => r.relation === 'references').map((r) => r.name)),
+  );
+  check(
+    'a rendered component attributes to the enclosing function',
+    jsx.references.find((r) => r.name === 'Card')?.from?.name === 'Screen',
+  );
+  check('calls in a tsx file still extract', !!jsx.references.find((r) => r.name === 'title'));
 
   check('an unknown extension stays unsupported', languageFor('notes.txt') === null);
 }
