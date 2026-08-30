@@ -23,20 +23,22 @@ export async function flushSession(
   const cursor = readCursor(sessionId);
 
   const { turns, nextOffset } = readTranscript(path, cursor);
-  await closeLandedWork(ctx.store, project);
   if (turns.length === 0) {
+    await closeLandedWork(ctx.store, project);
     writeCursor(sessionId, nextOffset);
     return { observations: 0, summary: null };
   }
 
   const observations = observationsFromTurns(turns, sessionId, project, ctx.config);
   if (observations.length === 0) {
+    await closeLandedWork(ctx.store, project);
     writeCursor(sessionId, nextOffset);
     return { observations: 0, summary: null };
   }
 
   await embedObservations(ctx, observations);
   await ctx.store.insertObservations(observations);
+  await closeLandedWork(ctx.store, project);
 
   const previous = rebuild ? null : await ctx.store.getSession(sessionId);
   const summary = summarize(observations, previous?.summary);

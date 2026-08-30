@@ -47,17 +47,16 @@ await runHook(async () => {
         ? await ctx.search.getObservations(toExpand.map((entry) => entry.id))
         : [];
 
+    const emitted: string[] = [];
     const block = renderPromptContext(
       entries,
       ctx.config.inject.promptMaxChars,
       expanded,
       ctx.config.inject.expandMaxChars,
+      emitted,
     );
     if (!block) return;
-    markShown(
-      sessionId,
-      entries.map((entry) => entry.id),
-    );
+    markShown(sessionId, emitted);
     emitContext(`${block}\n(context ≈ ${Math.round(block.length / 4)} tokens)\n`);
   } finally {
     await ctx.close();

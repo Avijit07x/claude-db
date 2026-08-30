@@ -18,7 +18,7 @@ export function observationsFromTurns(
 }
 
 function withoutPrivate(turn: Turn): Turn {
-  const strip = (text: string) => text.replace(/<private>[\s\S]*?<\/private>/gi, '[private]');
+  const strip = (text: string) => text.replace(/<private>[\s\S]*?(?:<\/private>|$)/gi, '[private]');
   return { ...turn, prompt: strip(turn.prompt), reasoning: strip(turn.reasoning) };
 }
 
@@ -221,7 +221,7 @@ function isExcluded(file: string, patterns: string[]): boolean {
   return patterns.some((pattern) => file.includes(pattern));
 }
 
-const PRIVATE_BLOCK = /<private>[\s\S]*?<\/private>/gi;
+const PRIVATE_BLOCK = /<private>[\s\S]*?(?:<\/private>|$)/gi;
 const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g;
 
 export function redact(text: string): string {

@@ -90,7 +90,7 @@ await runHook(async () => {
       }
     }
 
-    const rules = (await ctx.store.list({ project, kind: 'preference', limit: 100 }))
+    const rules = (await ctx.store.list({ project, kind: 'preference', limit: 100, newest: true }))
       .sort((a, b) => {
         const manual = Number(b.sessionId === 'manual') - Number(a.sessionId === 'manual');
         return manual !== 0 ? manual : b.createdAt - a.createdAt;

@@ -21,7 +21,7 @@ export function symbolsGreppedIn(command: string): string[] {
     const pattern = match[3] ?? match[4] ?? '';
     const rest = match[5] ?? '';
     if (!SYMBOL.test(pattern) && !WORD.test(pattern)) continue;
-    if (/-\w*v/.test(flags)) continue;
+    if (/(?:^|\s)-[A-Za-z]*v|--invert-match/.test(flags)) continue;
     const invocation = match[0];
     const piped = /^\s*\|/.test(invocation);
     const searchesTree =

@@ -12,12 +12,19 @@ function uncommittedFiles(project: string): Set<string> | null {
       encoding: 'utf8',
       maxBuffer: MAX_BUFFER,
     });
-    return new Set(
-      raw
-        .split('\0')
-        .filter((entry) => entry.length > 3)
-        .map((entry) => join(project, entry.slice(3))),
-    );
+    const files = new Set<string>();
+    const fields = raw.split('\0');
+    for (let i = 0; i < fields.length; i += 1) {
+      const entry = fields[i];
+      if (entry === undefined || entry.length <= 3) continue;
+      files.add(join(project, entry.slice(3)));
+      if (/^[RC]/.test(entry) || /^.[RC]/.test(entry)) {
+        const origin = fields[i + 1];
+        if (origin !== undefined && origin.length > 0) files.add(join(project, origin));
+        i += 1;
+      }
+    }
+    return files;
   } catch {
     return null;
   }
@@ -27,15 +34,35 @@ export async function closeLandedWork(store: MemoryStore, project: string): Prom
   const dirty = uncommittedFiles(project);
   if (!dirty) return 0;
 
-  const open = await store.list({ project, status: 'open', limit: OPEN_LIMIT });
-  const landed = open
-    .filter((obs) => obs.files.every((file) => !dirty.has(file)))
-    .map((obs) => obs.id);
+  const landed: string[] = [];
+  let after: number | undefined;
+  let afterId: string | undefined;
+
+  for (;;) {
+    const batch = await store.list({
+      project,
+      status: 'open',
+      ...(after === undefined ? {} : { after }),
+      ...(afterId === undefined ? {} : { afterId }),
+      limit: OPEN_LIMIT,
+    });
+    if (batch.length === 0) break;
+
+    for (const obs of batch) {
+      if (obs.files.every((file) => !dirty.has(file))) landed.push(obs.id);
+    }
+
+    const last = batch[batch.length - 1];
+    if (!last) break;
+    after = last.createdAt;
+    afterId = last.id;
+    if (batch.length < OPEN_LIMIT) break;
+  }
 
   return store.closeObservations(landed);
 }
 
 export async function openWork(store: MemoryStore, project: string): Promise<Observation[]> {
-  const open = await store.list({ project, status: 'open', limit: OPEN_LIMIT });
+  const open = await store.list({ project, status: 'open', limit: OPEN_LIMIT, newest: true });
   return open.sort((a, b) => b.createdAt - a.createdAt);
 }
