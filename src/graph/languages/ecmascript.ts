@@ -24,9 +24,25 @@ const TYPED_DEFINITIONS: DefinitionRule[] = [
   { kind: 'enum_declaration', field: ['name'], symbol: 'enum' },
 ];
 
+const TYPE_DECLARATION_SITES = [
+  'interface_declaration',
+  'type_alias_declaration',
+  'class_declaration',
+  'abstract_class_declaration',
+  'enum_declaration',
+  'type_parameter',
+  'implements_clause',
+];
+
 const TYPED_REFERENCES: ReferenceRule[] = [
   { kind: 'extends_clause', field: ['value'], relation: 'extends' },
   { kind: 'implements_clause', field: [], relation: 'implements' },
+  {
+    kind: 'type_identifier',
+    field: [],
+    relation: 'references',
+    excludeParents: TYPE_DECLARATION_SITES,
+  },
 ];
 
 export const typescript: LanguageSpec = {
