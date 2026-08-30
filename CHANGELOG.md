@@ -1,5 +1,92 @@
 # Changelog
 
+## 0.9.0
+
+A correctness release. Everything below was found by reviewing the whole
+codebase rather than reported, so most of it had been failing quietly.
+
+**Stored graphs rebuild on the first scan after upgrading.** Extraction and
+edge ids both changed, so `SCAN_VERSION` is bumped and the old rows are
+discarded rather than left to disagree with the new ones.
+
+### Fixed
+
+- **`claude-db merge` could permanently delete observations.** `list()` ordered
+  by `created_at` alone while `after` was a strict `>`, so any row sharing a
+  timestamp with a batch boundary was stepped over by every caller that pages
+  through the store. `merge` copies page by page and then removes the source
+  project, deleting exactly the rows its own loop had skipped. Git-seeded
+  observations take the commit date, which has one-second resolution, so ties
+  are routine. Paging is now a keyset walk over `(created_at, id)`.
+  `export` and `sync` were dropping the same rows without deleting them.
+
+- **A session's last turn was lost when the prompt was still being written.**
+  The flush cursor advanced to the raw end of the transcript even when the file
+  ended mid-line, so the next read began inside the JSON, the entry was dropped,
+  and the prompt with all its work never appeared again. The cursor now stops at
+  the last complete line.
+
+- **`find_usages` hid the real caller of any method.** Inbound edges were
+  matched on the destination name, but a member call is stored under its
+  qualified name, so the actual `repo.save()` caller was fetched and then
+  discarded, leaving only the class that declares it.
+
+- **A repeated name in one file pointed its edge at the wrong declaration.**
+  0.8.5 gave each declaration its own id, but the resolver still matched by
+  name and took the first one in the file, so the second `run()` got an edge to
+  the first, stamped at the confidence tier that means "read from the syntax".
+
+- **`implements` never produced an edge, and neither did `extends` in `.js` or
+  `.jsx`.** Those rules capture a whole clause, whose text includes the keyword,
+  and the whitespace guard dropped it.
+
+- **An incremental `scan` broke every cross-file edge it touched**, rewriting it
+  with no destination at full confidence, until someone ran `--force`.
+
+- **Two edges on one line could overwrite each other**, because the edge id
+  ignored the relation and the call it came from. `trim(value.trim())` lost the
+  direct call entirely.
+
+- **A file over 1 MB or containing a NUL made the graph reparse the whole repo
+  forever**, and kept its stale symbols indefinitely.
+
+- **A standing rule stopped being injected** once a project had more than 100
+  preferences, and `view` showed months-old rows as the current state past 500
+  observations. Both asked for the oldest N and sorted afterwards.
+
+- **Committed work was announced as "not committed yet".** Landed work was
+  closed before the new rows were inserted, so a session's final turn was always
+  left open. Renamed files were also mis-parsed out of `git status`, closing
+  work whose rename had not landed.
+
+- **A memory dropped by the prompt budget was suppressed for the rest of the
+  session**, having been marked as shown without being rendered.
+
+- **An unclosed `<private>` tag was not redacted**, so a pasted credential was
+  stored and injected back into context. The README promises it is stripped.
+
+- **The grep hook ignored `grep --recursive <symbol>`**, because its
+  invert-flag guard also matched `--recursive` and `--devices`.
+
+- **`export` and `import` carried no sessions**, so a restored database reported
+  "none yet for this project" against a full memory. One truncated line also
+  aborted `import` after earlier batches had committed, with no report of what
+  had landed.
+
+- **Postgres and Mongo diverged from SQLite in four places**: Mongo read a
+  zero-row timeline request as unlimited, scored Atlas vector hits on a
+  different scale so the relevance floor passed everything, and moved a
+  session's start time to when it ended; Postgres kept a stale vector when a row
+  was re-inserted without one, and could leave keyword search permanently broken
+  if it crashed while rebuilding the `tsv` column.
+
+- **`usages --mode path X --target Y` searched for a target named `--target`.**
+
+### Added
+
+- `ListFilter` takes `newest` and `afterId`; `EdgeFilter` takes `dstName`;
+  stores expose `sessionProjects()`.
+
 ## 0.8.5
 
 ### Added
