@@ -81,6 +81,24 @@ export class PostgresStore implements MemoryStore {
     return metaOps.readVectorDims(this.pool);
   }
 
+  async migrateVectorDims(dims: number): Promise<boolean> {
+    if (!this.vectorEnabled) return false;
+    if (!Number.isInteger(dims) || dims < 1 || dims > 16000) return false;
+    if (this.vectorDims === dims) return false;
+
+    await this.pool.query('ALTER TABLE observations DROP COLUMN IF EXISTS embedding');
+    await this.pool.query(`ALTER TABLE observations ADD COLUMN embedding vector(${dims})`);
+    await this.pool.query('UPDATE observations SET embedder = NULL');
+    await this.pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_obs_embedding
+         ON observations USING hnsw (embedding vector_cosine_ops)`,
+    );
+    this.vectorDims = await this.readVectorDims();
+    this.warnedDims = false;
+    await this.writeMeta();
+    return true;
+  }
+
   private async ensureVectorColumn(dims: number): Promise<boolean> {
     if (!this.vectorEnabled) return false;
     if (!Number.isInteger(dims) || dims < 1 || dims > 16000) return false;

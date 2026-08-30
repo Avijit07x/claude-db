@@ -34,6 +34,8 @@ export interface MemoryStore {
   insertObservations(observations: Observation[]): Promise<void>;
   getObservations(ids: string[]): Promise<Observation[]>;
 
+  migrateVectorDims?(dims: number): Promise<boolean>;
+
   remove(filter: RemoveFilter): Promise<number>;
 
   list(filter: ListFilter): Promise<Observation[]>;

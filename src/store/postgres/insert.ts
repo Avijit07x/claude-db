@@ -15,6 +15,7 @@ export async function insertObservations(
   try {
     await client.query('BEGIN');
     for (const obs of observations) {
+      const vectorStored = vectors && obs.embedding?.length === width;
       const columns = [
         'id',
         'session_id',
@@ -39,11 +40,11 @@ export async function insertObservations(
         JSON.stringify(obs.files),
         JSON.stringify(obs.tags),
         obs.createdAt,
-        obs.embedder ?? null,
+        vectorStored ? (obs.embedder ?? null) : null,
         obs.author ?? null,
         obs.status ?? 'done',
       ];
-      if (vectors && obs.embedding?.length === width) {
+      if (vectorStored && obs.embedding) {
         columns.push('embedding');
         values.push(`[${obs.embedding.join(',')}]`);
       }

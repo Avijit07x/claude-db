@@ -19,6 +19,16 @@ export function toSession(row: Record<string, unknown>): Session {
   return session;
 }
 
+function toVector(value: unknown): number[] | null {
+  if (Array.isArray(value)) return value as number[];
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return null;
+  const inner = trimmed.slice(1, -1);
+  if (inner.length === 0) return null;
+  return inner.split(',').map(Number);
+}
+
 export function toObservation(row: Record<string, unknown>): Observation {
   const obs: Observation = {
     id: row['id'] as string,
@@ -31,6 +41,8 @@ export function toObservation(row: Record<string, unknown>): Observation {
     tags: (row['tags'] as string[]) ?? [],
     createdAt: Number(row['created_at']),
   };
+  const embedding = toVector(row['embedding']);
+  if (embedding) obs.embedding = embedding;
   if (row['embedder'] != null) obs.embedder = row['embedder'] as string;
   if (row['author'] != null) obs.author = row['author'] as string;
   if (row['status'] != null) obs.status = row['status'] as NonNullable<Observation['status']>;
