@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.4
 
 ### Fixed
 
@@ -17,7 +17,7 @@
 - **Postgres: changing embedding dimensions permanently disabled vector search,
   and `reembed` could not repair it.**
   ([#14](https://github.com/Avijit07x/claude-db/issues/14))
-  Installing `@xenova/transformers` — which `doctor` recommends — moves `auto`
+  Installing `@xenova/transformers`, which `doctor` recommends, moves `auto`
   from the 256d builtin embedder to 384d MiniLM. `ensureVectorColumn` only ever
   created the `embedding` column, never widened an existing one, so every write
   was rejected for width and `searchVector` returned nothing on every query.
@@ -28,6 +28,7 @@
   and re-embeds every row, `embedder` is only written when the vector is stored,
   and rows missing a vector are treated as stale. The Postgres adapter also
   hydrates `embedding` on read, as SQLite and MongoDB already did.
+
 ### Added
 
 - **Rendering a component in `.tsx` now produces a graph edge.**
@@ -37,7 +38,8 @@
   all and `find_usages` reported it as unused. `jsx_opening_element` and
   `jsx_self_closing_element` are now reference rules, filtered to capitalised
   names via a new optional `namePattern` on `ReferenceRule` so host elements
-  like `div` and `span` are not mistaken for components. On a 639-file React
+  like `div` and `span` are not mistaken for components. The same rules apply to
+  `.jsx`, which resolves to the JavaScript spec. On a 639-file React
   Native repo this adds 7,904 edges, 3,477 of them resolving to a symbol in the
   repo, for 0.2s of extra parse time.
 
@@ -53,7 +55,7 @@
   `/home/f/work/epiclin_2` was looked up under `-home-f-work-epiclin_2` while
   its transcripts sat in `-home-f-work-epiclin-2`, so `flush`, `adoption` and
   `setup` all reported nothing to ingest. The name is now derived the same way
-  Claude Code writes it — one dash per non-alphanumeric character — which also
+  Claude Code writes it, one dash per non-alphanumeric character, which also
   covers paths with spaces, `@`, `~` or accented characters.
 
 ## 0.8.2
