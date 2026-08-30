@@ -11,6 +11,7 @@ export interface ReferenceRule {
   field: string[];
   relation: EdgeRelation;
   namePattern?: RegExp;
+  excludeParents?: string[];
 }
 
 export interface LanguageSpec {

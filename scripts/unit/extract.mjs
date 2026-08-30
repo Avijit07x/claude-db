@@ -1,4 +1,4 @@
-import { extractFile } from '../../dist/graph/scan/extract.js';
+import { extractFile, symbolId } from '../../dist/graph/scan/extract.js';
 import { languageFor } from '../../dist/graph/languages/index.js';
 import { ruby } from '../../dist/graph/languages/ruby.js';
 import { python } from '../../dist/graph/languages/python.js';
@@ -158,6 +158,57 @@ export function Screen() {
   check(
     '.jsx resolves to the spec that carries the jsx rules',
     languageFor('a.jsx') === javascript,
+  );
+
+  const dup = `export function first() {
+  const total = 1;
+  return total;
+}
+
+export function second() {
+  const total = 2;
+  return total;
+}
+`;
+  const dupes = extractFile(
+    { path: 'src/dup.ts', spec: languageFor('a.ts'), source: dup, hash: 'x' },
+    '/p',
+  ).symbols.filter((s) => s.name === 'total');
+  check(
+    'two declarations sharing a name and kind in one file keep separate ids',
+    dupes.length === 2 && new Set(dupes.map((s) => s.id)).size === 2,
+    `${dupes.length} symbols, ${new Set(dupes.map((s) => s.id)).size} ids`,
+  );
+  check(
+    'the first occurrence keeps the id it had before, so existing graphs do not churn',
+    symbolId('/p', 'src/dup.ts', 'total', 'const') === dupes[0].id,
+  );
+
+  const typed = `interface Props { a: number }
+type Id = string;
+export function use(p: Props): Id {
+  const m: Map<Id, Props> = new Map();
+  return m;
+}
+`;
+  const types = extractFile(
+    { path: 'src/types.ts', spec: languageFor('a.ts'), source: typed, hash: 'x' },
+    '/p',
+  );
+  const typeRef = (name) =>
+    types.references.filter((r) => r.name === name && r.relation === 'references');
+  check('a type in argument position is an edge', typeRef('Props').length > 0);
+  check('a type in return position is an edge', typeRef('Id').length > 0);
+  check(
+    'a type argument inside a generic is an edge',
+    typeRef('Map').length > 0 && typeRef('Id').length > 1,
+  );
+  check(
+    'declaring an interface or alias is not a reference to itself',
+    !typeRef('Props').some((r) => r.line === 1) && !typeRef('Id').some((r) => r.line === 2),
+    JSON.stringify(
+      types.references.filter((r) => r.relation === 'references').map((r) => r.name + '@' + r.line),
+    ),
   );
 
   check('an unknown extension stays unsupported', languageFor('notes.txt') === null);

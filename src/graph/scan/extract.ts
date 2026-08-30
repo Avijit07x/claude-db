@@ -29,18 +29,42 @@ interface Span {
 const CALLABLE = new Set(['function', 'method', 'class']);
 const IDENTIFIER = /^[\w$]+[?!]?$/;
 
-export function symbolId(project: string, file: string, name: string, kind: string): string {
-  return observationId('graph', 0, `${project}\0${file}\0${name}\0${kind}`);
+export function symbolId(
+  project: string,
+  file: string,
+  name: string,
+  kind: string,
+  index = 0,
+): string {
+  const seed = `${project}\0${file}\0${name}\0${kind}`;
+  return observationId('graph', 0, index === 0 ? seed : `${seed}\0${index}`);
+}
+
+function counter(): (name: string, kind: string) => number {
+  const seen = new Map<string, number>();
+  return (name, kind) => {
+    const key = `${name}\0${kind}`;
+    const index = seen.get(key) ?? 0;
+    seen.set(key, index + 1);
+    return index;
+  };
 }
 
 function extractByPattern(file: SourceFile, project: string): Extraction {
   const lines = file.source.split('\n');
   const symbols: CodeSymbol[] = [];
   const spans: Span[] = [];
+  const occurrence = counter();
 
   for (const declaration of declarationsIn(file.source)) {
     const symbol: CodeSymbol = {
-      id: symbolId(project, file.path, declaration.name, declaration.kind),
+      id: symbolId(
+        project,
+        file.path,
+        declaration.name,
+        declaration.kind,
+        occurrence(declaration.name, declaration.kind),
+      ),
       project,
       name: declaration.name,
       kind: declaration.kind,
@@ -112,6 +136,7 @@ export function extractFile(file: SourceFile, project: string): Extraction {
 
   const symbols: CodeSymbol[] = [];
   const spans: Span[] = [];
+  const occurrence = counter();
 
   for (const rule of file.spec.definitions) {
     for (const node of root.findAll({ rule: { kind: rule.kind } })) {
@@ -121,7 +146,7 @@ export function extractFile(file: SourceFile, project: string): Extraction {
 
       const line = named.range().start.line + 1;
       const symbol: CodeSymbol = {
-        id: symbolId(project, file.path, name, rule.symbol),
+        id: symbolId(project, file.path, name, rule.symbol, occurrence(name, rule.symbol)),
         project,
         name,
         kind: rule.symbol,
@@ -166,6 +191,7 @@ export function extractFile(file: SourceFile, project: string): Extraction {
       if (!name || /\s/.test(name)) continue;
       if (rule.relation === 'references' && name.includes('.')) continue;
       if (rule.namePattern && !rule.namePattern.test(name)) continue;
+      if (rule.excludeParents?.includes(node.parent()?.kind() ?? '')) continue;
 
       const line = target.range().start.line + 1;
       references.push({

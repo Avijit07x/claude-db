@@ -11,6 +11,7 @@ export interface AstNode {
   kind(): string;
   range(): AstRange;
   field(name: string): AstNode | null;
+  parent(): AstNode | null;
   findAll(matcher: { rule: { kind: string } }): AstNode[];
 }
 

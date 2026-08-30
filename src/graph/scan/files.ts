@@ -15,7 +15,7 @@ export interface SourceFile {
   hash: string;
 }
 
-export const SCAN_VERSION = 3;
+export const SCAN_VERSION = 4;
 
 const RULES_FINGERPRINT = createHash('sha256')
   .update(
