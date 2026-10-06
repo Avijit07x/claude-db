@@ -1,3 +1,5 @@
+import { rememberClaudeBinary } from '../util/claude-binary.js';
+
 export interface HookPayload {
   session_id?: string;
   cwd?: string;
@@ -29,6 +31,7 @@ export async function readPayload(): Promise<HookPayload> {
 
 export async function runHook(fn: () => Promise<void>): Promise<void> {
   try {
+    rememberClaudeBinary();
     await fn();
   } catch (error) {
     process.stderr.write(`[claude-db] ${error instanceof Error ? error.message : String(error)}\n`);
