@@ -1,5 +1,4 @@
 import { check } from '../lib/check.mjs';
-import { e, now, day } from '../lib/fixtures.mjs';
 
 export default async function run() {
   {

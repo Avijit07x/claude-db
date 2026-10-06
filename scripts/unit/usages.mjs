@@ -1,6 +1,5 @@
 import { check } from '../lib/check.mjs';
 import { seedUsagesRepo } from '../lib/repo.mjs';
-import { e, now, day } from '../lib/fixtures.mjs';
 
 export default async function run() {
   {

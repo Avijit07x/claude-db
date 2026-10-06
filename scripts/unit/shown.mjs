@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { CONFIG_DIR } from '../../dist/config/index.js';
 import { clearCursor } from '../../dist/capture/index.js';
-import { markShown, readShown } from '../../dist/hooks/shown.js';
+import { forgetShown, markShown, readShown } from '../../dist/hooks/shown.js';
 
 export default async function run() {
   const session = 'unit-shown-test';
@@ -34,13 +34,9 @@ export default async function run() {
   clearCursor(session);
   check('session end clears what was shown', !existsSync(path) && readShown(session).size === 0);
 
-  const hook = readFileSync('src/hooks/user-prompt.ts', 'utf8');
-  check(
-    'the prompt hook filters what it already injected',
-    /\.filter\(\(entry\) => !shown\.has\(entry\.id\)\)/.test(hook),
-  );
-  check(
-    'and injects nothing when every match is already in context',
-    /entries\.length === 0\) return;/.test(hook),
-  );
+  markShown(session, ['d4']);
+  forgetShown(session);
+  check('a compaction forgets what was shown', !existsSync(path) && readShown(session).size === 0);
+  forgetShown(session);
+  check('forgetting twice is harmless', readShown(session).size === 0);
 }

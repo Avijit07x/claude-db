@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 import { createStore } from '../dist/store/index.js';
 import { SearchService } from '../dist/search/index.js';
 import { NoopEmbedder } from '../dist/embed/index.js';
-import { remember } from '../dist/capture/index.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'recall-smoke-'));
 const uri = process.argv[2] ?? join(dir, 'memory.db');
@@ -92,8 +91,10 @@ import manual from './smoke/manual.mjs';
 import vectors from './smoke/vectors.mjs';
 import lifecycle from './smoke/lifecycle.mjs';
 import graph from './smoke/graph.mjs';
+import sessions from './smoke/sessions.mjs';
 
 await retrieval(ctx, check);
+await sessions(ctx, check);
 await reingest(ctx, check);
 await manual(ctx, check);
 await vectors(ctx, check);

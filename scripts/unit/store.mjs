@@ -1,5 +1,5 @@
 import { check } from '../lib/check.mjs';
-import { e, now, day } from '../lib/fixtures.mjs';
+import { createStore } from '../../dist/store/index.js';
 
 export default async function run() {
   {
@@ -64,8 +64,8 @@ export default async function run() {
     let rejected = false;
     try {
       await createStore('redis://localhost:6379');
-    } catch {
-      rejected = true;
+    } catch (err) {
+      rejected = /unsupported database scheme/i.test(err.message);
     }
     check('unknown scheme is rejected with a clear error', rejected);
   }

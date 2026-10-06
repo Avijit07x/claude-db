@@ -1,7 +1,4 @@
-export default async function run(
-  { store, search, project, observations, now, sessionId, expected, uri, dir },
-  check,
-) {
+export default async function run({ search, project, observations }, check) {
   const hits = await search.search({ text: 'websocket reconnect', project, limit: 5 });
   check('layer 1 returns hits', hits.length > 0, `${hits.length} hits`);
   check(

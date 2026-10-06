@@ -1,7 +1,7 @@
-import { observationsFromTurns } from '../../dist/capture/index.js';
+import { observationsFromTurns, redact } from '../../dist/capture/index.js';
 import { ConfigSchema } from '../../dist/config/index.js';
 import { check } from '../lib/check.mjs';
-import { now, config, turn } from '../lib/fixtures.mjs';
+import { config, turn } from '../lib/fixtures.mjs';
 
 export default async function run() {
   const [built] = observationsFromTurns([turn()], 's1', '/p', config);
@@ -47,6 +47,40 @@ export default async function run() {
   check('aws keys are redacted', !secrets[0].body.includes('AKIAIOSFODNN7EXAMPLE'));
   check('slack tokens are redacted', !secrets[0].body.includes('xoxb-1234567890'));
   check('jwts are redacted', !secrets[0].body.includes('eyJhbGciOiJIUzI1NiJ9'));
+
+  const pasted = observationsFromTurns(
+    [
+      turn({
+        prompt: 'PLAYWRIGHT_MCP_EXTENSION_TOKEN=fakeTok9_exampleNotRealValue-0123456789abcdefghij',
+      }),
+    ],
+    's1',
+    '/p',
+    config,
+  );
+  check(
+    'an unquoted token pasted into a prompt is redacted',
+    !JSON.stringify(pasted).includes('fakeTok9_example'),
+  );
+  for (const secret of [
+    'export GITHUB_TOKEN=abc123def456ghi789',
+    'DATABASE_PASSWORD=hunter2hunter2',
+    'token = abcdefghijklmnop',
+    'client_secret: s3cr3tValue99',
+  ]) {
+    check(
+      `an unquoted secret is redacted: ${secret.split(/[=:]/)[0].trim()}`,
+      redact(secret).endsWith('[redacted]'),
+    );
+  }
+  for (const plain of [
+    'MAX_TOKENS=4096',
+    'max_tokens: 100000',
+    'the token is saved',
+    'tokens = [a, b]',
+  ]) {
+    check(`a look-alike is left alone: ${plain}`, redact(plain) === plain);
+  }
 
   const dsn = observationsFromTurns(
     [

@@ -1,7 +1,6 @@
 import { observationsFromTurns } from '../../dist/capture/index.js';
-import { ConfigSchema } from '../../dist/config/index.js';
 import { check } from '../lib/check.mjs';
-import { now, config, turn } from '../lib/fixtures.mjs';
+import { config, turn } from '../lib/fixtures.mjs';
 
 export default async function run() {
   const standing = observationsFromTurns(
