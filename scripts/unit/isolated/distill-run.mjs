@@ -1,13 +1,18 @@
 import '../../lib/require-isolated.mjs';
 import { randomUUID } from 'node:crypto';
+import { expirePause } from '../../lib/budget-files.mjs';
 import { report } from '../../lib/isolated.mjs';
 import { ConfigSchema } from '../../../dist/config/index.js';
 import { createContext } from '../../../dist/context.js';
 import { distillUsage } from '../../../dist/facts/budget.js';
 import { backfill, distillSession, pendingSessions } from '../../../dist/facts/distill.js';
 import { factId, youScope } from '../../../dist/facts/model.js';
+import { describePause } from '../../../dist/util/daily-budget.js';
 
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
+const FAILURE = 'exited with code 1: error: not logged in';
+const near = (ms, target) => Math.abs(ms - target) < 60_000;
 const now = Date.now();
 const defaults = ConfigSchema.parse({});
 const open = (dailyLimit) =>
@@ -37,7 +42,7 @@ async function chat(ctx, project, sessionId, body, at) {
 let lastPrompt = '';
 const reply = (lines) => async (prompt) => {
   lastPrompt = prompt;
-  return lines === null ? null : lines.join('\n');
+  return lines === null ? { ok: false, reason: FAILURE } : { ok: true, stdout: lines.join('\n') };
 };
 const byId = async (ctx, ids) =>
   new Map((await ctx.store.getObservations(ids)).map((obs) => [obs.id, obs]));
@@ -170,7 +175,10 @@ try {
   const prompts = [];
   const result = await distillSession(windowed, big, 'chat-big', async (prompt) => {
     prompts.push(prompt);
-    return `{"op":"set","key":"window-${prompts.length}","type":"fact","text":"Fact from window ${prompts.length}."}`;
+    return {
+      ok: true,
+      stdout: `{"op":"set","key":"window-${prompts.length}","type":"fact","text":"Fact from window ${prompts.length}."}`,
+    };
   });
   report(
     'a long chat is read in windows, one call each',
@@ -194,7 +202,7 @@ try {
     let calls = 0;
     const over = await distillSession(tight, big, 'chat-big', async () => {
       calls += 1;
-      return '';
+      return { ok: true, stdout: '' };
     });
     report(
       'a chat that does not fit in what is left of the day is not started',
@@ -245,9 +253,17 @@ try {
   await chat(failing, shop, 'chat-d', 'Asked: d\n\nD.', now);
   const failed = await distillSession(failing, shop, 'chat-d', reply(null));
   report('a failed call is reported', failed.outcome === 'failed');
+  const first = distillUsage();
   report(
-    'and pauses distilling for a day',
-    distillUsage().pausedUntil > Date.now() + 23 * 3_600_000,
+    'and pauses distilling for an hour',
+    first.failures === 1 && near(first.pausedUntil - Date.now(), HOUR),
+    JSON.stringify(first),
+  );
+  report(
+    'and keeps the reason, which status shows',
+    first.lastFailure?.reason === FAILURE &&
+      describePause(first)?.endsWith(`after a failed call: ${FAILURE}`),
+    describePause(first) ?? 'not paused',
   );
   const paused = await distillSession(failing, shop, 'chat-d', reply(['{}']));
   report('nothing calls Claude while paused', paused.outcome === 'over-budget');
@@ -255,6 +271,33 @@ try {
     'the failed chat is left for later',
     (await failing.store.getSession('chat-d'))?.distilledAt === undefined,
   );
+  expirePause('distill');
+  await distillSession(failing, shop, 'chat-d', reply(null));
+  const second = distillUsage();
+  report(
+    'a second failure in a row pauses it for six hours',
+    second.failures === 2 && near(second.pausedUntil - Date.now(), 6 * HOUR),
+    JSON.stringify(second),
+  );
+  report(
+    'and status counts the failures',
+    describePause(second)?.includes('after 2 failed calls in a row'),
+  );
 } finally {
   await failing.close();
+}
+
+const recovering = await open(50);
+try {
+  await chat(recovering, shop, 'chat-e', 'Asked: e\n\nE.', now);
+  expirePause('distill');
+  const recovered = await distillSession(recovering, shop, 'chat-e', reply(['{}']));
+  const after = distillUsage();
+  report(
+    'a working call after failures clears the streak and the reason',
+    recovered.outcome === 'distilled' && after.failures === 0 && after.lastFailure === null,
+    JSON.stringify({ outcome: recovered.outcome, ...after }),
+  );
+} finally {
+  await recovering.close();
 }

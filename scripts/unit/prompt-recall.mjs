@@ -126,7 +126,7 @@ export default async function run() {
     let sent = '';
     const reply = (stdout) => async (prompt) => {
       sent = prompt;
-      return stdout;
+      return stdout === null ? { ok: false, reason: 'exited with code 1' } : { ok: true, stdout };
     };
     const pick = (stdout, previousReply = 'I will look at the feed next.') =>
       pickMemories(ctx, { prompt: PROMPT, previousReply, ids: [past.id, asked.id] }, reply(stdout));
@@ -166,7 +166,11 @@ export default async function run() {
     );
     check('a pick whose quote is not in the memory is dropped', reworded.kind === 'none');
     check('an empty pick shows nothing', (await pick('{"picks": []}')).kind === 'none');
-    check('a failed Haiku call is reported as failed', (await pick(null)).kind === 'failed');
+    const failed = await pick(null);
+    check(
+      'a failed Haiku call is reported as failed, with its reason',
+      failed.kind === 'failed' && failed.reason === 'exited with code 1',
+    );
     await pick('{"picks": []}', '');
     check('the first prompt of a chat says so to Haiku', sent.includes('(start of chat)'));
 
