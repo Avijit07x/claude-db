@@ -14,24 +14,24 @@
 
 ## Every session starts from zero
 
-You spent an hour yesterday explaining why the store uses three adapters, which
-approach you already tried and abandoned, and why that one function must not be
-touched. Today Claude knows none of it. So you explain it again.
+You spent an hour yesterday explaining why the store has three adapters, which
+approach you tried and dropped, and why one function must not be touched. Today
+Claude knows none of it, so you explain it again.
 
-claude-db fixes that, and the other half too. Claude re-derives your codebase
-every time, grepping a name and opening files to work out what calls what.
+claude-db gives Claude a memory that lasts, and a map of your code so it stops
+working out what calls what from scratch.
 
-```console
-$ claude-db search "why does capture read the transcript"
+## What you get
 
-83cf1246-eb14  decision  2026-08-19  Tested and written up.
-    …the old defaults prompt was now cut why does capture read the transcript…
-88fab24f-5e59  decision  2026-08-19  Finding 4's other half needs checking…
-    …cannot work: 0.029483 "why does capture read…" <- highly relevant…
-```
-
-You never run that command. Claude gets the same context injected on every
-prompt, so it walks in already knowing. Nothing leaves your machine.
+- **A memory that carries over.** When a chat ends, its decisions, dead ends and
+  rules are saved as short facts, and the next chat starts by seeing them.
+- **The right memory with each prompt.** Claude Haiku picks the one or two
+  earlier memories that fit what you just asked. That costs about 20 tokens a
+  prompt on average, and nothing on 69% of prompts.
+- **A code graph.** Who defines or calls a symbol, answered in one call: 2.0x
+  cheaper than grep and reading files, measured on eight real symbols.
+- **Your own database.** SQLite by default, or Postgres or MongoDB to share
+  memory across machines. No cloud, no subscription.
 
 ## Install
 
@@ -42,134 +42,95 @@ cd your-project
 claude-db install --project
 ```
 
-Restart Claude Code. That's it: capture and recall are hooks, so they run
-without being asked.
+Restart Claude Code. Capture and recall are hooks, so there is nothing else to
+run.
 
-`--project` scopes to one repo instead of every project on the machine. It
-writes `.claude/settings.local.json` and `.mcp.json`. Add `.mcp.json` to your
-`.gitignore`, since it holds a machine-specific path.
+`--project` limits it to this repo instead of every project on the machine. Add
+`.mcp.json` to your `.gitignore`, since it holds a path that only exists on your
+machine.
 
-## Map your code
-
-Memory fills itself as you work. The code graph needs one command:
-
-```bash
-claude-db scan
-```
-
-Claude then gets four modes through MCP: `text` (a live grep, works with no
-scan at all), `usages`, `explain` and `path`. Re-running `scan` is cheap: it
-hashes files and re-parses only what changed.
-
-TypeScript, TSX, JavaScript, Python, Go, Rust and Ruby are parsed properly, and
-every other language — Java, C, C++, C#, Swift, Kotlin, PHP, Elixir, shell and
-twenty more — is read by pattern, which finds declarations and name-matched
-references tagged `INFERRED`. Nothing else to install either way.
-
-## Use another database
-
-SQLite by default, at `~/.claude-memory/memory.db`. No setup, no network. Point
-it elsewhere to share memory across machines:
-
-```bash
-claude-db use "mongodb+srv://user:pass@cluster.mongodb.net/memory"
-claude-db use "postgres://user:pass@host:5432/memory"
-```
-
-Install the driver you need (`npm install mongodb` or `pg`); neither ships by
-default.
-
-## With it, and without it
-
-Asking _who defines and calls `closeObservations`_ by hand means a grep, then
-opening three store adapters to see which hits are definitions. One `explain`
-call answers it already classified: **2.1x cheaper**, measured across eight
-real symbols in this repo.
-
-Recall is the standing cost of ~180 tokens a prompt, skipped entirely on 28% of
-prompts because the answer is already in context:
-
-```
-  every prompt costs      180 tokens of recall
-  every lookup refunds    597 tokens   (1,115 by hand - 518 with)
-
-  so one lookup pays for 3.3 prompts of recall
-```
-
-Check it on your own repo with `npm run bench:ab` and `npm run bench:tokens`
-from a clone. [With and without](./docs/with-and-without.md) has every number,
-including the symbols where plain grep wins.
+A fresh install has no history yet. `claude-db scan` builds the code graph, and
+the `/cdb-scan` skill maps an existing codebase into memory, so search has
+something to find on day one. The [setup guide](./docs/setup-guide.md) covers
+the settings and habits that give the best results.
 
 ## Commands
 
-`cdb` is a shorter alias for all of them. These are the ones you actually type:
+`cdb` is a shorter alias for all of them.
 
-| Command                                  | What it does                                           |
-| ---------------------------------------- | ------------------------------------------------------ |
-| `claude-db install [--project]`          | Register hooks and the MCP server                      |
-| `claude-db status`                       | Is it wired up, and when did it last record anything   |
-| `claude-db doctor [--deep]`              | Resolved config; `--deep` proves a full round trip     |
-| `claude-db scan [--force]`               | Build the code graph for this repo                     |
-| `claude-db usages [--mode <m>] <symbol>` | What uses a symbol: live `git grep`, or the code graph |
-| `claude-db use <url>`                    | Switch database and verify it                          |
-| `claude-db view`                         | See this project's memory live in the browser          |
+| Command                         | What it does                                          |
+| ------------------------------- | ----------------------------------------------------- |
+| `claude-db install [--project]` | Register the hooks and the MCP server                 |
+| `claude-db status`              | Is it wired up, and when did it last record anything  |
+| `claude-db doctor [--deep]`     | Show the resolved config; `--deep` tests a round trip |
+| `claude-db scan`                | Build the code graph for this repo                    |
+| `claude-db use <url>`           | Switch database and verify it                         |
+| `claude-db distill [on\|off]`   | Turn chats into facts with Haiku                      |
+| `claude-db pick [on\|off]`      | Let Haiku pick the memory shown with each prompt      |
+| `claude-db view`                | See this project's memory in the browser              |
 
-Every other command, including `search`, `remember`, `seed`, `sync`, `export`,
-`prune` and `reset`, is in the [CLI reference](https://claude-db.vercel.app/docs/cli).
+Every other command, including `search`, `remember`, `sync` and `export`, is in
+the [CLI reference](https://claude-db.vercel.app/docs/cli).
 
-Install also adds a `/cdb-scan` skill: run it once on an existing project and
-Claude maps the codebase into memory, so search has something to find before
-you have any history.
+## Use another database
 
-## Requirements
+```bash
+claude-db use "postgres://user:pass@host:5432/memory"
+claude-db use "mongodb+srv://user:pass@cluster.mongodb.net/memory"
+```
 
-Node 22.5 or newer. That's the only hard requirement: SQLite comes from Node's
-builtin `node:sqlite`, so nothing compiles at install time.
-
-Embeddings run locally with a zero-dependency embedder. For real semantic
-search, `npm install @xenova/transformers` and it upgrades itself.
+Install the driver first, with `npm install -g pg` or `npm install -g mongodb`.
+Neither ships by default.
 
 ## Privacy
 
-Nothing leaves your machine unless you point it at a remote database.
-`.env`, `secrets/`, `node_modules` and `.git/` are never stored, text wrapped
-in `<private>...</private>` is stripped, and API keys and tokens are redacted
-before anything is written.
+Memory stays in your own database. Three things use the network, and each has
+an off switch:
+
+- **When a chat ends**, its saved, redacted text is sent once to Claude Haiku
+  through your own login, to make facts. Turn it off with `claude-db distill off`.
+- **When a prompt has related memory**, the prompt, the end of Claude's last
+  reply and up to ten saved excerpts go to Haiku, so it can pick what to show.
+  Turn it off with `claude-db pick off`.
+- **Once a day**, the npm registry is asked for the latest version. Turn it off
+  with `"updates": "off"` in the config.
+
+`.env`, `secrets/`, `node_modules` and `.git/` are never stored. Text inside
+`<private>...</private>` is stripped, and API keys and tokens are redacted
+before anything is written or sent.
+
+## Requirements
+
+Node 22.16 or newer. SQLite comes from Node's builtin `node:sqlite`, so nothing
+compiles at install time. For real semantic search, run
+`npm install -g @xenova/transformers` and the embedder upgrades itself.
 
 ## Documentation
 
-**[claude-db.vercel.app/docs](https://claude-db.vercel.app/docs)** has the rest:
-the [CLI reference](https://claude-db.vercel.app/docs/cli),
-[MCP tools](https://claude-db.vercel.app/docs/mcp-tools),
-[how it works](https://claude-db.vercel.app/docs/how-it-works),
-[databases](https://claude-db.vercel.app/docs/databases) and
-[troubleshooting](https://claude-db.vercel.app/docs/troubleshooting).
+- [Documentation site](https://claude-db.vercel.app/docs): the
+  [CLI reference](https://claude-db.vercel.app/docs/cli),
+  [MCP tools](https://claude-db.vercel.app/docs/mcp-tools),
+  [how it works](https://claude-db.vercel.app/docs/how-it-works),
+  [databases](https://claude-db.vercel.app/docs/databases) and
+  [troubleshooting](https://claude-db.vercel.app/docs/troubleshooting)
+- [Setup guide](./docs/setup-guide.md): settings, habits and costs
+- [With and without](./docs/with-and-without.md) and
+  [benchmarks](https://claude-db.vercel.app/docs/benchmarks): every number,
+  including the symbols where plain grep wins
+- [Changelog](./CHANGELOG.md)
 
-[Benchmarks](https://claude-db.vercel.app/docs/benchmarks) has every number,
-including the symbols where plain grep wins. Releases are in the
-[changelog](./CHANGELOG.md).
-
-## Development
+## Contributing
 
 ```bash
 npm install
 npm run build
-npm test      # 415 checks
-npm run lint  # house rules: no comments, no any, import extensions
-npm run try   # simulate a session, touches nothing
-npm run format
+npm test
+npm run lint
 ```
 
-Releases publish from CI on a version tag:
-
-```bash
-npm version patch
-git push --follow-tags
-```
-
-[CONTRIBUTING.md](./CONTRIBUTING.md) has the conventions, the test setup, and
-how to add a language to the code graph. Security reports go through
-[SECURITY.md](./SECURITY.md), privately.
+[CONTRIBUTING.md](./CONTRIBUTING.md) has the conventions, the test setup, how to
+add a language to the code graph, and how releases are made. Security reports go
+through [SECURITY.md](./SECURITY.md), privately.
 
 ## License
 

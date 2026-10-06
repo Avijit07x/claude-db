@@ -18,6 +18,9 @@ recall are hooks, and Claude reaches the rest over MCP.
 | `claude-db remember [--key <name>] <text>`        | Record a rule outright, e.g. "always use pnpm here" |
 | `claude-db forget <id>`                           | Delete specific observations by id                  |
 | `claude-db forget --session <id>`                 | Clear one session's summary, so it stops being injected |
+| `claude-db distill [on\|off]`                     | Turn chats into facts with Haiku; no argument, status |
+| `claude-db pick [on\|off]`                        | Let Haiku pick the memory shown with each prompt      |
+| `claude-db redact`                                | Re-apply secret redaction to memory already saved     |
 | `claude-db seed --from-git`                       | Fill a cold memory from this repo's history         |
 | `claude-db stats`                                 | What this project's memory is made of               |
 | `claude-db projects`                              | Every project with memory stored                    |
@@ -70,9 +73,15 @@ optional.
 | Key                     | Default | What it does                                                            |
 | ----------------------- | ------- | ----------------------------------------------------------------------- |
 | `embeddings.provider`   | `auto`  | `auto` uses the real model when installed, else the built-in embedder    |
-| `inject.perPrompt`      | `true`  | Inject matching memory above each prompt                                |
-| `inject.minOverlap`     | `1`     | Content words a memory must share with the prompt to be injected; `0` off |
+| `inject.perPrompt`      | `true`  | Show related memory with each prompt                                    |
+| `inject.minOverlap`     | `2`     | Content words a memory must share with the prompt to be considered; `0` off |
+| `inject.promptResults`  | `2`     | Most memories shown with one prompt                                     |
+| `pick.enabled`          | `true`  | Let Haiku pick which memories to show with a prompt                     |
+| `pick.dailyLimit`       | `150`   | Most picks a day; after that only strong word matches are shown         |
 | `capture.scripted`      | `false` | Capture headless `claude -p` / SDK sessions too                          |
+| `distill.enabled`       | `true`  | Turn each finished chat into short facts with one Haiku call             |
+| `distill.dailyLimit`    | `30`    | Most Haiku calls a day; older chats wait for the next day               |
+| `distill.backfillDays`  | `90`    | How far back older chats are turned into facts                          |
 | `capture.summarize`     | `off`   | `on` writes session summaries with your own Claude CLI; costs tokens     |
 | `capture.summarizeModel`| `opus`  | Model for those summaries: `opus`, `sonnet` or `haiku`, always low effort |
 | `updates`               | `notify`| Update checks: `auto`, `notify` or `off`                                |

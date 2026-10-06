@@ -5,7 +5,7 @@ function facts(stats: Stats): [string, string][] {
     stats.weekly ? [stats.weekly.toLocaleString(), 'installs a week'] : null,
     stats.stars ? [stats.stars.toLocaleString(), 'stars on GitHub'] : null,
     stats.unpackedKb ? [`${Math.round(stats.unpackedKb / 102.4) / 10} MB`, 'installed size'] : null,
-    ['Node 22.5+', 'nothing compiles'],
+    ['Node 22.16+', 'nothing compiles'],
     ['Apache-2.0', 'free forever'],
   ];
   return rows.filter(Boolean) as [string, string][];

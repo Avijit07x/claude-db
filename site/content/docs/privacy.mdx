@@ -1,11 +1,20 @@
-Nothing leaves your machine unless you point it at a remote database. There is no account, no
-telemetry and no phone-home.
+Memory lives in a database you choose. There is no account and no telemetry.
 
-## Local by default
+## What uses the network
 
-Memory is a SQLite file in your home directory, embeddings are computed locally, and the parser runs
-on your machine. The only network traffic claude-db can make is to a database you configured yourself
-with `claude-db use`.
+Memory is a SQLite file in your home directory unless you point it elsewhere, embeddings are computed
+locally, and the parser runs on your machine. Four things can reach the network, and each can be
+turned off:
+
+- **Your database**, if you configured a remote one with `claude-db use`.
+- **Turning chats into facts.** After a chat ends, its saved, already redacted text is sent once to
+  Claude Haiku through your own Claude Code login, the same service the chat itself used. At most 30
+  calls a day. `claude-db distill off` stops it.
+- **Picking memory for a prompt.** When a prompt has related memory, the prompt, the end of Claude's
+  previous reply, and up to ten excerpts of saved memory are sent to Claude Haiku through the same
+  login, so it can pick what to show. At most 150 calls a day. `claude-db pick off` stops it.
+- **The update check.** Once a day the npm registry is asked for the latest version. Set
+  `"updates": "off"` to stop it.
 
 ## What is never stored
 
@@ -16,7 +25,7 @@ with `claude-db use`.
 ## Redaction
 
 API keys and tokens are redacted before anything is written, so a key pasted into a prompt does not
-end up in the database as a side effect of the turn being captured.
+end up in the database, or in a fact, as a side effect of the turn being captured.
 
 <Callout title="Turns are summarised, not copied">
 One observation per turn holds a title, the reasoning, and the files touched. The raw transcript

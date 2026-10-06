@@ -15,7 +15,8 @@ claude-db use "mongodb+srv://user:pass@cluster.mongodb.net/memory"
 ```
 
 `use` switches the backend and verifies it can be reached before saving. Install the driver you need
-first, either `npm install pg` or `npm install mongodb`, since neither ships by default. `CLAUDE_DB_URL`
+first, either `npm install -g pg` or `npm install -g mongodb`, since neither ships by default and
+claude-db looks for them next to itself. `CLAUDE_DB_URL`
 overrides the config file when you need a one-off.
 
 <Callout title="Recall does not change with the backend">
