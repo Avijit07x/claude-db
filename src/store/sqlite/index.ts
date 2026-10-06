@@ -25,6 +25,8 @@ import { mkdirSync, readFileSync } from 'node:fs';
 
 export const HERE = dirname(fileURLToPath(import.meta.url));
 
+const BUSY_TIMEOUT_MS = 3000;
+
 export class SqliteStore implements MemoryStore {
   readonly kind = 'sqlite';
 
@@ -33,7 +35,9 @@ export class SqliteStore implements MemoryStore {
   static async create(uri: string): Promise<SqliteStore> {
     const path = toFilePath(uri);
     mkdirSync(dirname(path), { recursive: true });
-    return new SqliteStore(new DatabaseSync(path));
+    const db = new DatabaseSync(path);
+    db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
+    return new SqliteStore(db);
   }
 
   async init(): Promise<void> {
