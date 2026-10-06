@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { claudeBinary } from './claude-binary.js';
 
 const MAX_BUFFER = 1024 * 1024;
 const REASON_CHARS = 120;
@@ -23,10 +24,6 @@ interface ProcessFailure {
   code?: unknown;
   killed?: unknown;
   signal?: unknown;
-}
-
-export function claudeBinary(env: NodeJS.ProcessEnv = process.env): string {
-  return env['CLAUDE_CODE_EXECPATH'] || 'claude';
 }
 
 export async function runHeadlessResult(
@@ -64,7 +61,7 @@ export async function runHeadless(
 export function describeFailure(error: unknown, stderr: string, timeoutMs: number): string {
   const failure: ProcessFailure = typeof error === 'object' && error !== null ? error : {};
   if (failure.code === 'ENOENT') {
-    return 'claude was not found: set CLAUDE_CODE_EXECPATH or put it on PATH';
+    return 'claude was not found: put it on PATH, or set CLAUDE_CODE_EXECPATH';
   }
   if (failure.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
     return 'the reply was larger than the 1 MB buffer';
