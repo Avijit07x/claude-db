@@ -1,3 +1,4 @@
+import '../../lib/require-isolated.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';

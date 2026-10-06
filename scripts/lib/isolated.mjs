@@ -12,7 +12,12 @@ export function runIsolated(script) {
   const home = mkdtempSync(join(tmpdir(), 'isolated-home-'));
   try {
     const result = spawnSync(process.execPath, ['--no-warnings', script], {
-      env: { ...process.env, HOME: home, CLAUDE_DB_URL: join(home, 'memory.db') },
+      env: {
+        ...process.env,
+        HOME: home,
+        CLAUDE_DB_URL: join(home, 'memory.db'),
+        CLAUDE_DB_ISOLATED: '1',
+      },
       encoding: 'utf8',
       maxBuffer: 16 * 1024 * 1024,
     });
