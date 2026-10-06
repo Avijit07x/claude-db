@@ -47,9 +47,10 @@ export function findUsages(input: FindUsagesInput): UsagesResult {
       throw new Error(
         `too many matches for "${input.symbol}" to read at once — narrow it ` +
           '(a longer name, --path to a subdirectory, or --regex to anchor it tighter)',
+        { cause: error },
       );
     }
-    throw new Error((err.stderr ?? err.message).trim().split('\n')[0]);
+    throw new Error((err.stderr ?? err.message).trim().split('\n')[0], { cause: error });
   }
 
   const parsed = parseGrepOutput(raw).map((row) => ({
@@ -75,7 +76,9 @@ export function repoRootFor(start: string): string {
     }).trim();
   } catch (error) {
     const stderr = (error as { stderr?: string }).stderr?.trim();
-    throw new Error(`${start} is not inside a git working tree${stderr ? ` (${stderr})` : ''}`);
+    throw new Error(`${start} is not inside a git working tree${stderr ? ` (${stderr})` : ''}`, {
+      cause: error,
+    });
   }
 }
 

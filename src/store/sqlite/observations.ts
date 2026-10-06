@@ -110,6 +110,10 @@ export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observ
     conditions.push('project = ?');
     params.push(filter.project);
   }
+  if (filter.sessionId) {
+    conditions.push('session_id = ?');
+    params.push(filter.sessionId);
+  }
   if (filter.kind) {
     conditions.push('kind = ?');
     params.push(filter.kind);
@@ -162,7 +166,7 @@ export async function inventory(db: DatabaseSync): Promise<string[]> {
          WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'`,
     )
     .all() as Row[];
-  return foreignNames(rows.map((row) => String(row['name'] ?? '')));
+  return foreignNames(rows.map((row) => (typeof row['name'] === 'string' ? row['name'] : '')));
 }
 
 export async function closeObservations(db: DatabaseSync, ids: string[]): Promise<number> {
@@ -175,4 +179,15 @@ export async function closeObservations(db: DatabaseSync, ids: string[]): Promis
     ...(ids as never[]),
   );
   return row?.n ?? 0;
+}
+
+export async function markReplaced(db: DatabaseSync, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const holes = ids.map(() => '?').join(',');
+  const result = db
+    .prepare(
+      `UPDATE observations SET status = 'replaced' WHERE status != 'replaced' AND id IN (${holes})`,
+    )
+    .run(...(ids as never[]));
+  return Number(result.changes);
 }

@@ -18,3 +18,12 @@ export function scopeFilter(query: SearchQuery): Doc {
   }
   return filter;
 }
+
+export function visibleFilter(query: SearchQuery): Doc {
+  return {
+    status: { $ne: 'replaced' },
+    ...(query.excludeSessions && query.excludeSessions.length > 0
+      ? { sessionId: { $nin: query.excludeSessions } }
+      : {}),
+  };
+}

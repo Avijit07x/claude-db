@@ -7,9 +7,11 @@ export interface Session {
   startedAt: number;
   endedAt?: number;
   summary?: string;
+  updatedAt?: number;
+  distilledAt?: number;
 }
 
-export type ObservationStatus = 'open' | 'done';
+export type ObservationStatus = 'open' | 'done' | 'replaced';
 
 export interface Observation {
   id: string;
@@ -44,6 +46,7 @@ export interface SearchQuery {
   tag?: string;
   since?: number;
   until?: number;
+  excludeSessions?: string[];
   limit: number;
   maxScanCandidates?: number;
   embedder?: string;
@@ -58,6 +61,7 @@ export interface RemoveFilter {
 
 export interface ListFilter {
   project?: string;
+  sessionId?: string;
   kind?: ObservationKind;
   status?: ObservationStatus;
   after?: number;

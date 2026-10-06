@@ -6,6 +6,8 @@ type FeatureExtractor = (
   options: { pooling: 'mean'; normalize: boolean },
 ) => Promise<{ tolist(): number[][] }>;
 
+const TRANSFORMERS: string = '@xenova/transformers';
+
 export class LocalEmbedder implements Embedder {
   readonly id = 'Xenova/all-MiniLM-L6-v2';
   readonly dimensions = 384;
@@ -28,9 +30,7 @@ export class LocalEmbedder implements Embedder {
       }
       let transformers: TransformersModule;
       try {
-        transformers = (await import(
-          '@xenova/transformers' as string
-        )) as unknown as TransformersModule;
+        transformers = (await import(TRANSFORMERS)) as TransformersModule;
       } catch {
         throw new Error(
           'Local embeddings need @xenova/transformers. ' +
@@ -38,10 +38,7 @@ export class LocalEmbedder implements Embedder {
         );
       }
       transformers.env.allowLocalModels = false;
-      return (await transformers.pipeline(
-        'feature-extraction',
-        this.id,
-      )) as unknown as FeatureExtractor;
+      return (await transformers.pipeline('feature-extraction', this.id)) as FeatureExtractor;
     })();
     return this.pipelinePromise;
   }

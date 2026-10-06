@@ -3,7 +3,7 @@ import { NoopEmbedder } from './embedder.js';
 import { BuiltinEmbedder } from './builtin.js';
 
 export type { Embedder } from './embedder.js';
-export { NoopEmbedder, normalize } from './embedder.js';
+export { NoopEmbedder } from './embedder.js';
 export { BuiltinEmbedder } from './builtin.js';
 
 export type EmbeddingProvider = 'auto' | 'local' | 'builtin' | 'none';

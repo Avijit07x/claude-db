@@ -18,9 +18,11 @@ export interface PgModule {
   Pool: new (config: { connectionString: string }) => Pool;
 }
 
+const PG: string = 'pg';
+
 export async function importPg(): Promise<PgModule> {
   try {
-    const mod = (await import('pg' as string)) as unknown as {
+    const mod = (await import(PG)) as {
       default?: PgModule;
       Pool?: PgModule['Pool'];
     };
@@ -28,6 +30,6 @@ export async function importPg(): Promise<PgModule> {
     if (mod.Pool) return { Pool: mod.Pool };
     throw new Error('unexpected pg module shape');
   } catch {
-    throw new Error('Postgres driver not installed. Run: npm install pg');
+    throw new Error('Postgres driver not installed. Run: npm install -g pg');
   }
 }

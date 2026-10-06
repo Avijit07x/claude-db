@@ -34,9 +34,11 @@ export interface MongoModule {
   MongoClient: new (uri: string) => MongoClient;
 }
 
+const MONGODB: string = 'mongodb';
+
 export async function importMongo(): Promise<MongoModule> {
   try {
-    const mod = (await import('mongodb' as string)) as unknown as {
+    const mod = (await import(MONGODB)) as {
       default?: MongoModule;
       MongoClient?: MongoModule['MongoClient'];
     };
@@ -44,6 +46,6 @@ export async function importMongo(): Promise<MongoModule> {
     if (mod.default?.MongoClient) return mod.default;
     throw new Error('unexpected mongodb module shape');
   } catch {
-    throw new Error('MongoDB driver not installed. Run: npm install mongodb');
+    throw new Error('MongoDB driver not installed. Run: npm install -g mongodb');
   }
 }

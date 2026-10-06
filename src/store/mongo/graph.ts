@@ -1,4 +1,4 @@
-import type { Collection, Doc } from './driver.js';
+import type { Collection } from './driver.js';
 import type { CodeEdge, CodeSymbol, EdgeFilter, ScannedFile, SymbolFilter } from '../../types.js';
 import type { EdgeDoc, ScannedFileDoc, SymbolDoc } from './docs.js';
 import { toEdge, toSymbol, upsertsOf } from './docs.js';
@@ -45,7 +45,7 @@ export async function findSymbols(
   if (filter.file) query['file'] = filter.file;
 
   const docs = await symbols
-    .find(query as Doc)
+    .find(query)
     .sort({ file: 1, line: 1 })
     .limit(filter.limit ?? 500)
     .toArray();
@@ -74,7 +74,7 @@ export async function findEdges(
   }
 
   const docs = await edges
-    .find(query as Doc)
+    .find(query)
     .sort({ file: 1, line: 1, _id: 1 })
     .limit(filter.limit ?? 2000)
     .toArray();
@@ -87,7 +87,7 @@ export async function scannedFiles(
   scanned: Collection<ScannedFileDoc>,
   project: string,
 ): Promise<ScannedFile[]> {
-  const docs = await scanned.find({ project } as Doc).toArray();
+  const docs = await scanned.find({ project }).toArray();
   return docs.map((doc) => ({
     project: doc.project,
     path: doc.path,
@@ -107,9 +107,9 @@ export async function removeGraph(
   const symbolQuery = scoped ? { project, file: { $in: files } } : { project };
   const cacheQuery = scoped ? { project, path: { $in: files } } : { project };
 
-  const count = await symbols.countDocuments(symbolQuery as Doc);
-  await symbols.deleteMany(symbolQuery as Doc);
-  await edges.deleteMany(symbolQuery as Doc);
-  await scanned.deleteMany(cacheQuery as Doc);
+  const count = await symbols.countDocuments(symbolQuery);
+  await symbols.deleteMany(symbolQuery);
+  await edges.deleteMany(symbolQuery);
+  await scanned.deleteMany(cacheQuery);
   return count;
 }

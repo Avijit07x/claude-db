@@ -3,7 +3,7 @@ export const TSV_EXPRESSION = `
   setweight(to_tsvector('english', coalesce(tags::text, '')), 'B') ||
   setweight(to_tsvector('english', coalesce(body, '')), 'C')`;
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const DDL = `
       CREATE TABLE IF NOT EXISTS claude_db_meta (
@@ -45,6 +45,9 @@ export const DDL = `
       ALTER TABLE observations ADD COLUMN IF NOT EXISTS embedder TEXT;
       ALTER TABLE observations ADD COLUMN IF NOT EXISTS author   TEXT;
       ALTER TABLE observations ADD COLUMN IF NOT EXISTS status   TEXT NOT NULL DEFAULT 'done';
+
+      ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at   BIGINT;
+      ALTER TABLE sessions ADD COLUMN IF NOT EXISTS distilled_at BIGINT;
 
       CREATE TABLE IF NOT EXISTS symbols (
         id        TEXT PRIMARY KEY,

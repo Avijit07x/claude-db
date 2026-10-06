@@ -52,6 +52,7 @@ export interface MemoryStore {
   timeline(query: TimelineQuery): Promise<ObservationIndexEntry[]>;
 
   closeObservations(ids: string[]): Promise<number>;
+  markReplaced(ids: string[]): Promise<number>;
 
   upsertGraph(scan: {
     symbols: CodeSymbol[];
