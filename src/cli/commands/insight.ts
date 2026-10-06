@@ -1,6 +1,6 @@
 import type { RecallContext } from '../../context.js';
 import { createContext } from '../../context.js';
-import { eachObservation } from '../commands/transfer.js';
+import { eachObservation } from '../../store/each.js';
 import { resolve } from 'node:path';
 import { resolveProject } from '../../util/project.js';
 import { redact } from '../../capture/redact.js';
@@ -13,11 +13,16 @@ export async function cmdStats(): Promise<void> {
     const kinds = new Map<string, number>();
     const tags = new Map<string, number>();
     let embedded = 0;
+    let replaced = 0;
     let earliest = Number.POSITIVE_INFINITY;
     let latest = 0;
 
-    const total = await eachObservation(ctx, { project }, (batch) => {
+    const stored = await eachObservation(ctx, { project }, (batch) => {
       for (const obs of batch) {
+        if (obs.status === 'replaced') {
+          replaced += 1;
+          continue;
+        }
         kinds.set(obs.kind, (kinds.get(obs.kind) ?? 0) + 1);
         for (const tag of obs.tags) tags.set(tag, (tags.get(tag) ?? 0) + 1);
         if (obs.embedding && obs.embedding.length > 0) embedded += 1;
@@ -26,14 +31,17 @@ export async function cmdStats(): Promise<void> {
       }
     });
 
+    const total = stored - replaced;
     if (total === 0) {
-      console.log(`No memory stored for ${project}.`);
+      const note = replaced > 0 ? ` (${replaced} replaced, kept but left out of search)` : '';
+      console.log(`No memory stored for ${project}${note}.`);
       return;
     }
 
     const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
     console.log(`project     : ${project}`);
     console.log(`observations: ${total}`);
+    if (replaced > 0) console.log(`replaced    : ${replaced}, kept but left out of search`);
     console.log(`range       : ${day(earliest)} to ${day(latest)}`);
     console.log(`embedded    : ${embedded} of ${total}`);
     console.log('\nby kind');

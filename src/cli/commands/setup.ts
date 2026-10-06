@@ -11,6 +11,8 @@ import { readFileSync, statSync } from 'node:fs';
 import { resolveProject } from '../../util/project.js';
 import { mentionsPath } from '../../util/paths.js';
 import { transcriptsFor } from '../../capture/index.js';
+import { factCounts, pendingSessions } from '../../facts/distill.js';
+import { pickStatus } from './pick.js';
 
 export async function cmdInstall(scope: Scope): Promise<void> {
   const project = resolveProject(undefined);
@@ -57,8 +59,8 @@ function warnIfCommittable(project: string): void {
     ignored = readFileSync(gitignore, 'utf8')
       .split('\n')
       .some((line) => line.trim().replace(/^\//, '') === '.mcp.json');
-  } catch {
-    return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return;
   }
 
   if (ignored) return;
@@ -116,6 +118,14 @@ export async function cmdStatus(): Promise<void> {
     const worked = workedAt(project);
     console.log(`worked   : ${worked.last > 0 ? ago(worked.last) : 'never'}`);
     console.log(`recorded : ${lastSaved > 0 ? ago(lastSaved) : 'never'}`);
+    const facts = await factCounts(ctx, project);
+    console.log(`facts    : ${facts.project} for this project, ${facts.you} about you`);
+    console.log(
+      ctx.config.distill.enabled
+        ? `waiting  : ${(await pendingSessions(ctx, project)).length} chat(s) not yet turned into facts`
+        : 'distill  : off, so chats are not turned into facts (claude-db distill on)',
+    );
+    console.log(pickStatus(ctx.config));
 
     await closeLandedWork(ctx.store, project);
     const open = await openWork(ctx.store, project);

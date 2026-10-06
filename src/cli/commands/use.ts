@@ -1,6 +1,5 @@
 import type { MemoryStore } from '../../store/index.js';
 import { createStore } from '../../store/index.js';
-import { join } from 'node:path';
 import { loadConfig, saveConfig } from '../../config/index.js';
 import { redact } from '../../capture/index.js';
 
@@ -63,7 +62,7 @@ async function countObservations(store: {
 async function warnAboutStranding(previous: string, uri: string): Promise<void> {
   if (!previous || previous === uri) return;
 
-  let stranded = 0;
+  let stranded: number;
   try {
     const store = await createStore(previous);
     try {

@@ -5,6 +5,7 @@ import { packageVersion } from '../../update.js';
 import { randomUUID } from 'node:crypto';
 import { redact, remember } from '../../capture/index.js';
 import { resolveProject } from '../../util/project.js';
+import { ourHookFile } from '../install.js';
 import { settingsPathFor } from '../paths.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { toShortId } from '../../util/shortid.js';
@@ -47,19 +48,22 @@ function checkWiring(project: string): void {
     const path = settingsPathFor(scope, project);
     let settings: { hooks?: Record<string, { hooks: { command: string }[] }[]> };
     try {
-      settings = JSON.parse(readFileSync(path, 'utf8'));
+      settings = JSON.parse(readFileSync(path, 'utf8')) as typeof settings;
     } catch {
       continue;
     }
     for (const [event, entries] of Object.entries(settings.hooks ?? {})) {
       const ours = entries
         .flatMap((entry) => entry.hooks.map((hook) => hook.command))
-        .filter((command) =>
-          /[\\/]hooks[\\/](session-start|session-end|user-prompt|prefer-usages)\.js$/.test(
-            command.replace(/\\/g, '/'),
-          ),
-        );
-      if (ours.length > 1) problems.push(`${event} registered ${ours.length}x in ${path}`);
+        .filter((command) => ourHookFile(command) !== null);
+      const counts = new Map<string, number>();
+      for (const command of ours) {
+        const file = ourHookFile(command) ?? '';
+        counts.set(file, (counts.get(file) ?? 0) + 1);
+      }
+      for (const [file, count] of counts) {
+        if (count > 1) problems.push(`${event} ${file} registered ${count}x in ${path}`);
+      }
       for (const command of ours) {
         const file = command.replace(/^node\s+/, '');
         if (!existsSync(file)) problems.push(`${event} points at missing ${file}`);

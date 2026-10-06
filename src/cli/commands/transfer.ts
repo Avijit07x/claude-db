@@ -1,5 +1,4 @@
 import type { Observation, ObservationKind, Session } from '../../types.js';
-import type { RecallContext } from '../../context.js';
 import { BATCH } from '../constants.js';
 
 const SESSION_LIMIT = 10000;
@@ -9,35 +8,7 @@ import { loadConfig } from '../../config/index.js';
 import { readFileSync } from 'node:fs';
 import { resolveProject } from '../../util/project.js';
 import { valueOf } from '../args.js';
-
-export async function eachObservation(
-  ctx: RecallContext,
-  filter: { project?: string },
-  visit: (batch: Observation[]) => Promise<void> | void,
-): Promise<number> {
-  let after: number | undefined;
-  let afterId: string | undefined;
-  let total = 0;
-
-  for (;;) {
-    const batch = await ctx.store.list({
-      ...filter,
-      ...(after === undefined ? {} : { after }),
-      ...(afterId === undefined ? {} : { afterId }),
-      limit: BATCH,
-    });
-    if (batch.length === 0) return total;
-
-    await visit(batch);
-    total += batch.length;
-
-    const last = batch[batch.length - 1];
-    if (!last) return total;
-    after = last.createdAt;
-    afterId = last.id;
-    if (batch.length < BATCH) return total;
-  }
-}
+import { eachObservation } from '../../store/each.js';
 
 export async function cmdExport(argv: (string | undefined)[]): Promise<void> {
   const all = argv.includes('--all');

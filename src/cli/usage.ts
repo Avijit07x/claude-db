@@ -18,7 +18,11 @@ export function usage(): void {
   stats                       What this project's memory is made of
   adoption                    How often sessions grep vs use the memory tools
   view [--export <file>]      See this project's memory live in the browser
+  distill [on|off]            Turn chats into facts with Haiku; no argument shows status
+  pick [on|off]               Let Haiku pick the memory shown with each prompt
+  redact                      Re-apply secret redaction to memory already saved
   flush                       Re-ingest every transcript for this project
+        [--repair]            ...only chats that already have memory
   seed --from-git [--limit n] Fill a cold memory from this repo's history
   scan [--force]              Map this repo's symbols and how they connect
   usages [--mode m] <symbol>  Who uses a symbol; --mode usages|explain|path

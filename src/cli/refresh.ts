@@ -1,5 +1,6 @@
 import { BLOCK_START, INSTRUCTIONS, writeInstructions } from './instructions.js';
-import { Scope, instructionsPathFor, skillPathFor } from './paths.js';
+import { refreshHooks } from './install.js';
+import { Scope, instructionsPathFor, settingsPathFor, skillPathFor } from './paths.js';
 import { readText, writeAtomic } from './files.js';
 import { resolve } from 'node:path';
 
@@ -7,6 +8,9 @@ export function refreshInstalled(distDir: string, project: string): string[] {
   const refreshed: string[] = [];
 
   for (const scope of ['project', 'global'] as Scope[]) {
+    const settingsPath = settingsPathFor(scope, project);
+    if (refreshHooks(distDir, settingsPath)) refreshed.push(settingsPath);
+
     const skillPath = skillPathFor(scope, project);
     const current = readText(skillPath);
     if (current.length > 0) {
