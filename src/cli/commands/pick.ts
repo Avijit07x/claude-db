@@ -1,7 +1,7 @@
 import type { Config } from '../../config/index.js';
 import { loadConfig, setConfigValue } from '../../config/index.js';
 import { PICK_BUDGET } from '../../pick/run.js';
-import { budgetUsage } from '../../util/daily-budget.js';
+import { budgetUsage, describePause } from '../../util/daily-budget.js';
 
 export function pickStatus(config: Config, now = Date.now()): string {
   const { pick } = config;
@@ -9,10 +9,8 @@ export function pickStatus(config: Config, now = Date.now()): string {
     return 'pick     : off, prompts get memory only on a strong word match (claude-db pick on)';
   }
   const usage = budgetUsage(PICK_BUDGET, now);
-  const paused =
-    usage.pausedUntil > now
-      ? `, paused until ${new Date(usage.pausedUntil).toISOString()} after a failed call`
-      : '';
+  const pause = describePause(usage, now);
+  const paused = pause ? `, paused ${pause}` : '';
   return `pick     : on (${pick.model}), ${usage.used} of ${pick.dailyLimit} picks used today${paused}`;
 }
 

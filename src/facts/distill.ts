@@ -1,9 +1,10 @@
 import type { RecallContext } from '../context.js';
 import type { Observation } from '../types.js';
 import { embedObservations } from '../capture/flush.js';
-import { runHeadless } from '../util/claude-cli.js';
+import type { HeadlessResult } from '../util/claude-cli.js';
+import { runHeadlessResult } from '../util/claude-cli.js';
 import { formatDay } from '../util/day.js';
-import { pauseDistill, takeDistillCalls } from './budget.js';
+import { recordDistillFailure, recordDistillSuccess, takeDistillCalls } from './budget.js';
 import { FACT_SESSION, factId, factKey, factToObservation, factType, youScope } from './model.js';
 import type { ExistingFact, SetOp } from './ops.js';
 import { buildDistillPrompt, parseOps } from './ops.js';
@@ -19,7 +20,10 @@ const EXISTING_LIMIT = 80;
 const SESSION_ROWS = 1000;
 const TIMEOUT_MS = 120_000;
 
-export type Runner = (prompt: string, model: string, timeoutMs: number) => Promise<string | null>;
+export type Runner = (prompt: string, model: string, timeoutMs: number) => Promise<HeadlessResult>;
+
+type WindowResult =
+  { ok: true; set: number; retired: number; texts: string[] } | { ok: false; reason: string };
 
 export type DistillOutcome = 'distilled' | 'empty' | 'over-budget' | 'failed';
 
@@ -39,7 +43,7 @@ export async function distillSession(
   ctx: RecallContext,
   project: string,
   sessionId: string,
-  run: Runner = runHeadless,
+  run: Runner = runHeadlessResult,
 ): Promise<DistillResult> {
   const rows = (await ctx.store.list({ project, sessionId, limit: SESSION_ROWS })).filter(
     (obs) => obs.status !== 'replaced',
@@ -61,14 +65,15 @@ export async function distillSession(
   let summary: string[] = [];
   for (const window of windows) {
     const applied = await distillWindow(ctx, project, window, source, last.createdAt, run);
-    if (!applied) {
-      pauseDistill();
+    if (!applied.ok) {
+      recordDistillFailure(applied.reason);
       return { outcome: 'failed', set, retired };
     }
     set += applied.set;
     retired += applied.retired;
     if (applied.texts.length > 0) summary = applied.texts;
   }
+  recordDistillSuccess();
 
   const startedAt = rows[0]?.createdAt ?? last.createdAt;
   await markDistilled(ctx, project, sessionId, startedAt, summary.slice(0, 3).join(' | '));
@@ -82,16 +87,12 @@ async function distillWindow(
   source: string,
   at: number,
   run: Runner,
-): Promise<{ set: number; retired: number; texts: string[] } | null> {
+): Promise<WindowResult> {
   const existing = await existingFacts(ctx, project);
-  const stdout = await run(
-    buildDistillPrompt(chat, existing),
-    ctx.config.distill.model,
-    TIMEOUT_MS,
-  );
-  if (stdout === null) return null;
+  const reply = await run(buildDistillPrompt(chat, existing), ctx.config.distill.model, TIMEOUT_MS);
+  if (!reply.ok) return { ok: false, reason: reply.reason };
 
-  const ops = parseOps(stdout);
+  const ops = parseOps(reply.stdout);
   const sets = ops
     .filter((op): op is SetOp => op.op === 'set')
     .map((op): SetOp => (op.type === 'rule' ? op : { ...op, scope: 'project' }));
@@ -105,7 +106,7 @@ async function distillWindow(
     .flatMap((op) => existing.filter((fact) => fact.key === op.key))
     .map((fact) => factId(fact.scope === 'you' ? youScope() : project, fact.key));
   const retired = await ctx.store.markReplaced(retiring);
-  return { set: facts.length, retired, texts: sets.map((op) => op.text) };
+  return { ok: true, set: facts.length, retired, texts: sets.map((op) => op.text) };
 }
 
 export async function pendingSessions(
@@ -122,7 +123,7 @@ export async function pendingSessions(
 export async function backfill(
   ctx: RecallContext,
   project: string,
-  run: Runner = runHeadless,
+  run: Runner = runHeadlessResult,
 ): Promise<BackfillResult> {
   const pending = await pendingSessions(ctx, project);
   let distilled = 0;

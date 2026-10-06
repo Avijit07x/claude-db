@@ -10,6 +10,7 @@ import {
   factCounts,
   pendingSessions,
 } from '../../facts/distill.js';
+import { describePause } from '../../util/daily-budget.js';
 import { finishJob, releaseJob } from '../../util/job-lock.js';
 import { resolveProject } from '../../util/project.js';
 
@@ -67,11 +68,8 @@ async function printStatus(ctx: RecallContext, project: string): Promise<void> {
 
   console.log(`distill  : ${distill.enabled ? 'on' : 'off'} (${distill.model})`);
   console.log(`today    : ${usage.used} of ${distill.dailyLimit} calls used`);
-  if (usage.pausedUntil > Date.now()) {
-    console.log(
-      `paused   : until ${new Date(usage.pausedUntil).toISOString()} after a failed call`,
-    );
-  }
+  const pause = describePause(usage);
+  if (pause) console.log(`paused   : ${pause}`);
   console.log(`facts    : ${facts.project} for this project, ${facts.you} about you`);
   console.log(
     `waiting  : ${(await pendingSessions(ctx, project)).length} chat(s) not yet turned into facts`,
