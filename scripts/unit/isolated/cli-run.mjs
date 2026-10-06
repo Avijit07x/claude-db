@@ -37,13 +37,18 @@ report(
 
 const installed = cli(['install', '--project']);
 const settingsPath = join(project, '.claude', 'settings.local.json');
-const hookFiles = existsSync(settingsPath)
-  ? Object.values(readJson(settingsPath).hooks)
+function registeredHooks(path) {
+  try {
+    return Object.values(readJson(path).hooks)
       .flatMap((entries) =>
         entries.flatMap((entry) => entry.hooks.map((h) => h.command.split('/').pop())),
       )
-      .sort()
-  : [];
+      .sort();
+  } catch {
+    return [];
+  }
+}
+const hookFiles = registeredHooks(settingsPath);
 report(
   'install --project registers every hook in this project only',
   installed.code === 0 &&
