@@ -43,12 +43,12 @@ echo '.mcp.json' >> .gitignore
 
 | Path                          | What it is                                                        |
 | ----------------------------- | ----------------------------------------------------------------- |
-| `.claude/settings.local.json` | Registers the SessionStart, UserPromptSubmit and Stop hooks       |
+| `.claude/settings.local.json` | Registers the SessionStart, UserPromptSubmit, SessionEnd and PreToolUse hooks |
 | `.mcp.json`                   | Registers the server exposing the six [MCP tools](/docs/mcp-tools) |
 | `CLAUDE.local.md`             | A standing instruction to search memory before re-explaining      |
-| `~/.claude/skills/cdb-scan`   | The skill that maps an existing codebase in one pass              |
+| `.claude/skills/cdb-scan`     | The skill that maps an existing codebase in one pass              |
 
-A machine-wide install writes that instruction into `~/.claude/CLAUDE.md` instead.
+A machine-wide install writes that instruction into `~/.claude/CLAUDE.md`, and the skill under `~/.claude/skills/`, instead.
 
 <Callout title="Why a memory file as well as hooks">
 Hook output is context the agent may or may not act on. A memory file is a rule for the whole

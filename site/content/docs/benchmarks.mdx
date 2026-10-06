@@ -1,22 +1,23 @@
-Recall is not free: it costs tokens on every prompt. These are the measured numbers from this
-repository, including the cases where it does not pay off.
+Recall is not free: it costs tokens whenever it fires. These are measured numbers, including the
+cases where it does not pay off. Lookups are measured on this repository; recall is priced by
+replaying 300 real prompts from a project with about 660 memories.
 
 ## The standing cost
 
-Recall costs about 180 tokens a prompt, and is skipped entirely on 28% of prompts because the answer
-is already in context.
+Recall costs about 20 tokens a prompt on average, and nothing at all on 69% of prompts, where no
+earlier chat fits well enough.
 
 ## The refund
 
 Asking who defines and calls `closeObservations` by hand means a grep, then opening three store
 adapters to work out which hits are definitions. One `explain` call answers it already classified:
-**2.1x cheaper**, measured across eight real symbols in this repo.
+**2.0x cheaper**, measured across eight real symbols in this repo.
 
 ```text
-  every prompt costs      180 tokens of recall
-  every lookup refunds    597 tokens   (1,115 by hand - 518 with)
+  every prompt costs       20 tokens of recall
+  every lookup refunds    685 tokens   (1,338 by hand - 653 with)
 
-  so one lookup pays for 3.3 prompts of recall
+  so one lookup pays for 33.9 prompts of recall
 ```
 
 ## Where it loses

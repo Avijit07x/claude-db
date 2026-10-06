@@ -9,8 +9,10 @@ spend time on it.
 
 ## Requirements
 
-- **Node >= 22.5.** Not negotiable: the default store uses `node:sqlite`, which
-  is built in from that version. `postinstall` refuses to run on anything older.
+- **Node >= 22.16.** Not negotiable: the default store uses `node:sqlite`, which
+  loads without a flag from 22.13 and has full-text search (FTS5) from 22.16.
+  `postinstall` refuses to run on anything older. `.nvmrc` pins the major version
+  for `nvm use`.
 - **git**, since `scan` reads tracked files through `git ls-files`.
 - Nothing else. Postgres and MongoDB are optional and only needed if you work on
   those adapters.
@@ -40,15 +42,19 @@ are exercising your own code. Undo it with `node dist/cli/index.js uninstall --p
 
 ## The commands
 
-| command                | what it does                                                   |
-| ---------------------- | -------------------------------------------------------------- |
-| `npm run build`        | compile to `dist/` and copy assets                             |
-| `npm run typecheck`    | `tsc --noEmit`, no output                                      |
-| `npm test`             | the full suite: unit, local, filter, transcript, inject, smoke |
-| `npm run unit`         | just the unit checks — fastest loop                            |
-| `npm run smoke`        | end-to-end against SQLite; pass a URL to test another backend  |
-| `npm run format`       | Prettier over everything                                       |
-| `npm run format:check` | Prettier in check mode, writing nothing                        |
+| command                 | what it does                                                          |
+| ----------------------- | --------------------------------------------------------------------- |
+| `npm run build`         | compile to `dist/`, copy assets, remove stale output                  |
+| `npm run typecheck`     | `tsc --noEmit`, no output                                             |
+| `npm test`              | the full suite: unit, local, filter, transcript, inject, smoke        |
+| `npm run unit`          | just the unit checks — fastest loop                                   |
+| `npm run smoke`         | end-to-end against SQLite; pass a URL to test another backend         |
+| `npm run lint`          | house rules, then ESLint with type-aware rules                        |
+| `npm run knip`          | unused files, exports and dependencies                                |
+| `npm run coverage`      | the full suite under c8; summary in the terminal, lcov in `coverage/` |
+| `npm run check:package` | publint and arethetypeswrong on the packed tarball                    |
+| `npm run format`        | Prettier over everything                                              |
+| `npm run format:check`  | Prettier in check mode, writing nothing                               |
 
 `npm run smoke postgres://user:pass@localhost:5432/memory` (or a
 `mongodb://` URL) runs the same round trip against a real server, if you have
@@ -191,6 +197,7 @@ Before opening one:
 - [ ] `npm run typecheck` is clean
 - [ ] `npm run build` succeeds
 - [ ] `npm test` passes
+- [ ] `npm run lint` and `npm run knip` are clean
 - [ ] `npm run format:check` passes
 - [ ] a check exists that fails without your change
 - [ ] `CHANGELOG.md` has an entry, if the change is user-visible

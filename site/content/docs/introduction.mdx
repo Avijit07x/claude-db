@@ -45,14 +45,16 @@ map your code, and every command and MCP tool you get.
 
 ## What it is not
 
-It is not a cloud service and it is not an account. There is no telemetry, no sign-up, and nothing
-leaves your machine unless you deliberately point it at a remote database. It also does not replace
+It is not a cloud service and it is not an account. There is no telemetry and no sign-up. Memory lives
+in a database you choose; the only outside calls are small Claude Haiku calls through your own Claude
+Code login, one per finished chat and one to pick memory for a prompt that has some (`claude-db
+distill off` and `claude-db pick off` stop them), and a daily update check. It also does not replace
 `CLAUDE.md`: a stable overview of your project belongs there, while claude-db stores the things that
 actually happened.
 
 ## Requirements
 
-Node 22.5 or newer. That is the only hard requirement. SQLite comes from Node's builtin
+Node 22.16 or newer. That is the only hard requirement. SQLite comes from Node's builtin
 `node:sqlite`, and the parser ships as a prebuilt binary, so nothing compiles at install time.
 
 <Callout title="Better embeddings, optional">

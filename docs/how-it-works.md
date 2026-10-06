@@ -36,9 +36,38 @@ for. `claude-db uninstall` takes the block back out.
 file or ran a real command. Questions, `grep`, and "ok" are skipped. A busy day
 produces 10 to 20 rows, not hundreds.
 
-**What gets injected.** Recent session summaries at startup, plus the single
-best match in full on each prompt. Roughly 350 tokens when something relevant
-exists, zero when it doesn't.
+**What gets injected.** Recent session summaries at startup. Above a prompt, at
+most two memories from earlier chats, picked by Claude Haiku:
+
+1. Search finds the ten closest memories from other chats. If none shares at
+   least two content words with the prompt, nothing happens and Haiku is not
+   called.
+2. Haiku reads them with the prompt and the end of Claude's previous reply, and
+   picks only memories that hold something specific for this task. Most prompts
+   get none.
+3. Each pick carries one sentence copied from the memory. The code checks the
+   sentence is really in it, so a pick cannot carry a claim the memory does not
+   make.
+4. The pick runs in the background, so typing is never held up, and reaches
+   Claude with its first tool call. A turn that uses no tools does not get it.
+
+A line looks like `- Oct 1: asked "why does the order feed drop after a minute?": The
+websocket client sends no heartbeat, so the proxy closes an idle connection after
+60 seconds. (id)`: the
+day, the question that memory answered, the copied sentence, and the id
+`get_observations` expands. Nothing from the current chat is repeated back to
+it. Subagent reports, task notifications and slash commands are not prompts, so
+they get nothing.
+
+At most 150 picks a day (`pick.dailyLimit`), and a failed call pauses picking
+for an hour. Without Haiku (off, over the limit, or paused), only a strong word
+match is shown: the closest memory, if it shares four content words with the
+prompt. `claude-db pick off` turns Haiku off; `claude-db pick` shows today's
+count.
+
+**After `/compact`.** Compaction drops the chat's own history, so the start hook
+puts back what this chat decided and what it left uncommitted, under "Earlier in
+this chat".
 
 **What search returns.** An id, kind, date, title and one line of the matching
 body, enough to tell two similarly-titled rows apart without expanding either.
@@ -58,6 +87,43 @@ order is missed during a drop.
 Files: src/ws/client.ts, src/ws/reconnect.ts
 Ran: Test run: pnpm test
 ```
+
+## Facts
+
+A captured turn is a record of what happened, which makes a poor memory on its
+own: its title is whatever sentence Claude happened to write. So when a chat
+ends, one small Claude Haiku call reads the chat's saved rows, together with the
+facts already known, and writes short facts back: a **rule**, a **decision**
+and its reason, a **dead end**, a **to do**, or a lasting **fact**. A fact has
+a stable key, so a later chat updates it in place, and Haiku retires a fact the
+chat shows is no longer true. The raw rows stay as the evidence.
+
+Facts open each chat, as three short sections: about you, this project, and
+where you stopped, each line like `- Decided (Oct 5): All 12 timers fire after
+1.1s. (id)`. They are also what `search` finds, and they travel with the
+database to other machines. Above a prompt, picks come from earlier chats' rows:
+with Haiku picking from either, a picked fact was useful 60% of the time against
+69% for a chat's own rows, so facts are not offered there.
+
+Only a **rule** about how you like to work is filed under you, keyed by your
+git email, so it follows you into every project and never reaches a teammate
+on a shared database. Everything else stays in its project.
+
+The call goes through your own Claude Code login and runs in the background, so
+closing a chat stays instant. At most 30 calls a day; a failed call pauses it
+for a day while capture carries on; a long chat is read in windows of about
+40,000 characters, one call each. `claude-db distill off` turns it off, and
+`claude-db distill` shows what it has done.
+
+Claude Code's own memory files, `~/.claude/projects/<project>/memory/*.md`, are
+imported as facts too, at no AI cost. On the machine where Claude already reads
+them they are not repeated; on another machine sharing the database, they are.
+
+**Upgrading.** The first session after an update repairs memory saved under
+older capture rules, once and in the background: every chat that still has a
+transcript is re-saved, and rows the current rules no longer produce are marked
+replaced, kept but left out of search. Older chats are then turned into facts,
+newest first, within the daily limit.
 
 ## Unfinished work
 

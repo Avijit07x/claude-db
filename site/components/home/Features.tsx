@@ -62,13 +62,13 @@ const TILES: Tile[] = [
       <span className="flex flex-wrap items-baseline gap-x-9 gap-y-3">
         <span className="flex items-baseline gap-2.5">
           <span className="font-mono text-[27px] leading-none font-semibold text-ink tabular-nums">
-            180
+            20
           </span>
           tokens a prompt
         </span>
         <span className="flex items-baseline gap-2.5">
           <span className="font-mono text-[27px] leading-none font-semibold text-accent tabular-nums">
-            597
+            685
           </span>
           saved on a lookup
         </span>

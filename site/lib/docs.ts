@@ -53,7 +53,7 @@ export const DOCS: DocMeta[] = [
   {
     slug: 'privacy',
     title: 'Privacy',
-    description: 'What never leaves your machine, and what is never written down.',
+    description: 'What stays on your machine, what is sent and why, and what is never written down.',
     group: 'Guides',
   },
   {

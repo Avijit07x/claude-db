@@ -17,7 +17,9 @@
   "files": [
     "dist",
     "skills",
-    "docs",
+    "docs/how-it-works.md",
+    "docs/with-and-without.md",
+    "docs/setup-guide.md",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
