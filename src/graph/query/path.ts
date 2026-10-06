@@ -22,7 +22,7 @@ export async function shortestPath(
   };
   const Graph = graphology.default;
   const { bidirectional } = (await import('graphology-shortest-path/unweighted.js')) as unknown as {
-    bidirectional(graph: GraphologyGraph, from: string, to: string): string[] | null;
+    bidirectional: (graph: GraphologyGraph, from: string, to: string) => string[] | null;
   };
 
   const [symbols, edges] = await Promise.all([

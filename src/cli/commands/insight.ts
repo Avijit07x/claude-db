@@ -3,7 +3,7 @@ import { createContext } from '../../context.js';
 import { eachObservation } from '../commands/transfer.js';
 import { resolve } from 'node:path';
 import { resolveProject } from '../../util/project.js';
-import { redact } from '../../capture/turn-extractor.js';
+import { redact } from '../../capture/redact.js';
 
 export async function cmdStats(): Promise<void> {
   const project = resolveProject(undefined);

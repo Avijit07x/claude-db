@@ -5,8 +5,7 @@ import type { Reference } from './extract.js';
 import { listFiles, readSource } from './files.js';
 import { resolveEdges } from './resolve.js';
 
-export type { SourceFile } from './files.js';
-export { SCAN_VERSION, currentHashes, hashOf, listFiles, sourceFiles } from './files.js';
+export { SCAN_VERSION, currentHashes, hashOf } from './files.js';
 
 export interface ScanOptions {
   root: string;

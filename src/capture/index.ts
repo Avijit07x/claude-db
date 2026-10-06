@@ -10,7 +10,9 @@ export {
 } from './transcript.js';
 export type { Turn, TranscriptRead } from './transcript.js';
 export { observationsFromGit } from './git.js';
-export { observationsFromTurns, redact } from './turn-extractor.js';
+export { observationsFromTurns } from './turn-extractor.js';
+export { redact } from './redact.js';
+export { claimScrub, finishScrub, releaseScrub, scrubSecrets } from './scrub.js';
 export {
   flushSession,
   resetCursor,
@@ -21,4 +23,15 @@ export {
 } from './flush.js';
 export type { FlushResult } from './flush.js';
 export { closeLandedWork, openWork } from './progress.js';
+export {
+  REINGEST_VERSION,
+  claimReingest,
+  finishReingest,
+  reingestDone,
+  reingestProject,
+  rememberedTranscripts,
+  reingestSession,
+  releaseReingest,
+} from './reingest.js';
+export type { ProjectReingest, SessionReingest } from './reingest.js';
 export { aiSummary, buildSummaryPrompt, validateSummary } from './summarize.js';

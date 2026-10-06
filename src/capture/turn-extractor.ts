@@ -1,8 +1,9 @@
 import type { Config } from '../config/index.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { classifyCommand } from './command.js';
-import { isSearchable } from '../util/prompt.js';
+import { isSearchable, readablePrompt } from '../util/prompt.js';
 import { currentAuthor, observationId } from './identity.js';
+import { redact } from './redact.js';
 import type { Turn } from './transcript.js';
 
 export function observationsFromTurns(
@@ -13,8 +14,12 @@ export function observationsFromTurns(
 ): Observation[] {
   return turns
     .map(withoutPrivate)
-    .filter((turn) => isSubstantive(turn, config))
-    .map((turn) => buildObservation(turn, sessionId, project, config));
+    .map((turn) => ({
+      id: observationId(sessionId, turn.timestamp, turn.prompt),
+      turn: { ...turn, prompt: readablePrompt(turn.prompt) },
+    }))
+    .filter(({ turn }) => isSubstantive(turn, config))
+    .map(({ id, turn }) => buildObservation(turn, id, sessionId, project, config));
 }
 
 function withoutPrivate(turn: Turn): Turn {
@@ -36,6 +41,7 @@ function answers(reasoning: string): boolean {
 
 function buildObservation(
   turn: Turn,
+  id: string,
   sessionId: string,
   project: string,
   config: Config,
@@ -64,7 +70,7 @@ function buildObservation(
   const kind = classifyTurn(turn);
 
   return {
-    id: observationId(sessionId, turn.timestamp, turn.prompt),
+    id,
     sessionId,
     project,
     ...(author ? { author } : {}),
@@ -219,22 +225,6 @@ function shortPath(path: string): string {
 
 function isExcluded(file: string, patterns: string[]): boolean {
   return patterns.some((pattern) => file.includes(pattern));
-}
-
-const PRIVATE_BLOCK = /<private>[\s\S]*?(?:<\/private>|$)/gi;
-const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g;
-
-export function redact(text: string): string {
-  return text
-    .replace(PRIVATE_BLOCK, '[redacted]')
-    .replace(PRIVATE_KEY, '[redacted-private-key]')
-    .replace(/\/\/[^\s:/@]+:[^\s@]+@/g, '//[redacted]@')
-    .replace(/\b(sk-[A-Za-z0-9_-]{16,})\b/g, '[redacted-key]')
-    .replace(/\b(gh[pousr]_[A-Za-z0-9]{16,})\b/g, '[redacted-token]')
-    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[redacted-key]')
-    .replace(/\bxox[baprs]-[A-Za-z0-9-]{10,}/g, '[redacted-token]')
-    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '[redacted-jwt]')
-    .replace(/(?<=(password|secret|token|api[_-]?key)"?\s*[:=]\s*)"[^"]+"/gi, '"[redacted]"');
 }
 
 function truncate(text: string, max: number): string {

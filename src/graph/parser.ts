@@ -36,6 +36,7 @@ export function loadParser(): AstGrepModule {
         'as a prebuilt binary per platform, so this usually means this one is ' +
         `unsupported: ${process.platform}/${process.arch}. ` +
         `(${error instanceof Error ? error.message.split('\n')[0] : String(error)})`,
+      { cause: error },
     );
   }
 

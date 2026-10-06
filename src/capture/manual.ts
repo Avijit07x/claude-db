@@ -2,7 +2,7 @@ import type { RecallContext } from '../context.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { embedObservations } from './flush.js';
 import { currentAuthor, observationId } from './identity.js';
-import { redact } from './turn-extractor.js';
+import { redact } from './redact.js';
 
 export interface RememberInput {
   project: string;

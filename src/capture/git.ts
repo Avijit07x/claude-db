@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import type { Observation } from '../types.js';
 import { observationId } from './identity.js';
-import { classifyTurn, redact, topLevelDirs } from './turn-extractor.js';
+import { redact } from './redact.js';
+import { classifyTurn, topLevelDirs } from './turn-extractor.js';
 
 const RECORD = '';
 const FIELD = '';

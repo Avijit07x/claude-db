@@ -1,6 +1,6 @@
 import type { CodeSymbol, EdgeRelation } from '../../types.js';
 import { observationId } from '../../capture/identity.js';
-import { redact } from '../../capture/turn-extractor.js';
+import { redact } from '../../capture/redact.js';
 import { callsIn, declarationsIn } from '../languages/index.js';
 import { languageHandle, loadParser } from '../parser.js';
 import type { AstNode } from '../parser.js';
@@ -82,7 +82,7 @@ function extractByPattern(file: SourceFile, project: string): Extraction {
   const references: Reference[] = callsIn(file.source).map((call) => ({
     file: file.path,
     name: call.name,
-    relation: 'calls' as EdgeRelation,
+    relation: 'calls',
     line: call.line,
     from: nearestAbove(call.line, spans),
     weak: true,

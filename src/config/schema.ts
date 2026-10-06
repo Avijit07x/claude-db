@@ -25,14 +25,31 @@ export const ConfigSchema = z.object({
     })
     .prefault({}),
 
+  distill: z
+    .object({
+      enabled: z.boolean().default(true),
+      model: z.enum(['haiku', 'sonnet', 'opus']).default('haiku'),
+      dailyLimit: z.number().int().nonnegative().default(30),
+      backfillDays: z.number().int().positive().default(90),
+    })
+    .prefault({}),
+
+  pick: z
+    .object({
+      enabled: z.boolean().default(true),
+      model: z.enum(['haiku', 'sonnet', 'opus']).default('haiku'),
+      dailyLimit: z.number().int().nonnegative().default(150),
+    })
+    .prefault({}),
+
   inject: z
     .object({
       sessions: z.number().int().nonnegative().default(5),
       maxChars: z.number().int().positive().default(6000),
 
       perPrompt: z.boolean().default(true),
-      promptResults: z.number().int().positive().max(10).default(4),
-      minOverlap: z.number().int().min(0).default(1),
+      promptResults: z.number().int().positive().max(10).default(2),
+      minOverlap: z.number().int().min(0).default(2),
       promptMaxChars: z.number().int().positive().default(700),
       expandTop: z.number().int().min(0).max(3).default(0),
       expandMaxChars: z.number().int().positive().default(900),
