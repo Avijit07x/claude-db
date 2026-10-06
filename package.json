@@ -41,6 +41,7 @@
     "bench": "node scripts/bench.mjs",
     "bench:tokens": "node scripts/bench-tokens.mjs",
     "bench:ab": "node scripts/bench-ab.mjs",
+    "bench:inject": "node scripts/bench-inject.mjs",
     "postinstall": "node -e \"const v=process.versions.node.split('.').map(Number); if(v[0]<22||(v[0]===22&&v[1]<16)){console.error('\\n  claude-db needs Node >= 22.16 (its builtin SQLite has full-text search from there). You have '+process.versions.node+'.\\n');process.exit(1)}\"",
     "prepublishOnly": "npm run build && npm test",
     "format": "prettier --write .",

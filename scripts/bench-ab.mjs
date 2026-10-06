@@ -1,10 +1,26 @@
 import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
+import { silenceSqliteWarning } from '../dist/util/warnings.js';
+import { createContext } from '../dist/context.js';
+import { resolveProject } from '../dist/util/project.js';
+import { replay, replayablePrompts } from './lib/replay.mjs';
+import { headlessPicker } from '../dist/pick/run.js';
+
+silenceSqliteWarning();
 
 const PROJECT = process.cwd();
+const CLI = new URL('../dist/cli/index.js', import.meta.url).pathname;
 const CHARS_PER_TOKEN = 4;
-const INJECTION_PER_PROMPT = 180;
+
+const args = process.argv.slice(2);
+const option = (name) => {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+};
+const RECALL_FROM = resolveProject(option('--recall-from') ?? PROJECT);
+const RECALL_PROMPTS = Number(option('--last')) > 0 ? Number(option('--last')) : 300;
+const PICKING = !args.includes('--no-pick');
 
 const tok = (chars) => Math.round(chars / CHARS_PER_TOKEN);
 const pad = (s, n) => String(s).padEnd(n);
@@ -21,8 +37,28 @@ function sh(cmd, args) {
   }
 }
 
+const cdb = (commandArgs) => sh(process.execPath, ['--no-warnings', CLI, ...commandArgs]);
+
+async function measureRecall() {
+  const prompts = replayablePrompts(RECALL_FROM, RECALL_PROMPTS);
+  if (prompts.length === 0) return null;
+  const ctx = await createContext();
+  try {
+    const { answered, injectedChars } = await replay(ctx, RECALL_FROM, prompts, {
+      picker: PICKING ? headlessPicker(ctx.config) : null,
+    });
+    return {
+      prompts: prompts.length,
+      silent: prompts.length - answered,
+      perPrompt: injectedChars / prompts.length / CHARS_PER_TOKEN,
+    };
+  } finally {
+    await ctx.close();
+  }
+}
+
 function definingFile(symbol) {
-  const explain = sh('claude-db', ['usages', '--mode', 'explain', symbol]);
+  const explain = cdb(['usages', '--mode', 'explain', symbol]);
   const match = /Source: (\S+):/.exec(explain);
   return match?.[1] ?? null;
 }
@@ -66,7 +102,7 @@ rule();
 let withA = 0;
 let withoutA = 0;
 for (const symbol of SYMBOLS) {
-  const explain = sh('claude-db', ['usages', '--mode', 'explain', symbol]).length;
+  const explain = cdb(['usages', '--mode', 'explain', symbol]).length;
   if (explain === 0) continue;
   const grep = sh('git', [
     'grep',
@@ -105,7 +141,7 @@ rule();
 let withB = 0;
 let withoutB = 0;
 for (const [question, term] of QUESTIONS) {
-  const search = sh('claude-db', ['search', question]).length;
+  const search = cdb(['search', question]).length;
   const log = sh('git', ['log', '--oneline', '-S', term, '--all']);
   const top = log.split('\n')[0]?.split(' ')[0];
   const diff = top ? sh('git', ['show', '--stat', top]).length : 0;
@@ -126,9 +162,15 @@ rule();
 const perLookupWith = tok(withA / SYMBOLS.length);
 const perLookupWithout = tok(withoutA / SYMBOLS.length);
 const refund = perLookupWithout - perLookupWith;
-const ratio = INJECTION_PER_PROMPT / refund;
+const recall = await measureRecall();
+if (!recall) {
+  console.log(`  no chats to replay for ${RECALL_FROM}`);
+  console.log('  pass --recall-from <a project with memory> to measure the cost of recall');
+  process.exit(1);
+}
+const ratio = recall.perPrompt / refund;
 
-console.log(`  every prompt costs   ${num(INJECTION_PER_PROMPT, 6)} tokens of recall`);
+console.log(`  every prompt costs   ${num(Math.round(recall.perPrompt), 6)} tokens of recall`);
 console.log(
   `  every lookup refunds ${num(refund, 6)} tokens` +
     `   (${perLookupWithout} by hand - ${perLookupWith} with)`,
@@ -137,15 +179,19 @@ console.log(
   `\n  so one lookup pays for ${(1 / ratio).toFixed(1)} prompts of recall` +
     ` — break even at 1 lookup per ${(1 / ratio).toFixed(0)} prompts`,
 );
+console.log(
+  `  recall measured by replaying ${recall.prompts} prompts from ${RECALL_FROM};` +
+    ` ${Math.round((recall.silent / recall.prompts) * 100)}% of them got nothing`,
+);
 console.log();
 console.log(
   `  ${pad('a session of', 16)}${num('recall costs', 14)}${num('lookups to break even', 23)}`,
 );
 rule();
 for (const prompts of [1, 5, 10, 20, 60]) {
-  const cost = INJECTION_PER_PROMPT * prompts;
+  const cost = recall.perPrompt * prompts;
   console.log(
-    `  ${pad(`${prompts} prompts`, 16)}${num(cost.toLocaleString(), 14)}` +
+    `  ${pad(`${prompts} prompts`, 16)}${num(Math.round(cost).toLocaleString(), 14)}` +
       `${num((cost / refund).toFixed(1), 23)}`,
   );
 }
