@@ -1,15 +1,16 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { aiSummary } from '../../dist/capture/index.js';
+import { describeFailure, runHeadless, runHeadlessResult } from '../../dist/util/claude-cli.js';
 import {
   claudeBinary,
-  describeFailure,
-  runHeadless,
-  runHeadlessResult,
-} from '../../dist/util/claude-cli.js';
+  findClaudeAncestor,
+  rememberClaudeBinary,
+  rememberedBinary,
+} from '../../dist/util/claude-binary.js';
 
 const FAKE_CLAUDE = `#!/usr/bin/env node
 let stdin = '';
@@ -64,12 +65,59 @@ export default async function run() {
     'the running Claude Code binary is preferred',
     claudeBinary({ CLAUDE_CODE_EXECPATH: '/opt/claude' }) === '/opt/claude',
   );
+  const nothing = () => null;
   check(
     'claude on PATH is the fallback',
-    claudeBinary({}) === 'claude' && claudeBinary({ CLAUDE_CODE_EXECPATH: '' }) === 'claude',
+    claudeBinary({}, nothing) === 'claude' &&
+      claudeBinary({ CLAUDE_CODE_EXECPATH: '' }, nothing) === 'claude',
+  );
+  check(
+    'a remembered binary is used when the running one is unknown',
+    claudeBinary({}, () => '/opt/remembered') === '/opt/remembered' &&
+      claudeBinary({ CLAUDE_CODE_EXECPATH: '/opt/claude' }, () => '/opt/remembered') ===
+        '/opt/claude',
   );
 
   const dir = mkdtempSync(join(tmpdir(), 'claude-cli-'));
+  const memory = join(dir, 'claude-binary');
+  const target = join(dir, 'real-claude');
+  writeFileSync(target, FAKE_CLAUDE);
+  chmodSync(target, 0o755);
+  check('nothing is remembered at first', rememberedBinary(memory) === null);
+  rememberClaudeBinary({}, memory, nothing);
+  check('a run that finds no binary remembers nothing', rememberedBinary(memory) === null);
+  rememberClaudeBinary({}, memory, () => target);
+  check('a hook run records the binary it was started by', rememberedBinary(memory) === target);
+  rmSync(memory);
+  rememberClaudeBinary({ CLAUDE_CODE_EXECPATH: target }, memory, nothing);
+  check('the variable is recorded when it is set', rememberedBinary(memory) === target);
+  let searched = 0;
+  rememberClaudeBinary({}, memory, () => (searched++, null));
+  check('a still valid record is not searched for again', searched === 0);
+  check('the record is one line holding the path', readFileSync(memory, 'utf8') === `${target}\n`);
+  const table = {
+    10: { parent: 20, exe: '/usr/bin/dash' },
+    20: { parent: 30, exe: '/opt/editor/native-binary/claude' },
+    30: { parent: 40, exe: '/usr/bin/zsh' },
+    40: { parent: 1, exe: '/usr/bin/code' },
+  };
+  const inspect = (pid) => table[pid] ?? null;
+  check(
+    'the Claude binary is found above the shell a hook runs in',
+    findClaudeAncestor(10, inspect) === '/opt/editor/native-binary/claude',
+  );
+  check(
+    'a start that is Claude itself is found',
+    findClaudeAncestor(20, inspect) === table[20].exe,
+  );
+  check('a chain with no Claude gives nothing', findClaudeAncestor(30, inspect) === null);
+  check('an unknown process stops the search', findClaudeAncestor(99, inspect) === null);
+  const loop = () => ({ parent: 7, exe: '/usr/bin/sh' });
+  check('a loop in the chain cannot hang the search', findClaudeAncestor(7, loop) === null);
+  rmSync(target);
+  check('a binary that is gone is no longer used', rememberedBinary(memory) === null);
+  writeFileSync(memory, '\n');
+  check('an empty record is ignored', rememberedBinary(memory) === null);
   const fake = join(dir, 'claude');
   writeFileSync(fake, FAKE_CLAUDE);
   chmodSync(fake, 0o755);
