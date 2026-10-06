@@ -1,14 +1,20 @@
 import { CONFIG_DIR, loadConfig } from '../../config/index.js';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { checkForUpdate } from '../../update.js';
 import { createContext } from '../../context.js';
 import {
-  flushSession,
+  finishReingest,
+  finishScrub,
   redact,
-  resetCursor,
+  reingestProject,
+  releaseReingest,
+  releaseScrub,
+  rememberedTranscripts,
+  scrubSecrets,
   sweepCursors,
   transcriptsFor,
 } from '../../capture/index.js';
+import type { ProjectReingest } from '../../capture/index.js';
 import { resolveProject } from '../../util/project.js';
 import { rmSync } from 'node:fs';
 
@@ -43,37 +49,55 @@ function clearLocalState(): void {
   rmSync(join(CONFIG_DIR, 'cursors'), { recursive: true, force: true });
 }
 
-export async function cmdFlush(): Promise<void> {
+export async function cmdFlush(argv: (string | undefined)[]): Promise<void> {
   const project = resolveProject(undefined);
+  const repair = argv.includes('--repair');
   const transcripts = transcriptsFor(project);
 
   if (transcripts.length === 0) {
+    finishReingest(project);
     console.error(`No transcripts found for ${project}`);
     process.exit(1);
   }
 
-  const ctx = await createContext();
-  let total = 0;
-
+  let total: ProjectReingest;
   try {
-    for (const path of transcripts) {
-      const sessionId = basename(path, '.jsonl');
-      resetCursor(sessionId);
-      const result = await flushSession(ctx, sessionId, project, path, true);
-      if (result.observations > 0) {
-        console.log(
-          `${sessionId.slice(0, 8)}  ${String(result.observations).padStart(4)} observations`,
-        );
-        total += result.observations;
-      }
-    }
+    total = await reingest(project, transcripts, repair);
+  } catch (error) {
+    releaseReingest(project);
+    throw error;
+  }
+  finishReingest(project);
+
+  console.log(`\n${total.saved} observations from ${total.transcripts} transcript(s).`);
+  if (total.replaced > 0) {
+    console.log(
+      `${total.replaced} older observation(s) saved under the previous capture rules were ` +
+        'marked replaced. They stay in the database but no longer appear in search.',
+    );
+  }
+  const swept = sweepCursors();
+  if (swept > 0) console.log(`Swept ${swept} cursor(s) for transcripts that no longer exist.`);
+}
+
+async function reingest(
+  project: string,
+  transcripts: string[],
+  repair: boolean,
+): Promise<ProjectReingest> {
+  const ctx = await createContext();
+  try {
+    const chosen = repair ? await rememberedTranscripts(ctx, project, transcripts) : transcripts;
+    return await reingestProject(ctx, project, chosen, (result) => {
+      if (result.saved === 0 && result.replaced === 0) return;
+      const replaced = result.replaced > 0 ? `, ${result.replaced} replaced` : '';
+      console.log(
+        `${result.sessionId.slice(0, 8)}  ${String(result.saved).padStart(4)} observations${replaced}`,
+      );
+    });
   } finally {
     await ctx.close();
   }
-
-  console.log(`\n${total} observations from ${transcripts.length} transcript(s).`);
-  const swept = sweepCursors();
-  if (swept > 0) console.log(`Swept ${swept} cursor(s) for transcripts that no longer exist.`);
 }
 
 export async function cmdUpdate(argv: (string | undefined)[]): Promise<void> {
@@ -88,4 +112,26 @@ export async function cmdUpdate(argv: (string | undefined)[]): Promise<void> {
   else if (result.latest && result.latest !== result.current) {
     console.log(`${result.latest} is available (running ${result.current}): ${result.reason}`);
   } else console.log(`Up to date (${result.current}).`);
+}
+
+export async function cmdRedact(argv: (string | undefined)[]): Promise<void> {
+  const background = argv.includes('--background');
+  const ctx = await createContext();
+  const database = ctx.config.database;
+  let result: Awaited<ReturnType<typeof scrubSecrets>>;
+  try {
+    result = await scrubSecrets(ctx);
+  } catch (error) {
+    releaseScrub(database);
+    throw error;
+  } finally {
+    await ctx.close();
+  }
+  finishScrub(database);
+  if (background) return;
+  console.log(
+    result.observations + result.sessions === 0
+      ? 'Nothing to redact: no saved memory holds a secret the current rules catch.'
+      : `Redacted ${result.observations} memory row(s) and ${result.sessions} chat summary(ies).`,
+  );
 }

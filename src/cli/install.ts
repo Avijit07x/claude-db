@@ -22,11 +22,12 @@ function removeSkill(scope: Scope, project: string): void {
   rmSync(dirname(path), { recursive: true, force: true });
 }
 
-const HOOKS: [event: string, file: string, matcher?: string, timeout?: number][] = [
+const HOOKS: [event: string, file: string, matcher?: string | undefined, timeout?: number][] = [
   ['SessionStart', 'session-start.js'],
   ['UserPromptSubmit', 'user-prompt.js'],
   ['SessionEnd', 'session-end.js'],
   ['PreToolUse', 'prefer-usages.js', 'Bash|Grep', 10],
+  ['PreToolUse', 'pick-deliver.js', undefined, 5],
 ];
 
 export function assertStableLocation(distDir: string): void {
@@ -43,19 +44,26 @@ export function assertStableLocation(distDir: string): void {
   );
 }
 
-export function install(distDir: string, scope: Scope, project: string): string {
-  const path = settingsPathFor(scope, project);
-  const settings = readJson(path);
-  const hooks = (settings['hooks'] ?? {}) as Record<string, HookMatcher[]>;
+function withoutOurHooks(entries: HookMatcher[]): HookMatcher[] {
+  return entries
+    .map((entry) => ({
+      ...entry,
+      hooks: entry.hooks.filter((hook) => !isOurHook(hook.command)),
+    }))
+    .filter((entry) => entry.hooks.length > 0);
+}
 
+function withOurHooks(
+  hooks: Record<string, HookMatcher[]>,
+  distDir: string,
+): Record<string, HookMatcher[]> {
+  const merged: Record<string, HookMatcher[]> = {};
+  for (const [event, entries] of Object.entries(hooks)) {
+    const kept = withoutOurHooks(entries);
+    if (kept.length > 0) merged[event] = kept;
+  }
   for (const [event, file, matcher, timeout] of HOOKS) {
-    const kept = (hooks[event] ?? [])
-      .map((entry) => ({
-        ...entry,
-        hooks: entry.hooks.filter((hook) => !isOurHook(hook.command)),
-      }))
-      .filter((entry) => entry.hooks.length > 0);
-    kept.push({
+    (merged[event] ??= []).push({
       ...(matcher ? { matcher } : {}),
       hooks: [
         {
@@ -65,9 +73,32 @@ export function install(distDir: string, scope: Scope, project: string): string 
         },
       ],
     });
-    hooks[event] = kept;
   }
-  settings['hooks'] = hooks;
+  return merged;
+}
+
+export function refreshHooks(distDir: string, path: string): boolean {
+  const settings = readJson(path);
+  const hooks = (settings['hooks'] ?? {}) as Record<string, HookMatcher[]>;
+  const ours = Object.values(hooks)
+    .flatMap((entries) => entries.flatMap((entry) => entry.hooks.map((hook) => hook.command)))
+    .filter(isOurHook);
+  const here = `${hookCommand(distDir, '')}/`;
+  if (ours.length === 0 || !ours.every((command) => command.startsWith(here))) return false;
+
+  const merged = withOurHooks(hooks, distDir);
+  if (JSON.stringify(merged) === JSON.stringify(hooks)) return false;
+  writeJson(path, { ...settings, hooks: merged });
+  return true;
+}
+
+export function install(distDir: string, scope: Scope, project: string): string {
+  const path = settingsPathFor(scope, project);
+  const settings = readJson(path);
+  settings['hooks'] = withOurHooks(
+    (settings['hooks'] ?? {}) as Record<string, HookMatcher[]>,
+    distDir,
+  );
   delete settings['mcpServers'];
   writeJson(path, settings);
 
@@ -109,12 +140,7 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
   const hooks = (settings['hooks'] ?? {}) as Record<string, HookMatcher[]>;
 
   for (const [event, entries] of Object.entries(hooks)) {
-    const kept = entries
-      .map((entry) => ({
-        ...entry,
-        hooks: entry.hooks.filter((hook) => !isOurHook(hook.command)),
-      }))
-      .filter((entry) => entry.hooks.length > 0);
+    const kept = withoutOurHooks(entries);
 
     if (kept.length > 0) hooks[event] = kept;
     else delete hooks[event];
@@ -147,7 +173,11 @@ function hookCommand(distDir: string, file: string): string {
   return `node ${toPosix(resolve(distDir, 'hooks', file))}`;
 }
 
-function isOurHook(command: string): boolean {
+export function ourHookFile(command: string): string | null {
   const path = toPosix(command);
-  return HOOKS.some(([, file]) => path.endsWith(`/hooks/${file}`));
+  return HOOKS.find(([, file]) => path.endsWith(`/hooks/${file}`))?.[1] ?? null;
+}
+
+function isOurHook(command: string): boolean {
+  return ourHookFile(command) !== null;
 }

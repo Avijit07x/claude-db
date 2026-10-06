@@ -5,6 +5,17 @@ import { transcriptsFor } from '../../capture/transcript.js';
 import { resolveProject } from '../../util/project.js';
 import { DECLARED, isSymbol, symbolsGreppedIn } from '../../hooks/grep-symbols.js';
 
+interface TranscriptLine {
+  message?: { content?: unknown };
+}
+
+interface ToolUse {
+  type?: unknown;
+  id?: unknown;
+  name?: unknown;
+  input?: { command?: unknown };
+}
+
 export async function cmdAdoption(): Promise<void> {
   const project = resolveProject(undefined);
   const files = transcriptsFor(project);
@@ -19,21 +30,20 @@ export async function cmdAdoption(): Promise<void> {
   for (const file of files) {
     for (const line of readFileSync(file, 'utf8').split('\n')) {
       if (!line.includes('"tool_use"')) continue;
-      let entry: { message?: { content?: unknown } };
+      let entry: TranscriptLine | null;
       try {
-        entry = JSON.parse(line);
+        entry = JSON.parse(line) as TranscriptLine | null;
       } catch {
         continue;
       }
       const content = entry?.message?.content;
       if (!Array.isArray(content)) continue;
-      for (const item of content) {
+      for (const item of content as (ToolUse | null)[]) {
         if (item?.type !== 'tool_use' || typeof item.id !== 'string' || seen.has(item.id)) continue;
         seen.add(item.id);
         const name = typeof item.name === 'string' ? item.name : '';
-        if (name === 'Bash' && typeof item.input?.command === 'string') {
-          bash.push(item.input.command);
-        }
+        const command = item.input?.command;
+        if (name === 'Bash' && typeof command === 'string') bash.push(command);
         if (name.startsWith('mcp__memory__')) {
           const tool = name.slice('mcp__memory__'.length);
           memory.set(tool, (memory.get(tool) ?? 0) + 1);

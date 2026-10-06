@@ -1,5 +1,5 @@
 import type { ObservationKind } from '../../types.js';
-import { basename, join } from 'node:path';
+import { basename } from 'node:path';
 import { createContext } from '../../context.js';
 import { remember } from '../../capture/index.js';
 import { resolveProject } from '../../util/project.js';

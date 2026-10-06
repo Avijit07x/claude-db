@@ -1,5 +1,5 @@
 import type { MemoryStore } from '../../store/index.js';
-import type { Observation } from '../../types.js';
+import type { Observation, ObservationStatus, Session } from '../../types.js';
 import { BATCH } from '../constants.js';
 import { createContext } from '../../context.js';
 import { createStore } from '../../store/index.js';
@@ -24,16 +24,16 @@ export async function cmdSync(argv: (string | undefined)[]): Promise<void> {
   try {
     await remote.init();
 
-    const localIds = new Set<string>();
+    const localStatus = new Map<string, ObservationStatus>();
     await eachRemoteObservation(local.store, (batch) => {
-      for (const obs of batch) localIds.add(obs.id);
+      for (const obs of batch) localStatus.set(obs.id, obs.status ?? 'done');
     });
 
-    const remoteIds = new Set<string>();
+    const remoteStatus = new Map<string, ObservationStatus>();
     let pulled = 0;
     await eachRemoteObservation(remote, async (batch) => {
-      for (const obs of batch) remoteIds.add(obs.id);
-      const fresh = batch.filter((obs) => !localIds.has(obs.id));
+      for (const obs of batch) remoteStatus.set(obs.id, obs.status ?? 'done');
+      const fresh = batch.filter((obs) => !localStatus.has(obs.id));
       if (fresh.length === 0) return;
       pulled += fresh.length;
       if (confirmed) await local.store.insertObservations(fresh);
@@ -41,23 +41,72 @@ export async function cmdSync(argv: (string | undefined)[]): Promise<void> {
 
     let pushed = 0;
     await eachRemoteObservation(local.store, async (batch) => {
-      const fresh = batch.filter((obs) => !remoteIds.has(obs.id));
+      const fresh = batch.filter((obs) => !remoteStatus.has(obs.id));
       if (fresh.length === 0) return;
       pushed += fresh.length;
       if (confirmed) await remote.insertObservations(fresh);
     });
 
+    const localBehind = statusBehind(localStatus, remoteStatus);
+    const remoteBehind = statusBehind(remoteStatus, localStatus);
+    const moved = count(localBehind) + count(remoteBehind);
+
     if (!confirmed) {
-      console.log(`This would pull ${pulled} and push ${pushed} observation(s).`);
+      console.log(
+        `This would pull ${pulled} and push ${pushed} observation(s), ` +
+          `and bring ${moved} status(es) up to date.`,
+      );
       console.log('\nNothing was transferred. Re-run with --yes to confirm.');
       return;
     }
 
+    await applyStatus(local.store, localBehind);
+    await applyStatus(remote, remoteBehind);
     const sessions = await syncSessions(local.store, remote);
-    console.log(`Pulled ${pulled}, pushed ${pushed}, and reconciled ${sessions} session(s).`);
+    console.log(
+      `Pulled ${pulled}, pushed ${pushed}, brought ${moved} status(es) up to date, ` +
+        `and reconciled ${sessions} session(s).`,
+    );
   } finally {
     await remote.close();
     await local.close();
+  }
+}
+
+const STATUS_ORDER: Record<ObservationStatus, number> = { open: 0, done: 1, replaced: 2 };
+
+interface StatusUpdates {
+  done: string[];
+  replaced: string[];
+}
+
+function statusBehind(
+  mine: Map<string, ObservationStatus>,
+  theirs: Map<string, ObservationStatus>,
+): StatusUpdates {
+  const updates: StatusUpdates = { done: [], replaced: [] };
+  for (const [id, status] of theirs) {
+    const own = mine.get(id);
+    if (own === undefined) continue;
+    const ownRank = STATUS_ORDER[own] ?? -1;
+    const theirRank = STATUS_ORDER[status] ?? -1;
+    if (ownRank < 0 || theirRank <= ownRank) continue;
+    if (status === 'done') updates.done.push(id);
+    if (status === 'replaced') updates.replaced.push(id);
+  }
+  return updates;
+}
+
+function count(updates: StatusUpdates): number {
+  return updates.done.length + updates.replaced.length;
+}
+
+async function applyStatus(store: MemoryStore, updates: StatusUpdates): Promise<void> {
+  for (let start = 0; start < updates.done.length; start += BATCH) {
+    await store.closeObservations(updates.done.slice(start, start + BATCH));
+  }
+  for (let start = 0; start < updates.replaced.length; start += BATCH) {
+    await store.markReplaced(updates.replaced.slice(start, start + BATCH));
   }
 }
 
@@ -74,13 +123,44 @@ async function syncSessions(local: MemoryStore, remote: MemoryStore): Promise<nu
       [remote, local],
     ] as const) {
       for (const session of await from.recentSessions(project, 1000)) {
-        if (await to.getSession(session.id)) continue;
-        await to.upsertSession(session);
-        moved += 1;
+        if (await reconcileSession(session, from, to)) moved += 1;
       }
     }
   }
   return moved;
+}
+
+async function reconcileSession(
+  session: Session,
+  from: MemoryStore,
+  to: MemoryStore,
+): Promise<boolean> {
+  const other = await to.getSession(session.id);
+  if (!other) {
+    await to.upsertSession(session);
+    return true;
+  }
+
+  const ours = session.updatedAt ?? 0;
+  const theirs = other.updatedAt ?? 0;
+  if (other.summary !== session.summary && ours > theirs) {
+    await to.upsertSession(session);
+    return true;
+  }
+  if (other.summary === undefined && theirs > ours) {
+    await from.clearSummary(session.id);
+    return true;
+  }
+  if (session.distilledAt !== undefined && other.distilledAt === undefined) {
+    await to.upsertSession({
+      id: other.id,
+      project: other.project,
+      startedAt: other.startedAt,
+      distilledAt: session.distilledAt,
+    });
+    return true;
+  }
+  return false;
 }
 
 async function eachRemoteObservation(

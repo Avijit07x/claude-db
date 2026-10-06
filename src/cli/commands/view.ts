@@ -20,9 +20,9 @@ export interface ViewData {
 }
 
 async function collect(ctx: RecallContext, project: string): Promise<ViewData> {
-  const all = (await ctx.store.list({ project, limit: 500, newest: true })).sort(
-    (a, b) => b.createdAt - a.createdAt,
-  );
+  const all = (await ctx.store.list({ project, limit: 500, newest: true }))
+    .filter((obs) => obs.status !== 'replaced')
+    .sort((a, b) => b.createdAt - a.createdAt);
   const kinds: Record<string, number> = {};
   for (const obs of all) kinds[obs.kind] = (kinds[obs.kind] ?? 0) + 1;
 
@@ -57,6 +57,29 @@ async function collect(ctx: RecallContext, project: string): Promise<ViewData> {
   };
 }
 
+async function respond(
+  ctx: RecallContext,
+  project: string,
+  rawUrl: string,
+): Promise<{ type: string; body: string }> {
+  const url = new URL(rawUrl, 'http://localhost');
+  if (url.pathname === '/api/data') {
+    return { type: 'application/json', body: JSON.stringify(await collect(ctx, project)) };
+  }
+  if (url.pathname === '/api/search') {
+    const query = url.searchParams.get('q') ?? '';
+    const entries = await ctx.search.search({ text: query, project, limit: 20 });
+    const found = entries.map((entry) => ({
+      id: toShortId(entry.id),
+      kind: entry.kind,
+      when: entry.createdAt,
+      title: entry.title,
+    }));
+    return { type: 'application/json', body: JSON.stringify(found) };
+  }
+  return { type: 'text/html; charset=utf-8', body: renderPage(await collect(ctx, project), true) };
+}
+
 export async function cmdView(args: (string | undefined)[]): Promise<void> {
   const project = resolveProject(undefined);
   const ctx = await createContext();
@@ -70,36 +93,17 @@ export async function cmdView(args: (string | undefined)[]): Promise<void> {
     return;
   }
 
-  const server = createServer(async (req, res) => {
-    try {
-      const url = new URL(req.url ?? '/', 'http://localhost');
-      if (url.pathname === '/api/data') {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(await collect(ctx, project)));
-        return;
-      }
-      if (url.pathname === '/api/search') {
-        const query = url.searchParams.get('q') ?? '';
-        const entries = await ctx.search.search({ text: query, project, limit: 20 });
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(
-          JSON.stringify(
-            entries.map((entry) => ({
-              id: toShortId(entry.id),
-              kind: entry.kind,
-              when: entry.createdAt,
-              title: entry.title,
-            })),
-          ),
-        );
-        return;
-      }
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end(renderPage(await collect(ctx, project), true));
-    } catch (error) {
-      res.writeHead(500, { 'content-type': 'text/plain' });
-      res.end(error instanceof Error ? error.message : String(error));
-    }
+  const server = createServer((req, res) => {
+    respond(ctx, project, req.url ?? '/').then(
+      ({ type, body }) => {
+        res.writeHead(200, { 'content-type': type });
+        res.end(body);
+      },
+      (error: unknown) => {
+        if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' });
+        res.end(error instanceof Error ? error.message : String(error));
+      },
+    );
   });
 
   server.listen(0, '127.0.0.1', () => {

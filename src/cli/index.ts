@@ -8,7 +8,9 @@ import { cmdSync } from './commands/sync.js';
 import { cmdForget, cmdRemember, cmdSearch } from './commands/memory.js';
 import { cmdExport, cmdImport, cmdPrune, cmdReembed } from './commands/transfer.js';
 import { cmdMerge, cmdProjects, cmdStats } from './commands/insight.js';
-import { cmdFlush, cmdReset, cmdUpdate } from './commands/maintain.js';
+import { cmdFlush, cmdRedact, cmdReset, cmdUpdate } from './commands/maintain.js';
+import { cmdDistill } from './commands/distill.js';
+import { cmdPick } from './commands/pick.js';
 import { cmdScan, cmdUsages } from './commands/graph.js';
 import { cmdSeed } from './commands/seed.js';
 import { cmdAdoption } from './commands/adoption.js';
@@ -76,8 +78,17 @@ async function run(): Promise<void> {
     case 'update':
       await cmdUpdate(args);
       break;
+    case 'distill':
+      await cmdDistill(args);
+      break;
+    case 'pick':
+      cmdPick(args);
+      break;
+    case 'redact':
+      await cmdRedact(args);
+      break;
     case 'flush':
-      await cmdFlush();
+      await cmdFlush(args);
       break;
     case 'reset':
       await cmdReset(args);

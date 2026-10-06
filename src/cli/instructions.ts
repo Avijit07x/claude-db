@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { readText, writeAtomic } from './files.js';
 import { rmSync } from 'node:fs';
 
@@ -12,8 +11,10 @@ export const INSTRUCTIONS = [
   '',
   'You have persistent memory of this project: your past sessions, decisions',
   'and their reasoning, served by the `memory` MCP server. Session summaries',
-  'are injected at startup and the best matching observation is injected above',
-  'each prompt, but that is only ever a slice of what you know.',
+  'are injected at startup, and a `<memory>` block, added with a prompt or with',
+  'your first tool call after it, lists earlier work that fits the prompt, each',
+  'line ending in an id `get_observations` expands.',
+  'That is only ever a slice of what you know.',
   '',
   'Recall the rest *before* re-deriving something you already learned. That',
   'means before grepping or reading git history to reconstruct why something is',
