@@ -7,8 +7,10 @@ const HOOK_STDOUT_OWNERS = new Set(['payload.ts']);
 const problems = [];
 const fail = (file, line, rule, detail) => problems.push({ file, line, rule, detail });
 
-function tracked(pattern) {
-  return execFileSync('git', ['ls-files', pattern], { encoding: 'utf8' })
+function sourceFiles(pattern) {
+  return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', pattern], {
+    encoding: 'utf8',
+  })
     .split('\n')
     .filter(Boolean);
 }
@@ -91,7 +93,7 @@ function checkFile(file) {
   });
 }
 
-for (const file of tracked('src/**/*.ts')) checkFile(file);
+for (const file of sourceFiles('src/**/*.ts')) checkFile(file);
 
 if (problems.length > 0) {
   for (const { file, line, rule, detail } of problems) {
@@ -100,4 +102,4 @@ if (problems.length > 0) {
   console.error(`\n${problems.length} lint problem(s).`);
   process.exit(1);
 }
-console.log(`All lint checks passed (${tracked('src/**/*.ts').length} files).`);
+console.log(`All lint checks passed (${sourceFiles('src/**/*.ts').length} files).`);

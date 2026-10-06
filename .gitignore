@@ -1,23 +1,19 @@
 node_modules/
 dist/
 
-# site build output
 site/.next/
 site/out/
 site/next-env.d.ts
 *.tsbuildinfo
 
-# browser-automation scratch
 .playwright-mcp/
 
-# Internal benchmarking and planning notes, not part of the public repo
 SCALING.md
 PLAN*.md
 plan/
 docs/mcp-findings.md
 docs/token-economics.md
 
-# Personal, per-machine agent instructions
 CLAUDE.local.md
 *.log
 .env
@@ -29,7 +25,7 @@ CLAUDE.local.md
 *.db-shm
 .DS_Store
 
-# npm pack output
 *.tgz
 .mcp.json
 .claude
+coverage/
