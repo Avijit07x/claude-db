@@ -1,5 +1,231 @@
 # Changelog
 
+## 0.10.0
+
+### Changed
+
+- **Claude Haiku picks the memory shown with a prompt.** Search finds the ten
+  closest memories from other chats. If one shares two content words with the
+  prompt, Haiku reads them with the prompt and the end of Claude's previous
+  reply, and picks at most two, each with one sentence it must copy from the
+  memory; the code checks the sentence is there. The pick runs in the
+  background and reaches Claude with its first tool call, so typing is never
+  held up. Each line reads `- Oct 1: asked "<earlier question>": <copied
+  sentence> (id)`. Replaying the same 300 real prompts with old and new side by
+  side: 61% to 65% of shown memories judged useful on the final run of the
+  shipped code (70% on the labels the picks were studied with) against 23%, and
+  memory on 30% of prompts instead of 56%. Nothing from the current chat is
+  shown back to it.
+
+- **At most 150 picks a day.** A failed call pauses picking for an hour.
+  Without Haiku (off, over the limit, or paused) only a strong word match is
+  shown: the closest memory, if it shares four content words with the prompt.
+  `claude-db pick [on|off]` turns it off or shows today's count, and `status`
+  reports it. Saved configs still on earlier defaults (`promptResults: 4`,
+  `minOverlap: 1`, or the 0.9 `promptResults: 3`) move to two memories; values
+  you changed are kept.
+
+- **Prompts nobody typed get no memory.** Subagent reports, task
+  notifications, slash commands and local command output matched on noise,
+  useful once in eleven. Image paths are stripped before searching, since their
+  path words matched other image prompts and nothing else.
+
+- **The recall cost is measured, not assumed.** `bench:ab` priced recall with
+  a fixed 180 tokens. It now replays real chats through the prompt hook
+  (`--recall-from <project>`) and runs this build rather than whatever
+  `claude-db` is on `PATH`, with Haiku picking as it ships (`--no-pick` for
+  words only). Measured on 300 prompts: ~20 tokens a prompt, with nothing
+  injected on 69% of them, so one lookup pays for 34 prompts of recall.
+
+  The old figures used the assumed 180 tokens a prompt. Recall now costs about
+  a ninth of that, and one lookup saves 685 tokens (1,338 by hand against 653
+  with it) instead of 597 (1,115 against 518):
+
+  | A session of | Recall cost, before | Recall cost, now | Lookups to break even, before | Lookups to break even, now |
+  | ------------ | ------------------: | ---------------: | ----------------------------: | -------------------------: |
+  | 1 prompt     |                 180 |               20 |                           0.3 |                        0.0 |
+  | 5 prompts    |                 900 |              101 |                           1.5 |                        0.1 |
+  | 10 prompts   |               1,800 |              202 |                           3.0 |                        0.3 |
+  | 20 prompts   |               3,600 |              405 |                           6.0 |                        0.6 |
+  | 60 prompts   |              10,800 |            1,214 |                          18.1 |                        1.8 |
+
+### Added
+
+- **Chats become facts.** When a chat ends, one Claude Haiku call reads its
+  saved rows and the facts already known, and writes back short rules,
+  decisions with their reasons, dead ends, to-dos and lasting facts. Each has a
+  stable key, so a later chat updates it in place, and Haiku retires a fact the
+  chat shows is no longer true. The start of a chat shows them as about you,
+  this project, and where you stopped (`- Decided (Oct 5): ...`), and `search`
+  finds them. Above a prompt, picks come from earlier chats: offered to Haiku,
+  facts were useful 60% of the time against 69% for chat rows. On by default,
+  through your own Claude
+  Code login, in the background: at most 30 calls a day, a day's pause after a
+  failed call, a long chat read in windows of about 40,000 characters, and
+  older chats from the last 90 days turned into facts newest first.
+  `claude-db distill [on|off]` turns it off or shows what it has done, and the
+  first session after updating says so once.
+
+- **Only a rule follows you everywhere.** A rule about how you work is filed
+  under your git email and recalled in every project, and never reaches a
+  teammate on a shared database. Everything else stays in its project, whatever
+  scope the model asked for: on a real database it filed career details as
+  facts about the user.
+
+- **Claude Code's own memory files are imported as facts,** at no AI cost, kept
+  current as the files change and retired when one is deleted. On the machine
+  where Claude already reads them they are not repeated.
+
+- **A setup guide,** `docs/setup-guide.md`, ships with the package: requirements,
+  install, how to check it works, how to give a fresh install a head start, the
+  habits and settings that change results most, what each Haiku feature sends
+  and costs, teams, upkeep and troubleshooting.
+
+- **Existing installs get the new tool-call hook on their own.** The session
+  start refresh that already kept the skill and instructions current now also
+  adds missing claude-db hooks, only in settings files that already point at
+  the same copy of claude-db. No reinstall is needed after updating.
+
+- **`status` reports facts and how many chats are still waiting.**
+
+- **`/compact` no longer loses the chat's own work.** The start hook sees
+  `source: compact`, saves the latest turns, and puts back what the chat decided
+  and left uncommitted under "Earlier in this chat". What the chat had been
+  shown before is forgotten, since compaction just dropped it.
+
+- **MCP server instructions.** A short note on what `<memory>` lines are and
+  when to search, which Claude Code adds to the system prompt for global and
+  project installs alike.
+
+- **`npm run bench:inject`** replays a project's prompts in time order through
+  the hook's own code and reports how many got memory, how much came from the
+  same chat, the cost per prompt, and with `--judge` how much was useful, as a
+  range over two Haiku passes.
+
+### Development
+
+- **ESLint with type-aware rules, knip, c8, publint and arethetypeswrong.**
+  `npm run lint` runs the house rules and ESLint, `npm run knip` finds unused
+  code and packages, `npm run coverage` measures the suite, and
+  `npm run check:package` checks the packed tarball and its types. CI runs all
+  of them, and CodeQL scans every pull request. Fixing what they found removed
+  about a hundred unused imports, typed JSON that was `any`, and kept the cause
+  on rethrown errors.
+
+- **The plan, the results and every finding from this work are in one document,**
+  `docs/memory-improvements.md`, dated 2026-10-06.
+
+- **The MCP tools, the end-of-chat hook and the CLI are tested end to end,**
+  through the real server, hook and binary in a temporary home: install,
+  status, doctor, uninstall, remember, search, forget, export, import, reset,
+  prune, stats, projects, flush, view, pick and use.
+
+- **`npm audit` is clean.** Five advisories in packages the MCP SDK pulls in
+  were patched within their existing ranges.
+
+### Fixed
+
+- **The usefulness judge in `bench:inject` was close to chance.** It graded 20
+  items from different prompts per call and answered by position, so one slip
+  shifted every answer after it; its two passes agreed at kappa 0.14. It now
+  grades one prompt per call, labels every candidate by id without knowing
+  which were shown, sees the end of the previous reply, uses Sonnet by default,
+  and prints the agreement (kappa 0.80 on 2,521 pairs). Usefulness figures in
+  this release were re-measured with it.
+
+- **Secrets written as `NAME=value` are redacted, including in memory already
+  saved.** Redaction caught a value after a name like `token` or `password`
+  only in quotes, so a pasted `GITHUB_TOKEN=...` or `DATABASE_PASSWORD=...` was
+  stored as typed. Unquoted values are now redacted too, when they have a
+  letter and are 8 or more characters, so `MAX_TOKENS=4096` is left alone. The
+  same redaction runs on memory text sent to Haiku and on every line shown with
+  a prompt. Memory saved earlier is cleaned once, in the background, on the
+  first session after updating, for each database; a cleaned chat summary is
+  marked newer so `sync` carries it. `claude-db redact` runs the same clean-up
+  on demand.
+
+- **The real minimum is Node 22.16, and it is now enforced.** claude-db said
+  22.5, and its install check let 22.5 through, but `node:sqlite` needs a flag
+  before 22.13 and has no full-text search (FTS5) before 22.16, so the default
+  database failed on every version below 22.16. Checked on real Node 22.5.1,
+  22.12, 22.13, 22.15 and 22.16 binaries. The install check, `engines`, the docs
+  and CI now say 22.16, CI tests 22.16 itself, and an older Node now gets a
+  plain message instead of `no such module: fts5`.
+
+- **`install --project` warns about `.mcp.json` when there is no `.gitignore`.**
+  It stayed quiet exactly when nothing kept the file out of a commit.
+
+- **The driver install command is right for a global install.** The error and
+  four docs said `npm install pg` or `npm install mongodb`, which a globally
+  installed claude-db does not see. They now say `npm install -g pg` and
+  `npm install -g mongodb`, checked against a packed copy installed into a
+  throwaway prefix. The install page also named the wrong hooks and skill path.
+
+- **`claude-db view` no longer crashes when loading fails.** It sent the
+  success header before loading the data, so a failure tried to send a second
+  header and the unhandled rejection stopped the viewer. It now builds the whole
+  response first.
+
+- **A deleted source could still ship as compiled output.** The build never
+  cleared `dist/`, so a file removed from `src/` stayed in the package. The
+  build now removes compiled files whose source is gone.
+
+- **Two store tests passed without testing anything.** `createStore` was never
+  imported, so the scheme routing checks caught their own `ReferenceError` and
+  passed. They now import it, and the unknown-scheme check requires the real
+  message.
+
+- **`npm run lint` checks new files too,** not only files git already tracks.
+
+- **`sync` now keeps the newer chat summary.** Chats record when their summary
+  was written, so a summary rebuilt on one side, or cleared on purpose, wins over
+  an older copy, and a chat already turned into facts is marked so on both
+  sides.
+
+- **The privacy notes were out of date.** They said nothing leaves your machine
+  and that a configured database is the only network traffic; the daily update
+  check already contacted the npm registry. They now list every outside call and
+  how to turn each one off.
+
+- **VS Code's notes about the open file no longer count as part of a prompt.**
+
+- **A pasted image cost the user's own words.** Claude Code stores an image, a
+  skill's instructions and a subagent report as separate hidden messages after
+  the typed one, and capture started a new turn at each. The work was filed
+  under `Asked: [Image: source: ...]` and the request itself was dropped: 141 of
+  551 rows in one real database. Hidden messages and task notifications no
+  longer start a turn, saved text has image paths removed and slash commands
+  read as `/name args`, and ids still come from the raw prompt so re-ingesting
+  updates rows in place.
+
+- **Memory saved under the old rules is repaired once, in the background.** The
+  first session after updating runs `claude-db flush --repair`: every chat that
+  already has memory and whose transcript is still on disk is re-saved, and rows
+  it no longer produces are marked `replaced`. They stay in the database, and in
+  export and sync, but leave search, the timeline, `view` and `stats`. On the
+  database above: 140 rows replaced, 109 lost requests recovered, nothing else
+  touched. Chats Claude Code has already deleted keep their rows as they are.
+
+- **`sync` carries status across.** It only copied rows the other side lacked,
+  so work closed or replaced on one machine stayed open on the other. Status now
+  moves forward on both sides, open to done to replaced, never back.
+
+- **AI summaries never ran in VS Code,** which does not put `claude` on `PATH`.
+  Headless calls now use the running binary first. They also waited 3 seconds
+  for stdin on every call (8.5s down to 5.1s), and were saved as chats that
+  showed up in `/resume`; both are fixed, with a retry for older CLIs that do
+  not know `--no-session-persistence`.
+
+- **`fatal: not a git repository` leaked from the hooks** in a folder that is
+  not a git repo.
+
+- **Code blocks on the docs site showed a white scrollbar in dark mode.** The
+  page never told the browser its colour scheme, so wide code blocks, the home
+  demo and the command boxes drew the default light scrollbar over a dark
+  surface. The page now sets `color-scheme` for both themes, so the table and
+  sidebar scrollbars follow the theme too, and those three dark surfaces use a
+  thin scrollbar that matches them.
+
 ## 0.9.1
 
 ### Fixed
