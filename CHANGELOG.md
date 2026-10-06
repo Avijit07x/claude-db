@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **A second claude-db process no longer fails with `database is locked`.** The
+  SQLite database was opened with no wait time, so a hook that started while a
+  background job was writing (the clean-up or repair that runs after an update)
+  failed at once, and that session started without its memory block. The
+  connection now waits up to 3 seconds for the lock, which is under the 5 second
+  limit of the shortest hook. It showed up as one flaky macOS test after 0.10.0
+  was merged. SQLite only: Postgres and Mongo manage their own connections.
+
 ## 0.10.0
 
 ### Changed
