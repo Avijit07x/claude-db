@@ -1,3 +1,4 @@
+import '../../lib/require-isolated.mjs';
 import { randomUUID } from 'node:crypto';
 import { report } from '../../lib/isolated.mjs';
 import { ConfigSchema } from '../../../dist/config/index.js';

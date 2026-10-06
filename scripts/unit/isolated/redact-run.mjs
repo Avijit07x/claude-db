@@ -1,3 +1,4 @@
+import '../../lib/require-isolated.mjs';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, realpathSync } from 'node:fs';

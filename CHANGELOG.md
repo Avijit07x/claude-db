@@ -112,6 +112,16 @@
   about a hundred unused imports, typed JSON that was `any`, and kept the cause
   on rethrown errors.
 
+- **Test fixtures cannot hold real secrets or personal paths, and the isolated
+  test scripts cannot touch your real home.** `npm run lint` now also runs
+  `check:fixtures`, which fails on token-like strings, known key prefixes and
+  personal home paths in tracked files. `npm run check:fixtures -- --local`
+  also compares docs and tests with your own saved memory and Claude Code
+  chats and lists any six-word run they share, so private text is caught
+  before a push. The scripts under `scripts/unit/isolated` now refuse to run
+  unless `runIsolated` started them in a temporary home: run by hand, they
+  used the real home and database.
+
 - **The plan, the results and every finding from this work are in one document,**
   `docs/memory-improvements.md`, dated 2026-10-06.
 

@@ -32,6 +32,7 @@ import reingest from './unit/reingest.mjs';
 import syncStatus from './unit/sync-status.mjs';
 import factsOps from './unit/facts-ops.mjs';
 import facts from './unit/facts.mjs';
+import fixtures from './unit/fixtures.mjs';
 import suggest from './unit/suggest.mjs';
 import preferUsages from './unit/prefer-usages.mjs';
 import stopwords from './unit/stopwords.mjs';
@@ -81,6 +82,7 @@ await reingest();
 await syncStatus();
 await factsOps();
 await facts();
+await fixtures();
 await adapters();
 
 report('unit');
