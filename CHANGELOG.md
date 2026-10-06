@@ -2,6 +2,18 @@
 
 ## 0.10.1
 
+### Changed
+
+- **A failed Haiku call now says why, and pauses grow instead of staying fixed.**
+  `status`, `pick` and `distill` print the reason, for example `paused until
+  ... after a failed call: exited with code 1: error: not logged in`, or `timed
+  out after 30 s`, or `claude was not found`. Before, they only said a call
+  failed, and the cause could not be found. The first failure pauses the
+  feature for an hour, a second in a row for six hours, and later ones for a
+  day; a working call resets it. Facts used to lose a whole day to one
+  failure. The command line, which holds the prompt, is never part of the
+  reason.
+
 ### Fixed
 
 - **A second claude-db process no longer fails with `database is locked`.** The

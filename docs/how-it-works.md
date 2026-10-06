@@ -60,7 +60,8 @@ it. Subagent reports, task notifications and slash commands are not prompts, so
 they get nothing.
 
 At most 150 picks a day (`pick.dailyLimit`), and a failed call pauses picking
-for an hour. Without Haiku (off, over the limit, or paused), only a strong word
+for an hour, then six hours, then a day if calls keep failing, and `claude-db status`
+shows why. Without Haiku (off, over the limit, or paused), only a strong word
 match is shown: the closest memory, if it shares four content words with the
 prompt. `claude-db pick off` turns Haiku off; `claude-db pick` shows today's
 count.
@@ -111,7 +112,8 @@ on a shared database. Everything else stays in its project.
 
 The call goes through your own Claude Code login and runs in the background, so
 closing a chat stays instant. At most 30 calls a day; a failed call pauses it
-for a day while capture carries on; a long chat is read in windows of about
+(an hour, then six hours, then a day, with the reason in `claude-db distill`)
+while capture carries on; a long chat is read in windows of about
 40,000 characters, one call each. `claude-db distill off` turns it off, and
 `claude-db distill` shows what it has done.
 
