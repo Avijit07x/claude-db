@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.10.3
+
+### Fixed
+
+- **Picks and facts can now find Claude when `claude` is not on `PATH`.** Both call
+  Claude through its binary. Claude Code does not pass that path to its hooks, so
+  on a machine where `claude` is not on `PATH`, for example when Claude Code runs
+  inside an editor, every call failed with `claude was not found`, and the feature
+  paused. Each hook now looks up the Claude process that started it and saves
+  its path in `~/.claude-memory/claude-binary`. Background jobs and commands run
+  in a terminal use that path when `CLAUDE_CODE_EXECPATH` is not set. A saved path
+  that no longer exists, for example after an editor update, is replaced by the
+  next hook run. Linux and macOS only.
+
 ## 0.10.2
 
 ### Changed
