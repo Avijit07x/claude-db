@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.10.1
+## 0.10.2
 
 ### Changed
 
@@ -13,6 +13,8 @@
   day; a working call resets it. Facts used to lose a whole day to one
   failure. The command line, which holds the prompt, is never part of the
   reason.
+
+## 0.10.1
 
 ### Fixed
 
