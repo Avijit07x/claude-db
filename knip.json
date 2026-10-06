@@ -1,0 +1,21 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/hooks/{session-start,session-end,user-prompt,prefer-usages,pick-deliver}.ts",
+    "src/mcp/server.ts",
+    "src/pick/worker.ts",
+    "scripts/**/*.mjs"
+  ],
+  "project": ["src/**/*.ts", "scripts/**/*.mjs"],
+  "ignoreDependencies": [
+    "@ast-grep/lang-go",
+    "@ast-grep/lang-python",
+    "@ast-grep/lang-ruby",
+    "@ast-grep/lang-rust"
+  ],
+  "ignoreBinaries": ["xdg-open"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreIssues": {
+    "src/mcp/tools/*.ts": ["exports"]
+  }
+}

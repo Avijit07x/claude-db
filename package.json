@@ -23,14 +23,17 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22.5"
+    "node": ">=22.16"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs && node scripts/prune-dist.mjs",
     "dev": "tsc -w -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "node scripts/lint.mjs",
+    "lint": "node scripts/lint.mjs && eslint .",
     "test": "node scripts/unit.mjs && node scripts/local.mjs && node scripts/filter.mjs && node scripts/transcript.mjs && node scripts/inject.mjs && node scripts/smoke.mjs",
+    "coverage": "c8 npm test",
+    "check:package": "npm run build && publint && attw --pack . --profile esm-only",
+    "knip": "knip",
     "smoke": "node scripts/smoke.mjs",
     "unit": "node scripts/unit.mjs",
     "local": "node scripts/local.mjs",
@@ -38,7 +41,7 @@
     "bench": "node scripts/bench.mjs",
     "bench:tokens": "node scripts/bench-tokens.mjs",
     "bench:ab": "node scripts/bench-ab.mjs",
-    "postinstall": "node -e \"const v=process.versions.node.split('.').map(Number); if(v[0]<22||(v[0]===22&&v[1]<5)){console.error('\\n  claude-db needs Node >= 22.5 (node:sqlite is builtin from there). You have '+process.versions.node+'.\\n');process.exit(1)}\"",
+    "postinstall": "node -e \"const v=process.versions.node.split('.').map(Number); if(v[0]<22||(v[0]===22&&v[1]<16)){console.error('\\n  claude-db needs Node >= 22.16 (its builtin SQLite has full-text search from there). You have '+process.versions.node+'.\\n');process.exit(1)}\"",
     "prepublishOnly": "npm run build && npm test",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -55,9 +58,18 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.1",
+    "c8": "^12.0.0",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "knip": "^6.39.0",
     "prettier": "^3.8.0",
-    "typescript": "^5.9.3"
+    "publint": "^0.3.25",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1"
   },
   "keywords": [
     "claude",

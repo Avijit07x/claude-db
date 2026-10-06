@@ -22,8 +22,17 @@ jobs:
       - name: Formatting
         run: npm run format:check
 
-      - name: House rules
+      - name: Lint
         run: npm run lint
+
+      - name: Package contents and types
+        run: npm run check:package
+
+      - name: Unused files, exports and dependencies
+        run: npm run knip
+
+      - name: Coverage
+        run: npm run coverage
 
   test:
     runs-on: ${{ matrix.os }}
@@ -31,7 +40,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node: ['22.x', '24.x']
+        node: ['22.16', '22.x', '24.x']
 
     steps:
       - uses: actions/checkout@v4
