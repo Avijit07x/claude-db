@@ -236,7 +236,8 @@ Nothing leaves your machine except the things below, and each can be turned off.
 
 Both Haiku features go through your own Claude Code login, so they count against your plan like any
 other use. Haiku is the lightest model, and a pick is small next to an ordinary chat turn. A failed
-call pauses that feature, for an hour for picking and a day for facts, while recording carries on.
+call pauses that feature for an hour, then six hours, then a day if calls keep failing, while recording
+carries on. `claude-db status` shows the reason.
 
 What is never stored: `.env` files, anything under `secrets/`, `node_modules` and `.git/`. Text in
 `<private>...</private>` is stripped. API keys, tokens, private keys, connection-string passwords and
