@@ -11,6 +11,7 @@ function uncommittedFiles(project: string): Set<string> | null {
     const raw = execFileSync('git', ['-C', project, 'status', '--porcelain', '-z'], {
       encoding: 'utf8',
       maxBuffer: MAX_BUFFER,
+      stdio: ['ignore', 'pipe', 'ignore'],
     });
     const files = new Set<string>();
     const fields = raw.split('\0');

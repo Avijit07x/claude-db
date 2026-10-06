@@ -6,7 +6,7 @@ import { ruby } from './ruby.js';
 import { rust } from './rust.js';
 import type { LanguageSpec } from './rules.js';
 
-export type { DefinitionRule, LanguageSpec, ReferenceRule } from './rules.js';
+export type { LanguageSpec } from './rules.js';
 
 export const LANGUAGES: LanguageSpec[] = [typescript, tsx, javascript, python, go, rust, ruby];
 

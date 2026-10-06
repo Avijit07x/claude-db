@@ -1,6 +1,7 @@
 import { closeSync, fstatSync, openSync, readdirSync, readSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { isRelayedMessage } from '../util/prompt.js';
 import { resolveProject } from '../util/project.js';
 
 export interface Turn {
@@ -15,12 +16,15 @@ export interface Turn {
 export interface TranscriptRead {
   turns: Turn[];
   nextOffset: number;
+  lastTimestamp: number;
 }
 
 interface RawEntry {
   type?: string;
   timestamp?: string;
   isCompactSummary?: boolean;
+  isMeta?: boolean;
+  origin?: { kind?: string };
   message?: {
     content?: unknown;
   };
@@ -31,7 +35,7 @@ export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
   try {
     fd = openSync(path, 'r');
   } catch {
-    return { turns: [], nextOffset: fromOffset };
+    return { turns: [], nextOffset: fromOffset, lastTimestamp: 0 };
   }
 
   try {
@@ -39,7 +43,7 @@ export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
 
     const start = fromOffset > size ? 0 : fromOffset;
     const length = size - start;
-    if (length <= 0) return { turns: [], nextOffset: size };
+    if (length <= 0) return { turns: [], nextOffset: size, lastTimestamp: 0 };
 
     const buffer = Buffer.allocUnsafe(length);
     const bytesRead = readSync(fd, buffer, 0, length, start);
@@ -63,7 +67,12 @@ export function readTranscript(path: string, fromOffset = 0): TranscriptRead {
     const turns = groupIntoTurns(entries);
     const nextOffset = turns.length > 0 ? (turns[turns.length - 1]?.offset ?? complete) : complete;
 
-    return { turns, nextOffset };
+    const lastTimestamp = entries.reduce((latest, { entry }) => {
+      const at = Date.parse(entry.timestamp ?? '');
+      return Number.isNaN(at) ? latest : Math.max(latest, at);
+    }, 0);
+
+    return { turns, nextOffset, lastTimestamp };
   } finally {
     closeSync(fd);
   }
@@ -80,6 +89,7 @@ function groupIntoTurns(entries: { entry: RawEntry; offset: number }[]): Turn[] 
     if (!Number.isNaN(parsed)) lastKnown = parsed;
 
     if (entry.type === 'user') {
+      if (entry.isMeta || entry.origin?.kind === 'task-notification') continue;
       const text = extractText(entry.message?.content);
       if (!text || entry.isCompactSummary || isSyntheticPrompt(text)) continue;
 
@@ -143,6 +153,8 @@ function isSyntheticPrompt(text: string): boolean {
     text.includes('<system-reminder>') ||
     text.includes('<project-memory>') ||
     text.includes('<recalled-memory>') ||
+    text.startsWith('<memory') ||
+    isRelayedMessage(text) ||
     text.startsWith('Caveat:') ||
     text.startsWith('[Request interrupted') ||
     text.startsWith('<local-command')

@@ -69,7 +69,7 @@ const DECLARATION = new RegExp(
 );
 
 const CALLABLE =
-  /^[\t ]*(?:[A-Za-z_][\w:<>,.\[\]*&\t ]*[\t *&]+)?([A-Za-z_]\w*)[\t ]*\([^;=]*\)[\t ]*(?:const[\t ]*)?\{[\t ]*$/;
+  /^[\t ]*(?:[A-Za-z_][\w:<>,.[\]*&\t ]*[\t *&]+)?([A-Za-z_]\w*)[\t ]*\([^;=]*\)[\t ]*(?:const[\t ]*)?\{[\t ]*$/;
 
 const CALL = /\b([A-Za-z_]\w{2,})[\t ]*\(/g;
 

@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { runHeadless } from '../util/claude-cli.js';
 
 const MAX_INPUT_CHARS = 8000;
 const MAX_OUTPUT_CHARS = 800;
@@ -25,16 +25,6 @@ export function validateSummary(raw: string): string | null {
 
 export async function aiSummary(sessionText: string, model: string): Promise<string | null> {
   if (!sessionText.trim()) return null;
-  return new Promise((done) => {
-    try {
-      execFile(
-        'claude',
-        ['-p', buildSummaryPrompt(sessionText), '--model', model, '--effort', 'low'],
-        { timeout: TIMEOUT_MS, maxBuffer: 1024 * 1024 },
-        (error, stdout) => done(error ? null : validateSummary(stdout)),
-      );
-    } catch {
-      done(null);
-    }
-  });
+  const stdout = await runHeadless(buildSummaryPrompt(sessionText), model, TIMEOUT_MS);
+  return stdout === null ? null : validateSummary(stdout);
 }

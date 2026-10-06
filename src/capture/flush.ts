@@ -10,6 +10,7 @@ import { closeLandedWork } from './progress.js';
 export interface FlushResult {
   observations: number;
   summary: string | null;
+  lastReply: string;
 }
 
 export async function flushSession(
@@ -23,17 +24,18 @@ export async function flushSession(
   const cursor = readCursor(sessionId);
 
   const { turns, nextOffset } = readTranscript(path, cursor);
+  const lastReply = turns.at(-1)?.reasoning ?? '';
   if (turns.length === 0) {
     await closeLandedWork(ctx.store, project);
     writeCursor(sessionId, nextOffset);
-    return { observations: 0, summary: null };
+    return { observations: 0, summary: null, lastReply };
   }
 
   const observations = observationsFromTurns(turns, sessionId, project, ctx.config);
   if (observations.length === 0) {
     await closeLandedWork(ctx.store, project);
     writeCursor(sessionId, nextOffset);
-    return { observations: 0, summary: null };
+    return { observations: 0, summary: null, lastReply };
   }
 
   await embedObservations(ctx, observations);
@@ -50,7 +52,7 @@ export async function flushSession(
   });
 
   writeCursor(sessionId, nextOffset);
-  return { observations: observations.length, summary };
+  return { observations: observations.length, summary, lastReply };
 }
 
 export async function embedObservations(

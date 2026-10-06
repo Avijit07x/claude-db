@@ -20,7 +20,9 @@ export const SCAN_VERSION = 5;
 
 const RULES_FINGERPRINT = createHash('sha256')
   .update(
-    JSON.stringify(LANGUAGES, (_key, value) => (value instanceof RegExp ? String(value) : value)),
+    JSON.stringify(LANGUAGES, (_key, value: unknown) =>
+      value instanceof RegExp ? String(value) : value,
+    ),
   )
   .update(BASIC_FINGERPRINT)
   .digest('hex')
