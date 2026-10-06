@@ -7,6 +7,7 @@ const PROJECT = process.cwd();
 const SLUG = PROJECT.replace(/[/.]/g, '-');
 const TRANSCRIPTS = join(homedir(), '.claude', 'projects', SLUG);
 const CHARS_PER_TOKEN = 4;
+const MEMORY_TAGS = ['memory', 'recalled-memory', 'project-memory'];
 
 const tok = (chars) => Math.round(chars / CHARS_PER_TOKEN);
 const pad = (s, n) => String(s).padEnd(n);
@@ -35,7 +36,7 @@ function measureInjection() {
   for (const file of files) {
     sessions.add(file);
     for (const line of readFileSync(join(TRANSCRIPTS, file), 'utf8').split('\n')) {
-      if (!line.includes('recalled-memory') && !line.includes('project-memory')) continue;
+      if (!MEMORY_TAGS.some((tag) => line.includes(`<${tag}>`))) continue;
       let entry;
       try {
         entry = JSON.parse(line);
@@ -43,9 +44,9 @@ function measureInjection() {
         continue;
       }
       const blob = JSON.stringify(entry.attachment ?? entry.message ?? {});
-      for (const tag of ['recalled-memory', 'project-memory']) {
-        const open = blob.indexOf(tag);
-        const close = blob.indexOf(`/${tag}`);
+      for (const tag of MEMORY_TAGS) {
+        const open = blob.indexOf(`<${tag}>`);
+        const close = blob.indexOf(`</${tag}>`);
         if (open < 0 || close <= open) continue;
         const row = seen.get(tag) ?? { n: 0, chars: 0 };
         row.n += 1;
