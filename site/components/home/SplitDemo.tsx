@@ -22,7 +22,7 @@ const TONE: Record<Tone, string> = {
 
 function Feed({ lines, shown }: { lines: Line[]; shown: number }) {
   return (
-    <div className="min-h-[258px] flex-1 overflow-x-auto bg-term px-[15px] py-3.5 font-mono text-[11px] leading-[1.85] tracking-[-0.03em] text-term-ink">
+    <div className="scroll-term min-h-[258px] flex-1 overflow-x-auto bg-term px-[15px] py-3.5 font-mono text-[11px] leading-[1.85] tracking-[-0.03em] text-term-ink">
       {lines.slice(0, shown).map((line, i) => (
         <span key={i} className={`block whitespace-pre ${TONE[line.tone]}`}>
           {line.text || ' '}

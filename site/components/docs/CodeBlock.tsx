@@ -14,7 +14,7 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
 
   return (
     <div className="group relative mt-5 overflow-hidden rounded-xl border border-rule bg-term">
-      <pre className="m-0 overflow-x-auto px-4 py-3.5 pr-28 font-mono text-[12.5px] leading-[1.8] tracking-[-0.02em] text-term-ink">
+      <pre className="scroll-term m-0 overflow-x-auto px-4 py-3.5 pr-28 font-mono text-[12.5px] leading-[1.8] tracking-[-0.02em] text-term-ink">
         <code>{code}</code>
       </pre>
       <div className="absolute top-[11px] right-3 flex items-center gap-2.5">
