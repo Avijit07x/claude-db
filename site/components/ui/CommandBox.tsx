@@ -13,7 +13,7 @@ export function CommandBox({ command, compact = false }: { command: string; comp
 
   return (
     <div
-      className={`flex items-center overflow-x-auto bg-term font-mono tracking-[-0.03em] text-white ${
+      className={`scroll-term flex items-center overflow-x-auto bg-term font-mono tracking-[-0.03em] text-white ${
         compact
           ? 'gap-2 rounded-lg px-3 py-2.5 text-[11.5px]'
           : 'flex-1 basis-[380px] gap-3 rounded-[10px] border border-rule px-4 py-[15px] text-[clamp(11px,2.1vw,14px)]'
