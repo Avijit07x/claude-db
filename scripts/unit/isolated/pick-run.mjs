@@ -11,7 +11,10 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { expirePause } from '../../lib/budget-files.mjs';
 import { report } from '../../lib/isolated.mjs';
+import { pickStatus } from '../../../dist/cli/commands/pick.js';
+import { ConfigSchema } from '../../../dist/config/index.js';
 import { createContext } from '../../../dist/context.js';
 import { embedObservations } from '../../../dist/capture/index.js';
 import { finishPick, startPick, takeReady } from '../../../dist/pick/pending.js';
@@ -233,7 +236,19 @@ report(
   fallback.includes('Order feed needs a heartbeat') && !fallback.includes('asked "'),
   fallback,
 );
-report('after a failure, picking pauses for a while', budgetUsage('pick').pausedUntil > Date.now());
+const failure = budgetUsage('pick');
+report(
+  'after a failure, picking pauses for an hour',
+  failure.failures === 1 && Math.abs(failure.pausedUntil - Date.now() - 3_600_000) < 60_000,
+  JSON.stringify(failure),
+);
+report(
+  'the reason is kept and status shows it',
+  pickStatus(ConfigSchema.parse({})).includes(
+    'after a failed call: exited with code 1: error: not logged in',
+  ),
+  pickStatus(ConfigSchema.parse({})),
+);
 const paused = prompt(randomUUID(), 'why does the order feed drop after a minute');
 report(
   'while paused, the strong match is shown at once without calling Haiku',
@@ -250,3 +265,15 @@ report(
 );
 const weak = prompt(randomUUID(), 'the order feed looks fine now');
 report('with pick off, a weak match shows nothing', weak.stdout.trim() === '', weak.stdout);
+
+writeConfig({});
+expirePause('pick');
+const recovering = randomUUID();
+prompt(recovering, 'why does the order feed drop after a minute');
+await waitForReady(recovering);
+const recovered = budgetUsage('pick');
+report(
+  'a working pick after a failure clears the streak and the reason',
+  recovered.failures === 0 && recovered.lastFailure === null,
+  JSON.stringify(recovered),
+);

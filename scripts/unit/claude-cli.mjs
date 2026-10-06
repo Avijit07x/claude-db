@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { aiSummary } from '../../dist/capture/index.js';
-import { claudeBinary, runHeadless } from '../../dist/util/claude-cli.js';
+import {
+  claudeBinary,
+  describeFailure,
+  runHeadless,
+  runHeadlessResult,
+} from '../../dist/util/claude-cli.js';
 
 const FAKE_CLAUDE = `#!/usr/bin/env node
 let stdin = '';
@@ -41,6 +46,10 @@ process.stdout.write(JSON.stringify({ argv }));
 const BROKEN_CLAUDE = `#!/usr/bin/env node
 process.stderr.write('error: not logged in\\n');
 process.exit(1);
+`;
+
+const SLOW_CLAUDE = `#!/usr/bin/env node
+setTimeout(() => {}, 30000);
 `;
 
 function script(dir, name, body) {
@@ -132,15 +141,66 @@ export default async function run() {
       (await runHeadless('x', 'haiku', 5_000)) === null,
     );
 
+    const broken = await runHeadlessResult('x', 'haiku', 5_000);
+    check(
+      'a failed call says why: the exit code and the first line of the error',
+      !broken.ok && broken.reason === 'exited with code 1: error: not logged in',
+      broken.ok ? 'ok' : broken.reason,
+    );
+
     process.env.CLAUDE_CODE_EXECPATH = join(dir, 'missing');
     check(
       'a missing binary gives null, not a crash',
       (await runHeadless('x', 'haiku', 5_000)) === null,
     );
+    const missing = await runHeadlessResult('x', 'haiku', 5_000);
+    check(
+      'and says the binary was not found',
+      !missing.ok && missing.reason.startsWith('claude was not found'),
+      missing.ok ? 'ok' : missing.reason,
+    );
+
+    process.env.CLAUDE_CODE_EXECPATH = script(dir, 'slow-claude', SLOW_CLAUDE);
+    const slow = await runHeadlessResult('x', 'haiku', 300);
+    check(
+      'a call that runs out of time says how long it was given',
+      !slow.ok && slow.reason === 'timed out after 300 ms',
+      slow.ok ? 'ok' : slow.reason,
+    );
+
+    process.env.CLAUDE_CODE_EXECPATH = fake;
+    const good = await runHeadlessResult('hello', 'haiku', 5_000);
+    check('a working call returns its output', good.ok && JSON.parse(good.stdout).stdin === '');
   } finally {
     if (saved === undefined) delete process.env.CLAUDE_CODE_EXECPATH;
     else process.env.CLAUDE_CODE_EXECPATH = saved;
   }
+
+  const long = 'x'.repeat(300);
+  check(
+    'a long error line is cut to one short line',
+    describeFailure({ code: 2 }, `\n  ${long}\nsecond`, 1000).length < 150,
+  );
+  check(
+    'a stopped process names the signal',
+    describeFailure({ signal: 'SIGKILL', killed: false }, '', 1000) === 'stopped by SIGKILL',
+  );
+  check(
+    'a reply over the buffer is named',
+    describeFailure({ code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' }, '', 1000).includes('1 MB'),
+  );
+  check(
+    'the command line, which holds the prompt, never reaches the reason',
+    !describeFailure(
+      { code: 1, message: 'Command failed: claude -p PRIVATE-PROMPT' },
+      '',
+      1000,
+    ).includes('PRIVATE'),
+  );
+  check(
+    'an unknown failure still gives a reason',
+    describeFailure(undefined, '', 1000) === 'could not run claude',
+  );
 
   const notRepo = join(dir, 'not-a-repo');
   const probe = spawnSync(
