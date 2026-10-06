@@ -1,7 +1,7 @@
 import '../../lib/require-isolated.mjs';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
@@ -57,6 +57,7 @@ startPick(sessionId, job);
 const env = { ...process.env };
 delete env.CLAUDE_CODE_ENTRYPOINT;
 delete env.CLAUDE_DB_CAPTURE;
+env.CLAUDE_CODE_EXECPATH = process.execPath;
 const run = spawnSync(process.execPath, ['--no-warnings', hook], {
   input: JSON.stringify({
     session_id: sessionId,
@@ -71,6 +72,12 @@ report(
   'the hook exits cleanly and prints nothing',
   run.status === 0 && run.stdout === '',
   run.stderr,
+);
+
+report(
+  'a hook run remembers where Claude Code lives, for commands run outside it',
+  existsSync(join(memoryDir, 'claude-binary')) &&
+    readFileSync(join(memoryDir, 'claude-binary'), 'utf8').trim() === process.execPath,
 );
 
 const ctx = await createContext();
