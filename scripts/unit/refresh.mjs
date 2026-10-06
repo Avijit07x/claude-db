@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
@@ -65,7 +65,12 @@ export default async function run() {
 
   execFileSync(process.execPath, [join(dist, 'hooks', 'session-start.js')], {
     input: JSON.stringify({ cwd: live, session_id: 'refresh-test' }),
-    env: { ...process.env, CLAUDE_DB_URL: join(live, 'memory.db') },
+    env: {
+      ...process.env,
+      HOME: live,
+      CLAUDE_DB_URL: join(live, 'memory.db'),
+      CLAUDE_DB_CAPTURE: 'off',
+    },
     stdio: ['pipe', 'ignore', 'ignore'],
   });
 

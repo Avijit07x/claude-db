@@ -1,9 +1,8 @@
 import { check } from '../lib/check.mjs';
-import { e, now, day } from '../lib/fixtures.mjs';
 
 export default async function run() {
   {
-    const { install, uninstall } = await import('../../dist/cli/install.js');
+    const { install, refreshHooks, uninstall } = await import('../../dist/cli/install.js');
     const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } =
       await import('node:fs');
     const { tmpdir } = await import('node:os');
@@ -39,13 +38,32 @@ export default async function run() {
       ),
     );
 
+    const OURS = [
+      'pick-deliver.js',
+      'prefer-usages.js',
+      'session-end.js',
+      'session-start.js',
+      'user-prompt.js',
+    ];
+    const hookFiles = (value) =>
+      Object.values(value.hooks)
+        .flatMap((entries) =>
+          entries.flatMap((entry) => entry.hooks.map((h) => h.command.split('/').pop())),
+        )
+        .sort();
     const settings = read('.claude/settings.local.json');
     check(
       'install registers every hook exactly once',
-      Object.values(settings.hooks).every((entries) => entries.length === 1),
-      Object.entries(settings.hooks)
-        .map(([k, v]) => `${k}=${v.length}`)
-        .join(' '),
+      JSON.stringify(hookFiles(settings)) === JSON.stringify(OURS),
+      hookFiles(settings).join(' '),
+    );
+    check(
+      'both tool-call hooks are kept: one for Bash and Grep, one for every tool',
+      settings.hooks.PreToolUse.length === 2 &&
+        settings.hooks.PreToolUse[0].matcher === 'Bash|Grep' &&
+        settings.hooks.PreToolUse[1].matcher === undefined &&
+        settings.hooks.PreToolUse[1].hooks[0].command.endsWith('/hooks/pick-deliver.js'),
+      JSON.stringify(settings.hooks.PreToolUse),
     );
     check(
       'hook commands use forward slashes so they are compatible with a shell on Windows',
@@ -84,10 +102,8 @@ export default async function run() {
     const upgraded = read('.claude/settings.local.json');
     check(
       'reinstalling from a new path replaces hooks instead of stacking',
-      Object.values(upgraded.hooks).every((entries) => entries.length === 1),
-      Object.entries(upgraded.hooks)
-        .map(([k, v]) => `${k}=${v.length}`)
-        .join(' '),
+      JSON.stringify(hookFiles(upgraded)) === JSON.stringify(OURS),
+      hookFiles(upgraded).join(' '),
     );
     check(
       'the replacement points at the new path',
@@ -112,5 +128,58 @@ export default async function run() {
     );
 
     rmSync(repo, { recursive: true, force: true });
+
+    const older = mkdtempSync(join(tmpdir(), 'refresh-hooks-'));
+    const at = (file) => ({ type: 'command', command: `node ${dist}/hooks/${file}` });
+    const mine = { type: 'command', command: 'node /home/me/my-hook.js' };
+    const oldSettings = {
+      model: 'opus',
+      hooks: {
+        SessionStart: [{ hooks: [at('session-start.js')] }],
+        UserPromptSubmit: [{ hooks: [at('user-prompt.js')] }],
+        SessionEnd: [{ hooks: [at('session-end.js')] }],
+        PreToolUse: [
+          { matcher: 'Write', hooks: [mine] },
+          { matcher: 'Bash|Grep', hooks: [{ ...at('prefer-usages.js'), timeout: 10 }] },
+        ],
+      },
+    };
+    const oldPath = join(older, 'settings.json');
+    writeFileSync(oldPath, JSON.stringify(oldSettings));
+    check(
+      'an install from before the pick hook is refreshed',
+      refreshHooks(dist, oldPath) === true,
+    );
+    const refreshed = JSON.parse(readFileSync(oldPath, 'utf8'));
+    check(
+      'the refresh adds the missing hook and keeps every other one',
+      JSON.stringify(hookFiles(refreshed)) === JSON.stringify([...OURS, 'my-hook.js'].sort()),
+      hookFiles(refreshed).join(' '),
+    );
+    check(
+      "the refresh keeps the user's own settings and hooks",
+      refreshed.model === 'opus' && refreshed.hooks.PreToolUse[0].hooks[0].command === mine.command,
+    );
+    check('a current install is left alone', refreshHooks(dist, oldPath) === false);
+
+    const elsewhere = join(older, 'elsewhere.json');
+    const otherCopy = JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [
+          { hooks: [{ type: 'command', command: 'node /other/dist/hooks/user-prompt.js' }] },
+        ],
+      },
+    });
+    writeFileSync(elsewhere, otherCopy);
+    check(
+      'hooks that point at another copy of claude-db are never rewritten',
+      refreshHooks(dist, elsewhere) === false && readFileSync(elsewhere, 'utf8') === otherCopy,
+    );
+    check(
+      'a settings file without our hooks is never touched',
+      refreshHooks(dist, join(older, 'missing.json')) === false &&
+        !existsSync(join(older, 'missing.json')),
+    );
+    rmSync(older, { recursive: true, force: true });
   }
 }

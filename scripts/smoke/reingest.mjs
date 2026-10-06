@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 export default async function run(
-  { store, search, project, observations, now, sessionId, expected, uri, dir },
+  { store, search, project, now, sessionId, expected, uri },
   check,
 ) {
   const revised = {

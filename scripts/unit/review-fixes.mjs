@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { check } from '../lib/check.mjs';
-import { extractFile, symbolId } from '../../dist/graph/scan/extract.js';
+import { extractFile } from '../../dist/graph/scan/extract.js';
 import { resolveEdges } from '../../dist/graph/scan/resolve.js';
 import { languageFor } from '../../dist/graph/languages/index.js';
 import { createStore } from '../../dist/store/index.js';
@@ -11,7 +11,7 @@ import { queryGraph } from '../../dist/graph/query/lookup.js';
 import { readTranscript } from '../../dist/capture/index.js';
 import { renderPromptContext } from '../../dist/hooks/relevance.js';
 import { symbolsGreppedIn } from '../../dist/hooks/grep-symbols.js';
-import { redact } from '../../dist/capture/turn-extractor.js';
+import { redact } from '../../dist/capture/redact.js';
 import { findUsages } from '../../dist/usages/find.js';
 
 const ts = languageFor('a.ts');

@@ -79,6 +79,11 @@ const rows = [
     timestamp: at(7),
     message: { content: '<recalled-memory>a1b2 pattern</recalled-memory>' },
   },
+  {
+    type: 'user',
+    timestamp: at(8),
+    message: { content: '<memory>\n- Oct 5: a1b2 pattern (a1b2c3d4-e5f6)\n</memory>' },
+  },
 ];
 writeFileSync(path, rows.map((r) => JSON.stringify(r)).join('\n') + '\n{"torn":');
 
@@ -99,6 +104,7 @@ ck(
 );
 ck('ignores injected pseudo-prompts', !turns.some((t) => t.prompt.includes('system-reminder')));
 ck('ignores our own memory blocks', !turns.some((t) => t.prompt.includes('recalled-memory')));
+ck('ignores the current memory block too', !turns.some((t) => t.prompt.startsWith('<memory>')));
 ck(
   'a compaction summary is not mistaken for a prompt',
   !turns.some((t) => t.prompt.includes('continued from a previous conversation')),

@@ -1,10 +1,7 @@
 import { remember } from '../../dist/capture/index.js';
 import { NoopEmbedder } from '../../dist/embed/index.js';
 
-export default async function run(
-  { store, search, project, observations, now, sessionId, expected, uri, dir },
-  check,
-) {
+export default async function run({ store, search, project }, check) {
   const ctx = { store, embedder: async () => new NoopEmbedder() };
 
   const noted = await remember(ctx, {

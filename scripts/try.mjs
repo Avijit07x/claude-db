@@ -10,7 +10,8 @@ const project = join(dir, 'demo-checkout-app');
 const session = 'demo-session-1';
 
 mkdirSync(project, { recursive: true });
-const env = { ...process.env, CLAUDE_DB_URL: db, NODE_NO_WARNINGS: '1' };
+mkdirSync(join(dir, 'home'));
+const env = { ...process.env, HOME: join(dir, 'home'), CLAUDE_DB_URL: db, NODE_NO_WARNINGS: '1' };
 
 function hook(name, payload) {
   const res = spawnSync('node', [`dist/hooks/${name}.js`], {

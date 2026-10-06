@@ -1,9 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-export default async function run(
-  { store, search, project, observations, now, sessionId, expected, uri, dir },
-  check,
-) {
+export default async function run({ store, project, now, sessionId }, check) {
   const ancient = {
     id: randomUUID(),
     sessionId,
