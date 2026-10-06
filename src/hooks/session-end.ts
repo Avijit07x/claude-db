@@ -16,6 +16,8 @@ import { capturingDisabled, readPayload, runHook } from './payload.js';
 import { loadConfig } from '../config/index.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
+import { distillInBackground } from './background.js';
+import { clearPick, sweepPicks } from '../pick/pending.js';
 
 silenceSqliteWarning();
 
@@ -32,7 +34,7 @@ await runHook(async () => {
     const result = await flushSession(ctx, sessionId, project, payload.transcript_path);
 
     let summary = result.summary;
-    if (ctx.config.capture.summarize === 'on') {
+    if (!ctx.config.distill.enabled && ctx.config.capture.summarize === 'on') {
       const path = payload.transcript_path ?? transcriptPathFor(project, sessionId);
       const { turns } = readTranscript(path, 0);
       const observations = observationsFromTurns(turns, sessionId, project, ctx.config);
@@ -52,6 +54,9 @@ await runHook(async () => {
     });
 
     clearCursor(sessionId);
+    clearPick(sessionId);
+    sweepPicks();
+    if (ctx.config.distill.enabled) distillInBackground(project, sessionId);
 
     if (ctx.config.updates !== 'off' && isDue(readState())) {
       const cli = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'cli', 'index.js');

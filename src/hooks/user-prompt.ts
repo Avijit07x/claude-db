@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-import { flushSession } from '../capture/index.js';
+import { flushSession, redact } from '../capture/index.js';
 import { createContext } from '../context.js';
 import { capturingDisabled, emitContext, readPayload, runHook } from './payload.js';
 import { loadConfig } from '../config/index.js';
 import { markShown, readShown } from './shown.js';
-import { overlapCount, renderPromptContext } from './relevance.js';
-import { isSearchable } from '../util/prompt.js';
+import { promptCandidates, strictRecall, withCost } from './prompt-recall.js';
+import { pickInBackground } from './background.js';
+import { clearPick, startPick } from '../pick/pending.js';
+import { takePick } from '../pick/run.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 
@@ -23,41 +25,36 @@ await runHook(async () => {
   try {
     await ctx.store.upsertSession({ id: sessionId, project, startedAt: Date.now() });
 
-    await flushSession(ctx, sessionId, project, payload.transcript_path);
+    const { lastReply } = await flushSession(ctx, sessionId, project, payload.transcript_path);
 
-    const prompt = payload.prompt ?? '';
-    if (!ctx.config.inject.perPrompt || !isSearchable(prompt)) return;
-
-    const shown = readShown(sessionId);
-    const found = await ctx.search.search({
-      text: prompt,
+    const candidates = await promptCandidates(ctx, {
+      prompt: payload.prompt ?? '',
       project,
-      limit: ctx.config.inject.promptResults,
+      sessionId,
+      shown: readShown(sessionId),
     });
+    if (!candidates) {
+      clearPick(sessionId);
+      return;
+    }
 
-    const floor = ctx.config.inject.minOverlap;
-    const entries = found
-      .filter((entry) => !shown.has(entry.id))
-      .filter((entry) => floor === 0 || overlapCount(prompt, entry) >= floor);
-    if (entries.length === 0) return;
+    const fallback = await strictRecall(ctx, candidates);
+    if (takePick(ctx.config)) {
+      const token = startPick(sessionId, {
+        project,
+        prompt: redact(candidates.prompt),
+        previousReply: redact(lastReply),
+        ids: candidates.entries.map((entry) => entry.id),
+        fallback: fallback ? { text: withCost(fallback.block), ids: fallback.ids } : null,
+      });
+      pickInBackground(project, sessionId, token);
+      return;
+    }
 
-    const toExpand = entries.slice(0, ctx.config.inject.expandTop);
-    const expanded =
-      toExpand.length > 0
-        ? await ctx.search.getObservations(toExpand.map((entry) => entry.id))
-        : [];
-
-    const emitted: string[] = [];
-    const block = renderPromptContext(
-      entries,
-      ctx.config.inject.promptMaxChars,
-      expanded,
-      ctx.config.inject.expandMaxChars,
-      emitted,
-    );
-    if (!block) return;
-    markShown(sessionId, emitted);
-    emitContext(`${block}\n(context ≈ ${Math.round(block.length / 4)} tokens)\n`);
+    clearPick(sessionId);
+    if (!fallback) return;
+    markShown(sessionId, fallback.ids);
+    emitContext(withCost(fallback.block));
   } finally {
     await ctx.close();
   }

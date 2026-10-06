@@ -1,6 +1,6 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { CONFIG_DIR } from '../config/index.js';
+import { CONFIG_DIR } from '../config/dir.js';
 
 const LIMIT = 300;
 
@@ -14,6 +14,10 @@ export function readShown(sessionId: string): Set<string> {
   } catch {
     return new Set();
   }
+}
+
+export function forgetShown(sessionId: string): void {
+  rmSync(shownPath(sessionId), { force: true });
 }
 
 export function markShown(sessionId: string, ids: string[]): void {

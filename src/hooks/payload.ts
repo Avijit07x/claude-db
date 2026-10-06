@@ -3,6 +3,7 @@ export interface HookPayload {
   cwd?: string;
   transcript_path?: string;
   hook_event_name?: string;
+  source?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   tool_response?: unknown;
@@ -16,7 +17,7 @@ export function capturingDisabled(scripted: boolean): boolean {
 
 export async function readPayload(): Promise<HookPayload> {
   const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  for await (const chunk of process.stdin as AsyncIterable<Buffer>) chunks.push(chunk);
   const raw = Buffer.concat(chunks).toString('utf8').trim();
   if (raw.length === 0) return {};
   try {
@@ -37,4 +38,26 @@ export async function runHook(fn: () => Promise<void>): Promise<void> {
 
 export function emitContext(text: string): void {
   if (text.trim().length > 0) process.stdout.write(text);
+}
+
+export function emitToolContext(text: string): void {
+  if (text.trim().length === 0) return;
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: text },
+    }),
+  );
+}
+
+export function emitSessionStart(context: string, notice: string | null): void {
+  if (!notice) {
+    emitContext(context);
+    return;
+  }
+  process.stdout.write(
+    JSON.stringify({
+      systemMessage: notice,
+      hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context },
+    }),
+  );
 }
