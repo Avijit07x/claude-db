@@ -45,7 +45,7 @@ export async function getObservations(
     or.push({ _id: { $regex: `^${escapeRegex(prefix)}` } });
   }
 
-  const docs = await observations.find({ $or: or } as Doc).toArray();
+  const docs = await observations.find({ $or: or }).toArray();
   return docs.map(toObservation);
 }
 
@@ -74,8 +74,8 @@ export async function remove(
     query['$or'] = alternatives;
   }
 
-  const count = await observations.countDocuments(query as Doc);
-  await observations.deleteMany(query as Doc);
+  const count = await observations.countDocuments(query);
+  await observations.deleteMany(query);
   if (isWholeScope(filter)) {
     const scope = filter.project ? { project: filter.project } : {};
     await sessions.deleteMany(scope);
@@ -96,6 +96,7 @@ export async function list(
 ): Promise<Observation[]> {
   const query: Record<string, unknown> = {};
   if (filter.project) query['project'] = filter.project;
+  if (filter.sessionId) query['sessionId'] = filter.sessionId;
   if (filter.kind) query['kind'] = filter.kind;
   if (filter.status) query['status'] = filter.status;
   if (filter.after !== undefined) {
@@ -109,7 +110,7 @@ export async function list(
 
   const direction = filter.newest ? -1 : 1;
   const docs = await observations
-    .find(query as Doc)
+    .find(query)
     .sort({ createdAt: direction, _id: direction })
     .limit(filter.limit ?? 1000)
     .toArray();
@@ -118,10 +119,6 @@ export async function list(
 
 export async function listProjects(
   observations: Collection<ObservationDoc>,
-  sessions: Collection<SessionDoc>,
-  symbols: Collection<SymbolDoc>,
-  edges: Collection<EdgeDoc>,
-  scanned: Collection<ScannedFileDoc>,
 ): Promise<ProjectSummary[]> {
   const rows = await observations
     .aggregate<{ _id: string; n: number; last: number }>([
@@ -145,5 +142,16 @@ export async function closeObservations(
   const filter = { _id: { $in: ids }, status: 'open' } as Doc;
   const n = await observations.countDocuments(filter);
   await observations.updateMany(filter, { $set: { status: 'done' } });
+  return n;
+}
+
+export async function markReplaced(
+  observations: Collection<ObservationDoc>,
+  ids: string[],
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const filter = { _id: { $in: ids }, status: { $ne: 'replaced' } } as Doc;
+  const n = await observations.countDocuments(filter);
+  await observations.updateMany(filter, { $set: { status: 'replaced' } });
   return n;
 }

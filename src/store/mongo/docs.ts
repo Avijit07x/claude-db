@@ -15,6 +15,8 @@ export interface SessionDoc extends Doc {
   startedAt: number;
   endedAt?: number;
   summary?: string;
+  updatedAt?: number;
+  distilledAt?: number;
 }
 
 export interface ObservationDoc extends Doc {
@@ -84,6 +86,8 @@ export function toSession(doc: SessionDoc): Session {
   };
   if (doc.endedAt !== undefined) session.endedAt = doc.endedAt;
   if (doc.summary !== undefined) session.summary = doc.summary;
+  if (doc.updatedAt !== undefined) session.updatedAt = doc.updatedAt;
+  if (doc.distilledAt !== undefined) session.distilledAt = doc.distilledAt;
   return session;
 }
 

@@ -1,6 +1,5 @@
 import * as vectorSearchOps from './vectorSearch.js';
 import * as searchOps from './search.js';
-import { scopeFilter } from './filters.js';
 import type { VectorCache } from './filters.js';
 import * as observationsOps from './observations.js';
 import * as sessionsOps from './sessions.js';
@@ -21,25 +20,10 @@ import type {
 } from '../../types.js';
 import type { Collection, Db, Doc, MongoClient } from './driver.js';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
-import {
-  EdgeDoc,
-  ObservationDoc,
-  ScannedFileDoc,
-  SessionDoc,
-  SymbolDoc,
-  toDoc,
-  toEdge,
-  toIndexEntry,
-  toObservation,
-  toSession,
-  toSymbol,
-  upsertsOf,
-} from './docs.js';
-import { cosine } from '../../util/vector.js';
-import { databaseNameFrom, escapeRegex } from './helpers.js';
-import { foreignNames, isWholeScope } from '../adapter.js';
+import { EdgeDoc, ObservationDoc, ScannedFileDoc, SessionDoc, SymbolDoc } from './docs.js';
+import { databaseNameFrom } from './helpers.js';
+import { foreignNames } from '../adapter.js';
 import { importMongo } from './driver.js';
-import { partitionIds } from '../../util/shortid.js';
 
 export class MongoStore implements MemoryStore {
   readonly kind = 'mongodb';
@@ -162,19 +146,13 @@ export class MongoStore implements MemoryStore {
   }
 
   async listProjects(): Promise<ProjectSummary[]> {
-    return observationsOps.listProjects(
-      this.observations,
-      this.sessions,
-      this.symbols,
-      this.edges,
-      this.scanned,
-    );
+    return observationsOps.listProjects(this.observations);
   }
 
   async inventory(): Promise<string[]> {
     const res = await this.db.command({ listCollections: 1, nameOnly: true });
     const batch = (res['cursor'] as { firstBatch?: Doc[] } | undefined)?.firstBatch ?? [];
-    return foreignNames(batch.map((doc) => String(doc['name'] ?? '')));
+    return foreignNames(batch.map((doc) => (typeof doc['name'] === 'string' ? doc['name'] : '')));
   }
 
   async searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]> {
@@ -187,6 +165,10 @@ export class MongoStore implements MemoryStore {
 
   async closeObservations(ids: string[]): Promise<number> {
     return observationsOps.closeObservations(this.observations, ids);
+  }
+
+  async markReplaced(ids: string[]): Promise<number> {
+    return observationsOps.markReplaced(this.observations, ids);
   }
 
   async timeline(query: TimelineQuery): Promise<ObservationIndexEntry[]> {

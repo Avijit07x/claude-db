@@ -49,6 +49,7 @@ export function appendScope(
   params: unknown[],
   prefix: string,
 ): void {
+  conditions.push(`${prefix}status != 'replaced'`);
   if (query.project) {
     conditions.push(`${prefix}project = ?`);
     params.push(query.project);
@@ -68,6 +69,12 @@ export function appendScope(
   if (query.until !== undefined) {
     conditions.push(`${prefix}created_at <= ?`);
     params.push(query.until);
+  }
+  if (query.excludeSessions && query.excludeSessions.length > 0) {
+    conditions.push(
+      `${prefix}session_id NOT IN (${query.excludeSessions.map(() => '?').join(',')})`,
+    );
+    params.push(...query.excludeSessions);
   }
 }
 

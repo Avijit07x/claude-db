@@ -17,7 +17,7 @@ export async function searchKeyword(
   const match = toMatchExpression(query.text, query.project);
   if (match === null) return [];
 
-  const conditions = ['observations_fts MATCH ?'];
+  const conditions = ['observations_fts MATCH ?', "o.status != 'replaced'"];
   const params: unknown[] = [match];
   if (query.kind) {
     conditions.push('o.kind = ?');
@@ -34,6 +34,10 @@ export async function searchKeyword(
   if (query.until !== undefined) {
     conditions.push('o.created_at <= ?');
     params.push(query.until);
+  }
+  if (query.excludeSessions && query.excludeSessions.length > 0) {
+    conditions.push(`o.session_id NOT IN (${query.excludeSessions.map(() => '?').join(',')})`);
+    params.push(...query.excludeSessions);
   }
   params.push(query.limit);
 
@@ -103,13 +107,13 @@ export async function timeline(
     .prepare(
       `SELECT id, kind, title, project, created_at, 0 AS score FROM (
            SELECT * FROM observations
-           WHERE project = ? AND created_at <= ?
+           WHERE project = ? AND created_at <= ? AND status != 'replaced'
            ORDER BY created_at DESC LIMIT ?
          )
          UNION
          SELECT id, kind, title, project, created_at, 0 AS score FROM (
            SELECT * FROM observations
-           WHERE project = ? AND created_at > ?
+           WHERE project = ? AND created_at > ? AND status != 'replaced'
            ORDER BY created_at ASC LIMIT ?
          )
          ORDER BY created_at ASC`,

@@ -2,7 +2,7 @@ import type { Collection, Doc } from './driver.js';
 import type { ObservationIndexEntry, SearchQuery, TimelineQuery } from '../../types.js';
 import type { ObservationDoc } from './docs.js';
 import { toIndexEntry } from './docs.js';
-import { scopeFilter } from './filters.js';
+import { scopeFilter, visibleFilter } from './filters.js';
 
 export async function searchKeyword(
   observations: Collection<ObservationDoc>,
@@ -11,6 +11,7 @@ export async function searchKeyword(
   const filter: Doc = {
     $text: { $search: query.text },
     ...scopeFilter(query),
+    ...visibleFilter(query),
   };
 
   const docs = await observations
@@ -45,14 +46,28 @@ export async function timeline(
 
   const [before, after] = await Promise.all([
     observations
-      .find({ project: anchor.project, createdAt: { $lte: anchor.createdAt } }, { projection })
+      .find(
+        {
+          project: anchor.project,
+          createdAt: { $lte: anchor.createdAt },
+          status: { $ne: 'replaced' },
+        },
+        { projection },
+      )
       .sort({ createdAt: -1 })
       .limit(query.before + 1)
       .toArray(),
     query.after <= 0
       ? Promise.resolve([])
       : observations
-          .find({ project: anchor.project, createdAt: { $gt: anchor.createdAt } }, { projection })
+          .find(
+            {
+              project: anchor.project,
+              createdAt: { $gt: anchor.createdAt },
+              status: { $ne: 'replaced' },
+            },
+            { projection },
+          )
           .sort({ createdAt: 1 })
           .limit(query.after)
           .toArray(),

@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   project    TEXT NOT NULL,
   started_at INTEGER NOT NULL,
   ended_at   INTEGER,
-  summary    TEXT
+  summary    TEXT,
+  updated_at INTEGER,
+  distilled_at INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_project

@@ -29,7 +29,8 @@ export async function ensureTagsIndexed(pool: Pool): Promise<void> {
        JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
        WHERE d.adrelid = 'observations'::regclass AND a.attname = 'tsv'`,
   );
-  const expr = String(res.rows[0]?.['expr'] ?? '');
+  const value = res.rows[0]?.['expr'];
+  const expr = typeof value === 'string' ? value : '';
   if (expr.includes('tags')) return;
 
   const client = await pool.connect();

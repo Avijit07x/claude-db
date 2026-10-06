@@ -1,6 +1,7 @@
 import type { SearchQuery } from '../../types.js';
 
 export function appendScope(query: SearchQuery, conditions: string[], values: unknown[]): void {
+  conditions.push("status <> 'replaced'");
   if (query.project) {
     values.push(query.project);
     conditions.push(`project = $${values.length}`);
@@ -20,5 +21,9 @@ export function appendScope(query: SearchQuery, conditions: string[], values: un
   if (query.until !== undefined) {
     values.push(query.until);
     conditions.push(`created_at <= $${values.length}`);
+  }
+  if (query.excludeSessions && query.excludeSessions.length > 0) {
+    values.push(query.excludeSessions);
+    conditions.push(`session_id <> ALL($${values.length}::text[])`);
   }
 }

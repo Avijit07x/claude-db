@@ -2,6 +2,7 @@ import type { Collection } from './driver.js';
 import type { Session } from '../../types.js';
 import type { SessionDoc } from './docs.js';
 import { toSession } from './docs.js';
+import { summaryTime } from '../session-time.js';
 
 export async function upsertSession(
   sessions: Collection<SessionDoc>,
@@ -10,6 +11,9 @@ export async function upsertSession(
   const set: Partial<SessionDoc> = { project: session.project };
   if (session.endedAt !== undefined) set.endedAt = session.endedAt;
   if (session.summary !== undefined) set.summary = session.summary;
+  const updatedAt = summaryTime(session);
+  if (updatedAt !== null) set.updatedAt = updatedAt;
+  if (session.distilledAt !== undefined) set.distilledAt = session.distilledAt;
 
   await sessions.updateOne(
     { _id: session.id },
@@ -27,7 +31,10 @@ export async function getSession(
 }
 
 export async function clearSummary(sessions: Collection<SessionDoc>, id: string): Promise<boolean> {
-  const result = (await sessions.updateOne({ _id: id }, { $unset: { summary: '' } })) as {
+  const result = (await sessions.updateOne(
+    { _id: id, summary: { $type: 'string' } },
+    { $unset: { summary: '' }, $set: { updatedAt: Date.now() } },
+  )) as {
     modifiedCount?: number;
   };
   return (result.modifiedCount ?? 0) > 0;

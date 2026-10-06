@@ -2,7 +2,6 @@ import * as insertOps from './insert.js';
 import * as metaOps from './meta.js';
 import * as vectorSearchOps from './vectorSearch.js';
 import * as searchOps from './search.js';
-import { appendScope } from './filters.js';
 import * as observationsOps from './observations.js';
 import * as sessionsOps from './sessions.js';
 import * as graphOps from './graph.js';
@@ -22,10 +21,7 @@ import type {
 } from '../../types.js';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
 import { Pool, importPg } from './driver.js';
-import { DDL, SCHEMA_VERSION, TSV_EXPRESSION } from './schema.js';
-import { foreignNames, isWholeScope } from '../adapter.js';
-import { partitionIds } from '../../util/shortid.js';
-import { toEdge, toIndexEntry, toObservation, toSession, toSymbol } from './rows.js';
+import { DDL, SCHEMA_VERSION } from './schema.js';
 
 export class PostgresStore implements MemoryStore {
   readonly kind = 'postgres';
@@ -199,6 +195,10 @@ export class PostgresStore implements MemoryStore {
 
   async closeObservations(ids: string[]): Promise<number> {
     return observationsOps.closeObservations(this.pool, ids);
+  }
+
+  async markReplaced(ids: string[]): Promise<number> {
+    return observationsOps.markReplaced(this.pool, ids);
   }
 
   async timeline(query: TimelineQuery): Promise<ObservationIndexEntry[]> {

@@ -2,28 +2,35 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { Session } from '../../types.js';
 import type { Row } from './rows.js';
 import { toSession } from './rows.js';
+import { summaryTime } from '../session-time.js';
 
 export async function upsertSession(db: DatabaseSync, session: Session): Promise<void> {
   db.prepare(
-    `INSERT INTO sessions (id, project, started_at, ended_at, summary)
-         VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO sessions (id, project, started_at, ended_at, summary, updated_at, distilled_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
-           project  = excluded.project,
-           ended_at = COALESCE(excluded.ended_at, sessions.ended_at),
-           summary  = COALESCE(excluded.summary,  sessions.summary)`,
+           project      = excluded.project,
+           ended_at     = COALESCE(excluded.ended_at,     sessions.ended_at),
+           summary      = COALESCE(excluded.summary,      sessions.summary),
+           updated_at   = COALESCE(excluded.updated_at,   sessions.updated_at),
+           distilled_at = COALESCE(excluded.distilled_at, sessions.distilled_at)`,
   ).run(
     session.id,
     session.project,
     session.startedAt,
     session.endedAt ?? null,
     session.summary ?? null,
+    summaryTime(session),
+    session.distilledAt ?? null,
   );
 }
 
 export async function clearSummary(db: DatabaseSync, id: string): Promise<boolean> {
   const result = db
-    .prepare('UPDATE sessions SET summary = NULL WHERE id = ? AND summary IS NOT NULL')
-    .run(id);
+    .prepare(
+      'UPDATE sessions SET summary = NULL, updated_at = ? WHERE id = ? AND summary IS NOT NULL',
+    )
+    .run(Date.now(), id);
   return Number(result.changes) > 0;
 }
 
@@ -49,5 +56,7 @@ export async function recentSessions(
 
 export async function sessionProjects(db: DatabaseSync): Promise<string[]> {
   const rows = db.prepare('SELECT DISTINCT project FROM sessions').all() as Row[];
-  return rows.map((row) => String(row['project'] ?? '')).filter((project) => project.length > 0);
+  return rows
+    .map((row) => (typeof row['project'] === 'string' ? row['project'] : ''))
+    .filter((project) => project.length > 0);
 }

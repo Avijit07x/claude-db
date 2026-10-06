@@ -25,6 +25,8 @@ export function toSession(row: Row): Session {
   };
   if (row['ended_at'] != null) session.endedAt = Number(row['ended_at']);
   if (row['summary'] != null) session.summary = row['summary'] as string;
+  if (row['updated_at'] != null) session.updatedAt = Number(row['updated_at']);
+  if (row['distilled_at'] != null) session.distilledAt = Number(row['distilled_at']);
   return session;
 }
 

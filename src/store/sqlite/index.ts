@@ -9,7 +9,6 @@ import type {
   ListFilter,
   Observation,
   ObservationIndexEntry,
-  ObservationKind,
   RemoveFilter,
   ScannedFile,
   SearchQuery,
@@ -19,21 +18,10 @@ import type {
 } from '../../types.js';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
 import { DatabaseSync } from 'node:sqlite';
-import { Row, toBuffer, toEdge, toIndexEntry, toObservation, toSession, toSymbol } from './rows.js';
-import {
-  TAG_PREDICATE,
-  appendScope,
-  removeWhere,
-  toFilePath,
-  toMatchExpression,
-} from './filters.js';
-import { cosine, packVector, unpackVector } from '../../util/vector.js';
+import { toFilePath } from './filters.js';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { foreignNames, isWholeScope } from '../adapter.js';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { partitionIds } from '../../util/shortid.js';
-import { scopeToken } from '../../util/scope.js';
 
 export const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -49,7 +37,16 @@ export class SqliteStore implements MemoryStore {
   }
 
   async init(): Promise<void> {
-    this.db.exec(readFileSync(resolve(HERE, 'schema.sql'), 'utf8'));
+    try {
+      this.db.exec(readFileSync(resolve(HERE, 'schema.sql'), 'utf8'));
+    } catch (error) {
+      if (!/no such module: fts5/i.test(String(error))) throw error;
+      throw new Error(
+        `This Node's SQLite has no full-text search (FTS5), which claude-db needs. ` +
+          `Use Node 22.16 or newer; this is ${process.versions.node}.`,
+        { cause: error },
+      );
+    }
 
     const row = this.db.prepare('PRAGMA user_version').get() as
       { user_version?: number } | undefined;
@@ -69,7 +66,14 @@ export class SqliteStore implements MemoryStore {
         } catch {}
       }
     }
-    if (version < 3) this.db.exec('PRAGMA user_version = 3');
+    if (version < 4) {
+      for (const column of ['updated_at INTEGER', 'distilled_at INTEGER']) {
+        try {
+          this.db.exec(`ALTER TABLE sessions ADD COLUMN ${column}`);
+        } catch {}
+      }
+    }
+    if (version < 4) this.db.exec('PRAGMA user_version = 4');
   }
 
   async close(): Promise<void> {
@@ -134,6 +138,10 @@ export class SqliteStore implements MemoryStore {
 
   async closeObservations(ids: string[]): Promise<number> {
     return observationsOps.closeObservations(this.db, ids);
+  }
+
+  async markReplaced(ids: string[]): Promise<number> {
+    return observationsOps.markReplaced(this.db, ids);
   }
 
   async timeline(query: TimelineQuery): Promise<ObservationIndexEntry[]> {

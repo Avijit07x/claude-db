@@ -1,8 +1,8 @@
-import type { Collection } from './driver.js';
+import type { Collection, Doc } from './driver.js';
 import type { ObservationIndexEntry, SearchQuery } from '../../types.js';
 import type { ObservationDoc } from './docs.js';
 import { toIndexEntry } from './docs.js';
-import { scopeFilter } from './filters.js';
+import { scopeFilter, visibleFilter } from './filters.js';
 import type { VectorCache } from './filters.js';
 import * as searchOps from './search.js';
 import { cosine } from '../../util/vector.js';
@@ -17,6 +17,13 @@ export async function searchVector(
     cache.atlasVectorIndex = await searchOps.hasAtlasVectorIndex(observations);
   }
 
+  const refine: Doc = {
+    ...(query.embedder
+      ? { $or: [{ embedder: query.embedder }, { embedder: { $exists: false } }] }
+      : {}),
+    ...visibleFilter(query),
+  };
+
   if (cache.atlasVectorIndex) {
     const docs = await observations
       .aggregate<ObservationDoc & { score: number }>([
@@ -30,13 +37,7 @@ export async function searchVector(
             filter: scopeFilter(query),
           },
         },
-        ...(query.embedder
-          ? [
-              {
-                $match: { $or: [{ embedder: query.embedder }, { embedder: { $exists: false } }] },
-              },
-            ]
-          : []),
+        ...(Object.keys(refine).length > 0 ? [{ $match: refine }] : []),
         {
           $project: {
             kind: 1,
@@ -55,9 +56,7 @@ export async function searchVector(
     .find(
       {
         embedding: { $exists: true },
-        ...(query.embedder
-          ? { $or: [{ embedder: query.embedder }, { embedder: { $exists: false } }] }
-          : {}),
+        ...refine,
         ...scopeFilter(query),
       },
       { projection: { kind: 1, title: 1, project: 1, createdAt: 1, embedding: 1 } },

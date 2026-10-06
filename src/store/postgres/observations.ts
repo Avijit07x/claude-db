@@ -97,6 +97,10 @@ export async function list(pool: Pool, filter: ListFilter): Promise<Observation[
     values.push(filter.project);
     conditions.push(`project = $${values.length}`);
   }
+  if (filter.sessionId) {
+    values.push(filter.sessionId);
+    conditions.push(`session_id = $${values.length}`);
+  }
   if (filter.kind) {
     values.push(filter.kind);
     conditions.push(`kind = $${values.length}`);
@@ -145,7 +149,7 @@ export async function inventory(pool: Pool): Promise<string[]> {
     `SELECT tablename AS name FROM pg_tables
        WHERE schemaname = ANY(current_schemas(false))`,
   );
-  return foreignNames(res.rows.map((row) => String(row['name'] ?? '')));
+  return foreignNames(res.rows.map((row) => (typeof row['name'] === 'string' ? row['name'] : '')));
 }
 
 export async function timeline(pool: Pool, query: TimelineQuery): Promise<ObservationIndexEntry[]> {
@@ -158,12 +162,12 @@ export async function timeline(pool: Pool, query: TimelineQuery): Promise<Observ
   const res = await pool.query(
     `(SELECT id, kind, title, project, created_at, 0 AS score
         FROM observations
-        WHERE project = $1 AND created_at <= $2
+        WHERE project = $1 AND created_at <= $2 AND status <> 'replaced'
         ORDER BY created_at DESC LIMIT $3)
        UNION
        (SELECT id, kind, title, project, created_at, 0 AS score
         FROM observations
-        WHERE project = $1 AND created_at > $2
+        WHERE project = $1 AND created_at > $2 AND status <> 'replaced'
         ORDER BY created_at ASC LIMIT $4)
        ORDER BY created_at ASC`,
     [anchor.project, anchor.created_at, query.before + 1, query.after],
@@ -176,6 +180,16 @@ export async function closeObservations(pool: Pool, ids: string[]): Promise<numb
   const res = await pool.query(
     `UPDATE observations SET status = 'done'
      WHERE status = 'open' AND id = ANY($1::text[])`,
+    [ids],
+  );
+  return res.rowCount ?? 0;
+}
+
+export async function markReplaced(pool: Pool, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const res = await pool.query(
+    `UPDATE observations SET status = 'replaced'
+     WHERE status <> 'replaced' AND id = ANY($1::text[])`,
     [ids],
   );
   return res.rowCount ?? 0;
