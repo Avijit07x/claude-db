@@ -13,6 +13,19 @@ import * as usages from './tools/usages.js';
 
 silenceSqliteWarning();
 
+const INSTRUCTIONS = [
+  'Persistent memory of this project from earlier sessions: decisions, dead ends, fixes and the',
+  'reasoning behind them.',
+  '',
+  '- A <memory> block, added with a prompt or with your first tool call after it, lists earlier',
+  '  work that fits the prompt, one line each. The id at the end of a line opens the full record',
+  '  with get_observations.',
+  '- Call search before re-deriving why code is the way it is, before saying you lack context, and',
+  '  before asking the user to re-explain a past decision or a failed approach.',
+  '- Use find_usages, not grep, to look up a code symbol and what depends on it.',
+  '- When the user states a standing rule or preference, record it with remember.',
+].join('\n');
+
 function packageVersion(): string {
   try {
     const path = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
@@ -23,7 +36,10 @@ function packageVersion(): string {
 }
 
 const ctx = await createContext();
-const server = new McpServer({ name: 'claude-db', version: packageVersion() });
+const server = new McpServer(
+  { name: 'claude-db', version: packageVersion() },
+  { instructions: INSTRUCTIONS },
+);
 
 for (const tools of [search, memory, observations, usages]) tools.register(server, ctx);
 

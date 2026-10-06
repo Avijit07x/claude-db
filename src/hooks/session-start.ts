@@ -4,12 +4,16 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createContext } from '../context.js';
-import { openWork } from '../capture/index.js';
+import { distillNotice } from '../facts/notice.js';
+import { startFacts } from '../facts/start.js';
 import type { MemoryStore } from '../store/index.js';
-import { emitContext, readPayload, runHook } from './payload.js';
+import { startBackgroundWork } from './background.js';
+import { recoverAfterCompact } from './compact.js';
+import { capturingDisabled, emitSessionStart, readPayload, runHook } from './payload.js';
+import { markShown } from './shown.js';
+import { legacyBlock } from './start-legacy.js';
 import { resolveProject } from '../util/project.js';
 import { mentionsPath } from '../util/paths.js';
-import { toShortId } from '../util/shortid.js';
 import { refreshInstalled } from '../cli/refresh.js';
 import { updateNotice } from '../update.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
@@ -17,6 +21,10 @@ import { silenceSqliteWarning } from '../util/warnings.js';
 silenceSqliteWarning();
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'mcp', 'server.js');
+
+const SCAN_HINT =
+  'Code graph not built yet — run `claude-db scan` once to enable ' +
+  'find_usages and the symbol-grep hook.';
 
 async function refreshGraphQuietly(store: MemoryStore, project: string): Promise<void> {
   try {
@@ -55,73 +63,35 @@ await runHook(async () => {
 
   const ctx = await createContext();
   try {
-    const sessions = await ctx.store.recentSessions(project, ctx.config.inject.sessions);
-    const scanned = (await ctx.store.scannedFiles(project)).length;
-    const scanHint =
-      'Code graph not built yet — run `claude-db scan` once to enable ' +
-      'find_usages and the symbol-grep hook.';
+    const capturing = !capturingDisabled(ctx.config.capture.scripted);
+    if (capturing) startBackgroundWork(project, ctx.config.database);
 
-    if (sessions.length === 0) {
-      emitContext(
-        '<project-memory>none yet for this project; ' +
-          'it is recorded as you work</project-memory>\n' +
-          (scanned === 0 ? `${scanHint}\n` : ''),
-      );
-      return;
-    }
+    const earlier =
+      payload.source === 'compact' && payload.session_id
+        ? await recoverAfterCompact(ctx, project, payload.session_id, payload.transcript_path)
+        : null;
+    const restored = earlier?.ids ?? new Set<string>();
 
-    const lines = ['<project-memory>'];
-    let budget = ctx.config.inject.maxChars;
+    const facts = await startFacts(ctx, project, restored);
+    const legacy = facts ? null : await legacyBlock(ctx, project, restored);
+    if (facts && payload.session_id) markShown(payload.session_id, [...facts.ids]);
 
-    for (const session of sessions) {
-      const when = new Date(session.startedAt).toISOString().slice(0, 10);
-      const line = `- [${when}] ${session.summary ?? ''}`;
-      if (line.length > budget) break;
-      budget -= line.length;
-      lines.push(line);
-    }
-
-    const open = await openWork(ctx.store, project);
-    if (open.length > 0) {
-      lines.push('');
-      lines.push('Not committed yet, newest first:');
-      for (const obs of open.slice(0, 3)) {
-        lines.push(`- ${obs.title}`);
-      }
-    }
-
-    const rules = (await ctx.store.list({ project, kind: 'preference', limit: 100, newest: true }))
-      .sort((a, b) => {
-        const manual = Number(b.sessionId === 'manual') - Number(a.sessionId === 'manual');
-        return manual !== 0 ? manual : b.createdAt - a.createdAt;
-      })
-      .slice(0, 8);
-    if (rules.length > 0) {
-      lines.push('');
-      lines.push('Standing rules on record — expand any id with get_observations:');
-      for (const obs of rules) {
-        const when = new Date(obs.createdAt).toISOString().slice(0, 10);
-        const line = `- ${toShortId(obs.id)} [${when}] ${obs.title}`.slice(0, 140);
-        if (line.length > budget) break;
-        budget -= line.length;
-        lines.push(line);
-      }
-    }
-
-    lines.push('</project-memory>');
-    if (mcpRegistered(project)) {
-      lines.push(
+    const parts = [earlier?.block, facts?.block ?? legacy?.text].filter((part): part is string =>
+      Boolean(part),
+    );
+    if ((facts || legacy?.hasMemory) && mcpRegistered(project)) {
+      parts.push(
         "Search this project's full history with the memory MCP tools before " +
           'asking the user to re-explain prior decisions.',
       );
     }
-    if (scanned === 0) lines.push(scanHint);
+    if ((await ctx.store.scannedFiles(project)).length === 0) parts.push(SCAN_HINT);
+    const update = ctx.config.updates === 'off' ? null : updateNotice();
+    if (update) parts.push(update);
 
-    const notice = ctx.config.updates === 'off' ? null : updateNotice();
-    if (notice) lines.push(notice);
-
-    const body = lines.join('\n');
-    emitContext(`${body}\n(context ≈ ${Math.round(body.length / 4)} tokens)\n`);
+    const body = parts.join('\n');
+    const notice = capturing ? await distillNotice(ctx, project) : null;
+    emitSessionStart(`${body}\n(context ≈ ${Math.round(body.length / 4)} tokens)\n`, notice);
     await refreshGraphQuietly(ctx.store, project);
   } finally {
     await ctx.close();
