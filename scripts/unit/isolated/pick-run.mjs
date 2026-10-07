@@ -177,6 +177,16 @@ report('the background pick finishes', await waitForReady(live));
 
 const [call] = calls();
 const sent = call?.argv[call.argv.indexOf('-p') + 1] ?? '';
+report(
+  'the pick asks for Haiku 5.5 by its full name',
+  call?.argv[call.argv.indexOf('--model') + 1] === 'claude-haiku-5-5',
+  call?.argv.join(' '),
+);
+report(
+  'status names Haiku 5.5 and the haiku it falls back to',
+  pickStatus(ConfigSchema.parse({})).includes('on (claude-haiku-5-5, else haiku)'),
+  pickStatus(ConfigSchema.parse({})),
+);
 report('Haiku runs with thinking off', call?.thinking === '0', JSON.stringify(call));
 report(
   'Haiku runs with a short system prompt, no tools and no MCP servers',
