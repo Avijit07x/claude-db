@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ScannedFile } from '../../types.js';
 import { hashOf, sourceFiles } from '../scan/files.js';
@@ -6,12 +6,19 @@ import { hashOf, sourceFiles } from '../scan/files.js';
 const MTIME_SLACK_MS = 2000;
 
 function changedSinceScan(root: string, entry: ScannedFile): boolean {
+  let fd: number;
   try {
-    const path = join(root, entry.path);
-    if (statSync(path).mtimeMs <= entry.scannedAt - MTIME_SLACK_MS) return false;
-    return hashOf(readFileSync(path)) !== entry.hash;
+    fd = openSync(join(root, entry.path), 'r');
   } catch {
     return true;
+  }
+  try {
+    if (fstatSync(fd).mtimeMs <= entry.scannedAt - MTIME_SLACK_MS) return false;
+    return hashOf(readFileSync(fd)) !== entry.hash;
+  } catch {
+    return true;
+  } finally {
+    closeSync(fd);
   }
 }
 
