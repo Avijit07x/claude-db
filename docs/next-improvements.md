@@ -350,6 +350,10 @@ Handoff, Oct 6:
 
 ## 7. Match projects by git link
 
+**Status: in progress.** The design and the 10 steps are in [improve-project-key.md](./improve-project-key.md).
+Step 1 is done. The design differs from the plan below: `resolveProject()` stays a folder, and a separate key is
+added at the store.
+
 Designed in Phase 5a of [memory-improvements.md](./memory-improvements.md). Not started.
 
 **Problem.** A project is keyed by its folder path, for example `/home/dev/Code/shop`. The same repository on
