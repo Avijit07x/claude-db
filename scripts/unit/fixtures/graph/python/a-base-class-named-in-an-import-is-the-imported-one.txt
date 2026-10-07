@@ -1,0 +1,17 @@
+=== a.py
+class Base:
+    pass
+=== b.py
+class Base:
+    pass
+=== main.py
+from b import Base
+
+class Child(Base):
+    pass
+=== expected
+symbol a.py:1 Base class
+symbol b.py:1 Base class
+symbol main.py:3 Child class
+edge main.py:1 main.py imports Base -> b.py:1 Base EXTRACTED 1
+edge main.py:3 Child extends Base -> b.py:1 Base EXTRACTED 1

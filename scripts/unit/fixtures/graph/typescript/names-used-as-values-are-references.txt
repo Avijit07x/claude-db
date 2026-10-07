@@ -1,0 +1,24 @@
+=== src/a.ts
+export function redact() { return 1; }
+=== src/b.ts
+import { redact } from './a';
+export const mapped = list.map(redact);
+export function withDefault(run = redact) { return run; }
+export const picked = cond ? redact : other;
+export type Tool = typeof redact;
+redact();
+=== expected
+symbol src/a.ts:1 redact function
+symbol src/b.ts:2 mapped const
+symbol src/b.ts:3 withDefault function
+symbol src/b.ts:4 picked const
+symbol src/b.ts:5 Tool type
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports redact -> src/a.ts:1 redact EXTRACTED 1
+edge src/b.ts:2 src/b.ts calls list.map -> nothing EXTRACTED 1
+edge src/b.ts:2 src/b.ts references list -> nothing EXTRACTED 1
+edge src/b.ts:2 src/b.ts references redact -> src/a.ts:1 redact EXTRACTED 1
+edge src/b.ts:3 withDefault references redact -> src/a.ts:1 redact EXTRACTED 1
+edge src/b.ts:4 src/b.ts references redact -> src/a.ts:1 redact EXTRACTED 1
+edge src/b.ts:5 src/b.ts references redact -> src/a.ts:1 redact EXTRACTED 1
+edge src/b.ts:6 src/b.ts calls redact -> src/a.ts:1 redact EXTRACTED 1

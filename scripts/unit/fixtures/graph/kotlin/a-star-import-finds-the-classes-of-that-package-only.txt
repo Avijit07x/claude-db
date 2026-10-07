@@ -1,0 +1,24 @@
+=== src/m/Item.kt
+package m
+
+class Item
+=== src/m/Other.kt
+package m
+
+class Other
+=== src/u/Use.kt
+package u
+
+import m.*
+
+class Use {
+  val a: Item? = null
+  val b: Other? = null
+  val c: Missing? = null
+}
+=== expected
+symbol src/m/Item.kt:3 Item class
+symbol src/m/Other.kt:3 Other class
+symbol src/u/Use.kt:5 Use class
+edge src/u/Use.kt:6 Use references Item -> src/m/Item.kt:3 Item EXTRACTED 1
+edge src/u/Use.kt:7 Use references Other -> src/m/Other.kt:3 Other EXTRACTED 1

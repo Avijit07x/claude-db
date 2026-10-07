@@ -1,0 +1,11 @@
+=== src/a.ts
+export function join() { return 1; }
+=== src/b.ts
+import { join } from 'node:path';
+export const p = join('a', 'b');
+=== expected
+symbol src/a.ts:1 join function
+symbol src/b.ts:2 p const
+edge src/b.ts:1 src/b.ts imports join -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports node:path -> nothing EXTRACTED 1
+edge src/b.ts:2 src/b.ts calls join -> src/a.ts:1 join INFERRED 0.95

@@ -1,0 +1,21 @@
+=== Cargo.toml
+[package]
+name = "app"
+version = "0.1.0"
+=== src/lib.rs
+pub struct Display;
+pub fn read() {}
+=== src/user.rs
+use std::fmt::Display;
+use std::fs::read;
+
+fn go() {
+    read();
+}
+=== expected
+symbol src/lib.rs:1 Display class
+symbol src/lib.rs:2 read function
+symbol src/user.rs:4 go function
+edge src/user.rs:1 src/user.rs imports Display -> nothing EXTRACTED 1
+edge src/user.rs:2 src/user.rs imports read -> nothing EXTRACTED 1
+edge src/user.rs:5 go calls read -> nothing EXTRACTED 1

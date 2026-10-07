@@ -1,0 +1,23 @@
+=== a.py
+def make():
+    return 1
+=== b.py
+def make():
+    return 2
+=== main.py
+def first():
+    from a import make as build
+    return build()
+
+def second():
+    from b import make as build
+    return build()
+=== expected
+symbol a.py:1 make function
+symbol b.py:1 make function
+symbol main.py:1 first function
+symbol main.py:5 second function
+edge main.py:2 first imports make -> a.py:1 make EXTRACTED 1
+edge main.py:3 first calls make -> a.py:1 make EXTRACTED 1
+edge main.py:6 second imports make -> b.py:1 make EXTRACTED 1
+edge main.py:7 second calls make -> b.py:1 make EXTRACTED 1

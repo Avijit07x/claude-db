@@ -73,6 +73,7 @@ export function repoRootFor(start: string): string {
   try {
     return execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], {
       encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
   } catch (error) {
     const stderr = (error as { stderr?: string }).stderr?.trim();

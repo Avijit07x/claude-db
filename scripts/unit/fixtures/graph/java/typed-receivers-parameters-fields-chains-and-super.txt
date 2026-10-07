@@ -1,0 +1,125 @@
+=== src/a/Base.java
+package a;
+
+public class Base {
+  public void close() {}
+}
+=== src/a/Item.java
+package a;
+
+public class Item {
+  public String name() { return ""; }
+}
+=== src/a/Store.java
+package a;
+
+public class Store extends Base {
+  public Item find(String id) { return null; }
+  public static Store of(int n) { return null; }
+  public static Store of(String s) { return null; }
+  public void save(Item item) { close(); }
+  public void close() { super.close(); }
+  interface Listener {
+    void changed();
+  }
+}
+=== src/b/Other.java
+package b;
+
+public class Other {
+  public Object find(String id) { return null; }
+  public void close() {}
+  public void changed() {}
+  public int length() { return 0; }
+  public String name() { return ""; }
+}
+=== src/b/Use.java
+package b;
+
+import a.Item;
+import a.Store;
+import java.util.List;
+
+class Use {
+  private final Store store = new Store();
+  void run(Store s, String text, List<Item> items, Store.Listener listener) {
+    s.find("x");
+    store.find("y").name();
+    this.store.close();
+    text.length();
+    Store.of(1);
+    var made = new Store();
+    made.close();
+    var found = s.find("z");
+    found.name();
+    listener.changed();
+    items.forEach(item -> item.name());
+  }
+}
+=== expected
+symbol src/a/Base.java:3 Base class
+symbol src/a/Base.java:4 close method
+symbol src/a/Item.java:3 Item class
+symbol src/a/Item.java:4 name method
+symbol src/a/Store.java:3 Store class
+symbol src/a/Store.java:4 find method
+symbol src/a/Store.java:5 of method
+symbol src/a/Store.java:6 of method
+symbol src/a/Store.java:7 save method
+symbol src/a/Store.java:8 close method
+symbol src/a/Store.java:9 Listener interface
+symbol src/a/Store.java:10 changed method
+symbol src/b/Other.java:3 Other class
+symbol src/b/Other.java:4 find method
+symbol src/b/Other.java:5 close method
+symbol src/b/Other.java:6 changed method
+symbol src/b/Other.java:7 length method
+symbol src/b/Other.java:8 name method
+symbol src/b/Use.java:7 Use class
+symbol src/b/Use.java:9 run method
+edge src/a/Base.java:4 Base defines close -> src/a/Base.java:4 close EXTRACTED 1
+edge src/a/Item.java:4 Item defines name -> src/a/Item.java:4 name EXTRACTED 1
+edge src/a/Store.java:3 Store extends Base -> src/a/Base.java:3 Base EXTRACTED 1
+edge src/a/Store.java:4 find references Item -> src/a/Item.java:3 Item EXTRACTED 1
+edge src/a/Store.java:4 Store defines find -> src/a/Store.java:4 find EXTRACTED 1
+edge src/a/Store.java:5 of references Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/a/Store.java:5 Store defines of -> src/a/Store.java:5 of EXTRACTED 1
+edge src/a/Store.java:6 of references Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/a/Store.java:6 Store defines of -> src/a/Store.java:6 of EXTRACTED 1
+edge src/a/Store.java:7 save calls close -> src/a/Store.java:8 close EXTRACTED 1
+edge src/a/Store.java:7 save references Item -> src/a/Item.java:3 Item EXTRACTED 1
+edge src/a/Store.java:7 Store defines save -> src/a/Store.java:7 save EXTRACTED 1
+edge src/a/Store.java:8 close calls close -> src/a/Base.java:4 close EXTRACTED 1
+edge src/a/Store.java:8 Store defines close -> src/a/Store.java:8 close EXTRACTED 1
+edge src/a/Store.java:9 Store defines Listener -> src/a/Store.java:9 Listener EXTRACTED 1
+edge src/a/Store.java:10 Listener defines changed -> src/a/Store.java:10 changed EXTRACTED 1
+edge src/b/Other.java:4 Other defines find -> src/b/Other.java:4 find EXTRACTED 1
+edge src/b/Other.java:5 Other defines close -> src/b/Other.java:5 close EXTRACTED 1
+edge src/b/Other.java:6 Other defines changed -> src/b/Other.java:6 changed EXTRACTED 1
+edge src/b/Other.java:7 Other defines length -> src/b/Other.java:7 length EXTRACTED 1
+edge src/b/Other.java:8 Other defines name -> src/b/Other.java:8 name EXTRACTED 1
+edge src/b/Use.java:3 src/b/Use.java imports Item -> src/a/Item.java:3 Item EXTRACTED 1
+edge src/b/Use.java:4 src/b/Use.java imports Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/b/Use.java:5 src/b/Use.java imports List -> nothing EXTRACTED 1
+edge src/b/Use.java:8 Use calls Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/b/Use.java:8 Use references Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/b/Use.java:9 run references Item -> src/a/Item.java:3 Item EXTRACTED 1
+edge src/b/Use.java:9 run references List -> nothing EXTRACTED 1
+edge src/b/Use.java:9 run references Listener -> src/a/Store.java:9 Listener EXTRACTED 1
+edge src/b/Use.java:9 run references Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/b/Use.java:9 run references Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/b/Use.java:9 Use defines run -> src/b/Use.java:9 run EXTRACTED 1
+edge src/b/Use.java:10 run calls s.find -> src/a/Store.java:4 find EXTRACTED 1
+edge src/b/Use.java:11 run calls name -> src/a/Item.java:4 name EXTRACTED 1
+edge src/b/Use.java:11 run calls store.find -> src/a/Store.java:4 find EXTRACTED 1
+edge src/b/Use.java:12 run calls close -> src/a/Store.java:8 close EXTRACTED 1
+edge src/b/Use.java:13 run calls text.length -> nothing EXTRACTED 1
+edge src/b/Use.java:14 run calls Store.of -> src/a/Store.java:5 of EXTRACTED 1
+edge src/b/Use.java:14 run references Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/b/Use.java:15 run calls Store -> src/a/Store.java:3 Store EXTRACTED 1
+edge src/b/Use.java:16 run calls made.close -> src/a/Store.java:8 close EXTRACTED 1
+edge src/b/Use.java:17 run calls s.find -> src/a/Store.java:4 find EXTRACTED 1
+edge src/b/Use.java:18 run calls found.name -> src/a/Item.java:4 name EXTRACTED 1
+edge src/b/Use.java:19 run calls listener.changed -> src/a/Store.java:10 changed EXTRACTED 1
+edge src/b/Use.java:20 run calls item.name -> src/b/Other.java:8 name INFERRED 0.85
+edge src/b/Use.java:20 run calls items.forEach -> nothing EXTRACTED 1

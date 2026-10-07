@@ -26,7 +26,9 @@ export function usage(): void {
         [--repair]            ...only chats that already have memory
   seed --from-git [--limit n] Fill a cold memory from this repo's history
   scan [--force]              Map this repo's symbols and how they connect
-  usages [--mode m] <symbol>  Who uses a symbol; --mode usages|explain|path
+  languages                   Show how each language is read: real syntax or pattern
+  usages [--mode m] <symbol>  Who uses a symbol: the graph, then text it could not link
+         [--mode usages|explain|path|text]
          [--target <symbol>]  ...the second symbol, for --mode path
          [--regex] [--context n] [--path <dir>] [--limit n]
   export [--all] > out.jsonl  Dump memory as JSONL, for backup or migration

@@ -1,0 +1,8 @@
+=== wrappers.py
+from werkzeug.wrappers import Request as RequestBase
+
+class Request(RequestBase):
+    pass
+=== expected
+symbol wrappers.py:3 Request class
+edge wrappers.py:1 wrappers.py imports Request -> nothing EXTRACTED 1

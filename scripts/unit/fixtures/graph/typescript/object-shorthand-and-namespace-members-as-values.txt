@@ -1,0 +1,29 @@
+=== src/a.ts
+export function A() { return 1; }
+export function other() { return 2; }
+=== src/util.ts
+export function codePointLength() { return 1; }
+export class Klass {}
+=== src/b.ts
+import { A } from './a';
+import * as util from './util';
+function other() { return 3; }
+export const map = { A, other, plain: 1 };
+export const v = register(util.codePointLength);
+export type K = typeof util.Klass;
+=== expected
+symbol src/a.ts:1 A function
+symbol src/a.ts:2 other function
+symbol src/b.ts:3 other function
+symbol src/b.ts:4 map const
+symbol src/b.ts:5 v const
+symbol src/b.ts:6 K type
+symbol src/util.ts:1 codePointLength function
+symbol src/util.ts:2 Klass class
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports A -> src/a.ts:1 A EXTRACTED 1
+edge src/b.ts:2 src/b.ts imports ./util -> nothing EXTRACTED 1
+edge src/b.ts:4 src/b.ts references A -> src/a.ts:1 A EXTRACTED 1
+edge src/b.ts:5 src/b.ts calls register -> nothing EXTRACTED 1
+edge src/b.ts:5 src/b.ts references codePointLength -> src/util.ts:1 codePointLength EXTRACTED 1
+edge src/b.ts:6 src/b.ts references Klass -> src/util.ts:2 Klass EXTRACTED 1

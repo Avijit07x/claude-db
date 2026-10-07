@@ -1,0 +1,46 @@
+=== src/o/Outer.java
+package o;
+
+public class Outer {
+  public static class Inner {}
+  public static class Deep {
+    public static class Leaf {}
+  }
+}
+=== src/o/Second.java
+package o;
+
+public class Second {
+  public static class Inner {}
+}
+=== src/u/Use.java
+package u;
+
+import o.Outer.Inner;
+import o.Second;
+
+public class Use {
+  Inner a;
+  Second.Inner b;
+  o.Outer.Deep c;
+}
+=== expected
+symbol src/o/Outer.java:3 Outer class
+symbol src/o/Outer.java:4 Inner class
+symbol src/o/Outer.java:5 Deep class
+symbol src/o/Outer.java:6 Leaf class
+symbol src/o/Second.java:3 Second class
+symbol src/o/Second.java:4 Inner class
+symbol src/u/Use.java:6 Use class
+edge src/o/Outer.java:4 Outer defines Inner -> src/o/Outer.java:4 Inner EXTRACTED 1
+edge src/o/Outer.java:5 Outer defines Deep -> src/o/Outer.java:5 Deep EXTRACTED 1
+edge src/o/Outer.java:6 Deep defines Leaf -> src/o/Outer.java:6 Leaf EXTRACTED 1
+edge src/o/Second.java:4 Second defines Inner -> src/o/Second.java:4 Inner EXTRACTED 1
+edge src/u/Use.java:3 src/u/Use.java imports Inner -> src/o/Outer.java:4 Inner EXTRACTED 1
+edge src/u/Use.java:3 src/u/Use.java imports Outer -> src/o/Outer.java:3 Outer EXTRACTED 1
+edge src/u/Use.java:4 src/u/Use.java imports Second -> src/o/Second.java:3 Second EXTRACTED 1
+edge src/u/Use.java:7 Use references Inner -> src/o/Outer.java:4 Inner EXTRACTED 1
+edge src/u/Use.java:8 Use references Inner -> src/o/Second.java:4 Inner EXTRACTED 1
+edge src/u/Use.java:8 Use references Second -> src/o/Second.java:3 Second EXTRACTED 1
+edge src/u/Use.java:9 Use references Deep -> src/o/Outer.java:5 Deep EXTRACTED 1
+edge src/u/Use.java:9 Use references Outer -> src/o/Outer.java:3 Outer EXTRACTED 1

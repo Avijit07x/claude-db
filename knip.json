@@ -9,9 +9,12 @@
   "project": ["src/**/*.ts", "scripts/**/*.mjs"],
   "ignoreDependencies": [
     "@ast-grep/lang-go",
+    "@ast-grep/lang-java",
+    "@ast-grep/lang-kotlin",
     "@ast-grep/lang-python",
     "@ast-grep/lang-ruby",
-    "@ast-grep/lang-rust"
+    "@ast-grep/lang-rust",
+    "oxc-resolver"
   ],
   "ignoreBinaries": ["xdg-open"],
   "ignoreExportsUsedInFile": true,

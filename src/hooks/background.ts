@@ -1,6 +1,3 @@
-import { spawn } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   claimReingest,
   claimScrub,
@@ -10,22 +7,9 @@ import {
 } from '../capture/index.js';
 import { FACTS_JOB } from '../facts/distill.js';
 import { claimJob, jobMark, releaseJob } from '../util/job-lock.js';
-
-const DIST = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const CLI = resolve(DIST, 'cli', 'index.js');
-const PICK_WORKER = resolve(DIST, 'pick', 'worker.js');
+import { CLI, PICK_WORKER, runDetached } from './detached.js';
 
 const FACTS_EVERY_MS = 60 * 60 * 1000;
-
-function runDetached(script: string, args: string[], cwd: string, release: () => void): void {
-  try {
-    spawn(process.execPath, [script, ...args], { cwd, detached: true, stdio: 'ignore' })
-      .on('error', release)
-      .unref();
-  } catch {
-    release();
-  }
-}
 
 export function startBackgroundWork(project: string, database: string, now = Date.now()): void {
   if (claimScrub(database, now)) {

@@ -1,0 +1,15 @@
+=== src/config/schema.ts
+export type Config = { a: number };
+=== src/config/index.ts
+export * from './schema.js';
+=== src/cli/run.ts
+import type { Config } from '../config/index.js';
+export const c: Config = { a: 1 };
+=== expected
+symbol src/cli/run.ts:2 c const
+symbol src/config/schema.ts:1 Config type
+edge src/cli/run.ts:1 src/cli/run.ts imports ../config/index.js -> nothing EXTRACTED 1
+edge src/cli/run.ts:1 src/cli/run.ts imports Config -> src/config/schema.ts:1 Config EXTRACTED 1
+edge src/cli/run.ts:2 src/cli/run.ts references Config -> src/config/schema.ts:1 Config EXTRACTED 1
+edge src/config/index.ts:1 src/config/index.ts imports ./schema.js -> nothing EXTRACTED 1
+edge src/config/index.ts:1 src/config/index.ts imports * -> nothing EXTRACTED 1

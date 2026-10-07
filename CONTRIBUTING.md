@@ -1,23 +1,11 @@
 # Contributing to claude-db
 
-Thanks for being here. This guide covers how the project is built, the rules
-that keep it small, and what a change needs before it can be merged.
+Thanks for helping. Bug reports and small, focused pull requests help most. For anything large, open an
+issue first, so the design is agreed before you spend time on it.
 
-Bug reports and small, focused pull requests are the most useful contributions.
-For anything large, open an issue first so the design can be agreed before you
-spend time on it.
+## Set up
 
-## Requirements
-
-- **Node >= 22.16.** Not negotiable: the default store uses `node:sqlite`, which
-  loads without a flag from 22.13 and has full-text search (FTS5) from 22.16.
-  `postinstall` refuses to run on anything older. `.nvmrc` pins the major version
-  for `nvm use`.
-- **git**, since `scan` reads tracked files through `git ls-files`.
-- Nothing else. Postgres and MongoDB are optional and only needed if you work on
-  those adapters.
-
-## Getting set up
+You need Node 22.16 or newer and git. Postgres and MongoDB are only needed to work on those stores.
 
 ```bash
 git clone https://github.com/Avijit07x/claude-db
@@ -26,215 +14,96 @@ npm install
 npm run build
 ```
 
-The test suite imports from `dist/`, not `src/`, so **build before you test**
-— including after every source change. `npm run dev` keeps `tsc -w` running if
-you would rather not think about it.
+Tests run against `dist/`, so build after every change. `npm run dev` rebuilds on save.
 
-To try your build against a real Claude Code session:
+To try your build in a real Claude Code session, run this in the repository you want to track, and undo it
+with `uninstall --project`:
 
 ```bash
-npm run build
-node dist/cli/index.js install --project   # from the repo you want to track
+node /path/to/claude-db/dist/cli/index.js install --project
 ```
 
-Use the local `dist/` path rather than a global install while developing, so you
-are exercising your own code. Undo it with `node dist/cli/index.js uninstall --project`.
+## Everyday commands
 
-## The commands
+| Command          | What it does                      |
+| ---------------- | --------------------------------- |
+| `npm run build`  | Compile to `dist/`                |
+| `npm run unit`   | The unit checks, the fastest loop |
+| `npm test`       | The full suite                    |
+| `npm run lint`   | House rules and ESLint            |
+| `npm run format` | Prettier over everything          |
 
-| command                  | what it does                                                                 |
-| ------------------------ | ---------------------------------------------------------------------------- |
-| `npm run build`          | compile to `dist/`, copy assets, remove stale output                         |
-| `npm run typecheck`      | `tsc --noEmit`, no output                                                    |
-| `npm test`               | the full suite: unit, local, filter, transcript, inject, smoke               |
-| `npm run unit`           | just the unit checks — fastest loop                                          |
-| `npm run smoke`          | end-to-end against SQLite; pass a URL to test another backend                |
-| `npm run lint`           | house rules, ESLint with type-aware rules, then the fixture check            |
-| `npm run check:fixtures` | secrets and personal paths in files; `-- --local` also checks your own chats |
-| `npm run knip`           | unused files, exports and dependencies                                       |
-| `npm run coverage`       | the full suite under c8; summary in the terminal, lcov in `coverage/`        |
-| `npm run check:package`  | publint and arethetypeswrong on the packed tarball                           |
-| `npm run format`         | Prettier over everything                                                     |
-| `npm run format:check`   | Prettier in check mode, writing nothing                                      |
-
-`npm run smoke postgres://user:pass@localhost:5432/memory` (or a
-`mongodb://` URL) runs the same round trip against a real server, if you have
-one to point at.
-
-## Code conventions
-
-**No comments.** The codebase carries none, deliberately. Explain a change in
-the commit message, the changelog, or the pull request — not in the source. If a
-piece of code needs a comment to be understood, that is a signal to rename
-something or split the function.
-
-**TypeScript, strict.** `strict`, `noUncheckedIndexedAccess`, and
-`exactOptionalPropertyTypes` are all on. Optional properties are spread in
-conditionally (`...(tags ? { tags } : {})`) rather than assigned `undefined`.
-
-**ESM with explicit extensions.** Module resolution is `NodeNext`, so relative
-imports end in `.js` even though the source is `.ts`.
-
-**Small modules.** Most files sit between 40 and 200 lines. When one grows past
-that, split it the way `src/mcp/tools/` and `src/cli/commands/` already are: a
-thin dispatch module plus focused modules that each export one entry point.
-
-**Formatting is Prettier's job.** 100 columns, single quotes, semicolons,
-trailing commas. Run `npm run format` before committing.
+The others, such as `typecheck`, `knip`, `coverage`, `smoke` and `bench:usages`, are in `package.json`.
 
 ## Where things live
 
-| path           | holds                                                                     |
-| -------------- | ------------------------------------------------------------------------- |
-| `src/capture/` | transcripts to observations: extraction, classification, redaction, flush |
-| `src/store/`   | one adapter interface, three backends (`sqlite/`, `mongo/`, `postgres/`)  |
-| `src/search/`  | hybrid keyword + vector retrieval and ranking                             |
-| `src/embed/`   | the built-in embedder and the optional local model                        |
-| `src/graph/`   | the code graph: language specs, scanning, extraction, queries             |
-| `src/hooks/`   | the four hook entry points Claude Code runs                               |
-| `src/mcp/`     | the MCP server and its tools                                              |
-| `src/cli/`     | the `claude-db` / `cdb` commands, install and uninstall                   |
-| `scripts/`     | the test suite and benchmarks                                             |
+| Path           | Holds                                                                  |
+| -------------- | ---------------------------------------------------------------------- |
+| `src/capture/` | Chats to saved memory: extraction, redaction, flush                    |
+| `src/store/`   | One store interface, three backends (`sqlite/`, `mongo/`, `postgres/`) |
+| `src/search/`  | Keyword and vector search, and ranking                                 |
+| `src/embed/`   | The built-in embedder and the optional local model                     |
+| `src/graph/`   | The code graph: languages, scanning, queries                           |
+| `src/hooks/`   | The hooks Claude Code runs                                             |
+| `src/mcp/`     | The MCP server and its tools                                           |
+| `src/cli/`     | The `claude-db` and `cdb` commands                                     |
+| `scripts/`     | Tests and benchmarks                                                   |
+
+## Rules
+
+- **No comments in code.** Explain a change in the commit message or the pull request. If code needs a
+  comment, rename or split it instead.
+- **Strict TypeScript and ESM.** Relative imports end in `.js`. Optional properties are spread in
+  (`...(tags ? { tags } : {})`), never set to `undefined`.
+- **Small files.** Most are 40 to 200 lines. Split a bigger one into focused modules.
+- **Hooks never break a session.** Hook code runs inside `runHook`, which catches every error.
+  `PreToolUse` runs on every Bash call, so keep it fast.
+- **All three stores.** A store change goes into `sqlite/`, `mongo/` and `postgres/`. Only the `adapters`
+  CI job tests the last two; `npm run smoke <postgres:// or mongodb:// URL>` tries one locally.
+- **Few dependencies.** A pull request that adds one says what it replaces and why our own code would not do.
+- **Nothing leaves the machine.** No telemetry. The only network calls are the update check and the
+  database the user chose.
+- **Measure before you claim.** A claim about behaviour needs numbers from the real thing.
 
 ## Tests
 
-There is no test framework, and adding one is not wanted. Tests are plain `.mjs`
-files that import from `dist/` and assert with a shared `check()` helper:
+There is no test framework. A test is a plain `.mjs` file that imports from `dist/`:
 
 ```js
 import { check } from '../lib/check.mjs';
 
 export default async function run() {
-  check('a label that reads as a sentence', actual === expected, actual);
+  check('a piped grep is output filtering', actual === expected, actual);
 }
 ```
 
-To add a unit test, create `scripts/unit/<name>.mjs` exporting a default
-function, then register it in `scripts/unit.mjs` — both the import and the call.
-Registration is explicit on purpose; there is no glob.
+Add it as `scripts/unit/<name>.mjs` and register it in `scripts/unit.mjs`. Name each check as a claim, pass
+the actual value last so a failure shows it, and keep it fast. Every change in behaviour needs a check that
+fails without it. Code graph tests are fixture files, see [Adding a language](./docs/adding-a-language.md).
 
-What a test should be:
+## Commits and pull requests
 
-- **Named as a claim**, not as a function name. `'a piped grep is output
-filtering'` beats `'test symbolsGreppedIn 3'`.
-- **Failing for one reason.** Pass the actual value as the third argument so a
-  failure prints what it got.
-- **Cheap.** The whole unit suite runs in seconds and should stay that way.
+A commit is one change with a short prefix: `feat:`, `fix:`, `docs:`, `refactor:` or `chore:`, then an
+imperative line, such as `fix: replace hook registrations on reinstall`. No `Co-Authored-By` or "generated
+with" lines.
 
-Every behavioural change needs a check that fails without it. Pure refactors
-need the existing suite to stay green.
+Before you open a pull request:
 
-## Rules that are easy to miss
+- [ ] `npm run typecheck`, `npm run build` and `npm test` pass
+- [ ] `npm run lint`, `npm run knip` and `npm run format:check` are clean
+- [ ] a check fails without your change
+- [ ] examples are invented, and `npm run check:fixtures -- --local` shows nothing of yours
+- [ ] `CHANGELOG.md` has an entry, if users will notice the change
 
-**All three adapters, always.** Any change to the store interface has to land in
-`sqlite/`, `mongo/`, and `postgres/`. Local tests only cover SQLite — the
-`adapters` CI job, which runs real Postgres and MongoDB services, is the _only_
-verification the other two ever get. Wait for it before merging storage changes.
+In the description, say what changed, how you checked it, and what you did not cover. CI runs the suite on
+Ubuntu and macOS with Node 22 and 24.
 
-**Hooks must never break a session.** Everything in `src/hooks/` runs inside
-`runHook`, which swallows errors and always exits 0. A memory layer that can
-take down someone's session is worse than no memory layer. Hooks also run on a
-latency budget: `PreToolUse` fires on every Bash call, so keep work off that
-path unless it is genuinely needed.
+## More
 
-**Measure before you claim.** Statements about behaviour need numbers behind
-them, produced by replaying the real thing rather than a re-implementation of
-it, with the accuracy limits stated alongside. "This should be faster" is not a
-result; "1,932 replayed commands, 43 to 72 matches, method and caveats below"
-is.
-
-**Dependencies are a last resort.** The runtime dependency list is deliberately
-short, and every entry has to earn its place against the standard library and
-Node's built-ins. Backend drivers (`pg`, `mongodb`) and the local embedding
-model are optional peer dependencies precisely so most users never install them.
-A pull request adding a runtime dependency should say what it replaces and why a
-few lines of our own would not do.
-
-**Nothing leaves the machine.** No telemetry, no phone-home, no hosted service.
-The only network calls are the update check against the npm registry and
-whatever database URL the user configured themselves.
-
-## Adding a language to the code graph
-
-The graph is driven by small declarative specs, so a new language is usually a
-short file rather than a project.
-
-1. Add the grammar package: `npm install @ast-grep/lang-<language>`.
-2. Create `src/graph/languages/<language>.ts` exporting a `LanguageSpec` — the
-   node kinds that declare symbols and the node kinds that reference them.
-   `python.ts` is the shortest example to copy.
-3. Register it in `src/graph/languages/index.ts`: add it to `LANGUAGES`, and to
-   `DYNAMIC_LANGUAGES` if the grammar ships as a separate package.
-4. Bump `SCAN_VERSION` in `src/graph/scan/files.ts` so existing users reparse
-   instead of being served a graph built by the old rules.
-5. Add extraction checks with a small real-world snippet in the language.
-
-To find the node kinds and field names a grammar exposes, parse a sample file
-and print the tree — guessing at them wastes more time than the ten lines of
-script it takes to look.
-
-## Commits
-
-Short prefix, imperative, one logical change:
-
-```
-feat: catch plain-word and git grep symbol lookups
-fix: replace hook registrations on reinstall instead of stacking duplicates
-docs: changelog for 0.7.0
-refactor: name MCP tool handlers after their tools
-chore: bump the ast-grep packages
-```
-
-**No trailers.** No `Co-Authored-By`, no "generated with" lines. The message
-ends with the last line of the body.
-
-Keep the diff to one concern. A feature, its changelog entry, and a version bump
-are three commits, not one.
-
-## Pull requests
-
-Before opening one:
-
-- [ ] `npm run typecheck` is clean
-- [ ] `npm run build` succeeds
-- [ ] `npm test` passes
-- [ ] `npm run lint` and `npm run knip` are clean
-- [ ] examples in tests and docs are invented, and `npm run check:fixtures -- --local` shows nothing of yours
-- [ ] `npm run format:check` passes
-- [ ] a check exists that fails without your change
-- [ ] `CHANGELOG.md` has an entry, if the change is user-visible
-- [ ] no comments were added to the code
-
-In the description, say what changed and why, how you verified it, and what you
-did _not_ cover. Numbers are welcome; guesses stated as facts are not.
-
-CI runs on Ubuntu and macOS against Node 22 and 24, typechecks, builds, tests,
-and installs the packed tarball to confirm it works as a real install. Storage
-changes additionally need the `adapters` job green. Formatting is not enforced
-by CI, so run `npm run format` yourself.
-
-## Releases (maintainers)
-
-- **Patch** (`0.7.1`): direct to `main`.
-- **Minor** (`0.8.0`): branch `v0.8`, open a pull request, and wait for the
-  `adapters` job before merging.
-
-Either way:
-
-1. The feature commits.
-2. A separate `docs: changelog for 0.<minor>.0` commit — `CHANGELOG.md` only.
-3. A separate version commit bumping **both** `package.json` and
-   `package-lock.json`.
-4. From `main`, an **annotated** tag: `git tag -a v0.8.0 -m "0.8.0"`. A
-   lightweight tag is skipped silently by `git push --follow-tags`, which then
-   reports "Everything up-to-date" and publishes nothing.
-5. `git push --follow-tags`, which triggers `publish.yml`.
-
-`publish.yml` refuses to publish when the tag and `package.json` disagree, so
-confirm the version matches before pushing. npm burns a version string
-permanently — a republish of the same version is rejected.
+- [Adding a language to the code graph](./docs/adding-a-language.md)
+- [Releasing](./docs/releasing.md), for maintainers
 
 ## Licence
 
-By contributing, you agree that your contributions are licensed under the
-[Apache License 2.0](./LICENSE), the same as the project.
+By contributing, you agree that your contributions are licensed under the [Apache License 2.0](./LICENSE),
+the same as the project.

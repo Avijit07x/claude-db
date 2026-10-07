@@ -1,0 +1,177 @@
+{
+  "repositories": [
+    {
+      "name": "claude-db",
+      "language": "typescript",
+      "url": "https://github.com/Avijit07x/claude-db",
+      "commit": "6b5788b6e2f5899d41bbc522fbdc8ce26682e908",
+      "tsconfig": "tsconfig.json"
+    },
+    {
+      "name": "zustand",
+      "language": "typescript",
+      "url": "https://github.com/pmndrs/zustand",
+      "commit": "d7a5583cffd80af515f7dfb69583c95cbdc9e2ce",
+      "tsconfig": "tsconfig.json"
+    },
+    {
+      "name": "zod",
+      "language": "typescript",
+      "url": "https://github.com/colinhacks/zod",
+      "commit": "0b216ef674e297ebe41d8bf902262e56f8755822",
+      "tsconfig": "tsconfig.json"
+    },
+    {
+      "name": "core",
+      "language": "typescript",
+      "url": "https://github.com/vuejs/core",
+      "commit": "4ab865a848a1da3d10fb674f857e5fff13094644",
+      "tsconfig": "tsconfig.json"
+    },
+    {
+      "name": "trpc",
+      "language": "typescript",
+      "url": "https://github.com/trpc/trpc",
+      "commit": "d756e591a5e37ef20b8d75ecd4d736c195497289",
+      "tsconfig": "tsconfig.json"
+    },
+    {
+      "name": "py_flask",
+      "language": "python",
+      "url": "https://github.com/pallets/flask",
+      "commit": "d73fa1cdcbd8b1465c151db8924ba58b1dd14e35"
+    },
+    {
+      "name": "py_requests",
+      "language": "python",
+      "url": "https://github.com/psf/requests",
+      "commit": "611c6162cbc4ac2020a2f91c7cfa4f3abf9bbb60"
+    },
+    {
+      "name": "py_httpx",
+      "language": "python",
+      "url": "https://github.com/encode/httpx",
+      "commit": "b5addb64f0161ff6bfe94c124ef76f6a1fba5254"
+    },
+    {
+      "name": "py_rich",
+      "language": "python",
+      "url": "https://github.com/Textualize/rich",
+      "commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f"
+    },
+    {
+      "name": "py_pydantic",
+      "language": "python",
+      "url": "https://github.com/pydantic/pydantic",
+      "commit": "895c0c285c5cb4c0c7c7a4619a80941c12f2c75f"
+    },
+    {
+      "name": "py_fastapi",
+      "language": "python",
+      "url": "https://github.com/tiangolo/fastapi",
+      "commit": "94918c1d40afb27065c64d523219ed2ad9822f76"
+    },
+    {
+      "name": "go_chi",
+      "language": "go",
+      "url": "https://github.com/go-chi/chi",
+      "commit": "167e1e3bd039d060696b99c8da4e876ae04f42c1"
+    },
+    {
+      "name": "go_gin",
+      "language": "go",
+      "url": "https://github.com/gin-gonic/gin",
+      "commit": "43fe48e8a0f44af783116cdb010725e6bb50255f"
+    },
+    {
+      "name": "go_cobra",
+      "language": "go",
+      "url": "https://github.com/spf13/cobra",
+      "commit": "adbc8813901bba65827259daa8e22ff94ec1f30e"
+    },
+    {
+      "name": "go_testify",
+      "language": "go",
+      "url": "https://github.com/stretchr/testify",
+      "commit": "87a7b9d57689f6579db2da795ab8deeab29cb724"
+    },
+    {
+      "name": "go_client_golang",
+      "language": "go",
+      "url": "https://github.com/prometheus/client_golang",
+      "commit": "de866d63fa67a78f723397d33624b89a439dbe73"
+    },
+    {
+      "name": "go_viper",
+      "language": "go",
+      "url": "https://github.com/spf13/viper",
+      "commit": "528f7416c4b56a4948673984b190bf8713f0c3c4"
+    },
+    {
+      "name": "rs_ripgrep",
+      "language": "rust",
+      "url": "https://github.com/BurntSushi/ripgrep",
+      "commit": "3fce3b5bb0236da2df6d99672afb8a719642eca7"
+    },
+    {
+      "name": "rs_clap",
+      "language": "rust",
+      "url": "https://github.com/clap-rs/clap",
+      "commit": "ccc89b83875474399e9d9d70841163f6319d1a41"
+    },
+    {
+      "name": "rs_serde",
+      "language": "rust",
+      "url": "https://github.com/serde-rs/serde",
+      "commit": "6693a89cca77e0151437da1c7f890090b9ebf04c"
+    },
+    {
+      "name": "java_gson",
+      "language": "java",
+      "url": "https://github.com/google/gson",
+      "commit": "845664ba1c307e6c1910d07cfed2f622e0ad8df1"
+    },
+    {
+      "name": "java_commons-lang",
+      "language": "java",
+      "url": "https://github.com/apache/commons-lang",
+      "commit": "682a8ff5cddfeedecb98f62ac7c8d94b5ff65f33"
+    },
+    {
+      "name": "java_retrofit",
+      "language": "java",
+      "url": "https://github.com/square/retrofit",
+      "commit": "50b452440d680b36c94de7467506852597fa474f"
+    },
+    {
+      "name": "java_jackson-core",
+      "language": "java",
+      "url": "https://github.com/FasterXML/jackson-core",
+      "commit": "064bdad95ce5d00747526d6b4a4061d3f1d0681f"
+    },
+    {
+      "name": "java_spring-petclinic",
+      "language": "java",
+      "url": "https://github.com/spring-projects/spring-petclinic",
+      "commit": "500158f732419217507c7656904b8e6aa1bcc0d6"
+    },
+    {
+      "name": "kt_okhttp",
+      "language": "kotlin",
+      "url": "https://github.com/square/okhttp",
+      "commit": "42e5888d45623662c138ed27e80ea28bbe0aa5cc"
+    },
+    {
+      "name": "kt_kotlinx.coroutines",
+      "language": "kotlin",
+      "url": "https://github.com/Kotlin/kotlinx.coroutines",
+      "commit": "bd2e9a1b90400fb7b2fa4f8731e7d8148799ab73"
+    },
+    {
+      "name": "kt_koin",
+      "language": "kotlin",
+      "url": "https://github.com/InsertKoinIO/koin",
+      "commit": "dc86ef8dd8fbe8564fb7453c03f5b738da3450bb"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+=== a/src/com/x/Item.kt
+package com.x
+
+class Item
+=== b/src/com/y/Item.kt
+package com.y
+
+class Item
+=== c/src/com/z/Use.kt
+package com.z
+
+import com.y.Item
+
+class Use {
+  val field: Item = Item()
+}
+=== expected
+symbol a/src/com/x/Item.kt:3 Item class
+symbol b/src/com/y/Item.kt:3 Item class
+symbol c/src/com/z/Use.kt:5 Use class
+edge c/src/com/z/Use.kt:3 c/src/com/z/Use.kt imports Item -> b/src/com/y/Item.kt:3 Item EXTRACTED 1
+edge c/src/com/z/Use.kt:6 Use calls Item -> b/src/com/y/Item.kt:3 Item EXTRACTED 1
+edge c/src/com/z/Use.kt:6 Use references Item -> b/src/com/y/Item.kt:3 Item EXTRACTED 1

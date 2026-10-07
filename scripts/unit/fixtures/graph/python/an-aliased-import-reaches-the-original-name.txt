@@ -1,0 +1,11 @@
+=== lib/tools.py
+def build():
+    return 1
+=== main.py
+from lib.tools import build as make
+
+make()
+=== expected
+symbol lib/tools.py:1 build function
+edge main.py:1 main.py imports build -> lib/tools.py:1 build EXTRACTED 1
+edge main.py:3 main.py calls build -> lib/tools.py:1 build EXTRACTED 1

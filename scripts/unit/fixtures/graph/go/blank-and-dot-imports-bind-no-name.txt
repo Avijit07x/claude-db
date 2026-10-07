@@ -1,0 +1,23 @@
+=== go.mod
+module example.com/app
+
+go 1.22
+=== util/util.go
+package util
+
+func Do() {}
+=== main.go
+package main
+
+import (
+	_ "example.com/app/util"
+	. "fmt"
+)
+
+func main() {
+	Do()
+}
+=== expected
+symbol main.go:8 main function
+symbol util/util.go:3 Do function
+edge main.go:9 main calls Do -> util/util.go:3 Do INFERRED 0.95

@@ -13,6 +13,7 @@ export const rust: LanguageSpec = {
   ],
   references: [
     { kind: 'call_expression', field: ['function'], relation: 'calls' },
-    { kind: 'use_declaration', field: ['argument'], relation: 'imports' },
+    { kind: 'call_expression', field: ['function', 'name'], relation: 'calls' },
+    { kind: 'call_expression', field: ['function', 'field'], relation: 'calls' },
   ],
 };

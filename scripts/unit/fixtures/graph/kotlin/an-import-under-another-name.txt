@@ -1,0 +1,23 @@
+=== src/a/Thing.kt
+package a
+
+class Thing
+=== src/b/Thing.kt
+package b
+
+class Thing
+=== src/u/Use.kt
+package u
+
+import a.Thing as Wanted
+import b.Thing
+
+class Use(val x: Wanted, val y: Thing)
+=== expected
+symbol src/a/Thing.kt:3 Thing class
+symbol src/b/Thing.kt:3 Thing class
+symbol src/u/Use.kt:6 Use class
+edge src/u/Use.kt:3 src/u/Use.kt imports Thing -> src/a/Thing.kt:3 Thing EXTRACTED 1
+edge src/u/Use.kt:4 src/u/Use.kt imports Thing -> src/b/Thing.kt:3 Thing EXTRACTED 1
+edge src/u/Use.kt:6 Use references Thing -> src/a/Thing.kt:3 Thing EXTRACTED 1
+edge src/u/Use.kt:6 Use references Thing -> src/b/Thing.kt:3 Thing EXTRACTED 1

@@ -1,0 +1,16 @@
+=== fixtures.py
+def app():
+    return 1
+
+def test_it(app):
+    return app.run()
+
+def test_other(client=app):
+    return [app for app in range(3)]
+=== expected
+symbol fixtures.py:1 app function
+symbol fixtures.py:4 test_it function
+symbol fixtures.py:7 test_other function
+edge fixtures.py:5 test_it calls app.run -> nothing EXTRACTED 1
+edge fixtures.py:7 test_other references app -> fixtures.py:1 app EXTRACTED 1
+edge fixtures.py:8 test_other calls range -> nothing EXTRACTED 1

@@ -1,0 +1,11 @@
+=== src/a.ts
+export const b = 1;
+export const x = b satisfies z.core.$Big;
+export const y = (b as z.core.$Other);
+=== expected
+symbol src/a.ts:1 b const
+symbol src/a.ts:2 x const
+symbol src/a.ts:3 y const
+edge src/a.ts:2 src/a.ts references $Big -> nothing EXTRACTED 1
+edge src/a.ts:2 src/a.ts references core -> nothing EXTRACTED 1
+edge src/a.ts:3 src/a.ts references $Other -> nothing EXTRACTED 1

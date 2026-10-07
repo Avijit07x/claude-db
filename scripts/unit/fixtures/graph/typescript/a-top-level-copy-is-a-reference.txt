@@ -1,0 +1,11 @@
+=== src/a.ts
+export function fn() { return 1; }
+export const copy = fn;
+function g() { const inner = fn; return inner; }
+=== expected
+symbol src/a.ts:1 fn function
+symbol src/a.ts:2 copy const
+symbol src/a.ts:3 g function
+symbol src/a.ts:3 inner const
+edge src/a.ts:2 src/a.ts references fn -> src/a.ts:1 fn EXTRACTED 1
+edge src/a.ts:3 g defines inner -> src/a.ts:3 inner EXTRACTED 1

@@ -405,5 +405,4 @@ memory by hand when that happens.
 All the items ship in 0.11.0, decided on 2026-10-07. No separate version is made for any of them. Item 7
 changes how rows are matched to projects, so the release note gives it its own section.
 
-The code graph work is planned in separate files, starting from
-[find-usages-accuracy.md](./find-usages-accuracy.md).
+The code graph work is planned in [plan-code-graph.md](./plan-code-graph.md).

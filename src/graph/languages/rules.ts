@@ -4,6 +4,14 @@ export interface DefinitionRule {
   kind: string;
   field: string[];
   symbol: SymbolKind;
+  nameKind?: string;
+  memberOf?: string[];
+}
+
+export interface ListItem {
+  kind: string;
+  field?: string;
+  select?: string[];
 }
 
 export interface ReferenceRule {
@@ -12,6 +20,10 @@ export interface ReferenceRule {
   relation: EdgeRelation;
   namePattern?: RegExp;
   excludeParents?: string[];
+  objectKinds?: string[];
+  listOf?: ListItem[];
+  qualifier?: string;
+  parents?: string[];
 }
 
 export interface LanguageSpec {

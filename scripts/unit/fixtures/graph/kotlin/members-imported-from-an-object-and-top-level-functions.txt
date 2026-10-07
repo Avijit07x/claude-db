@@ -1,0 +1,59 @@
+=== src/h/Helpers.kt
+package h
+
+object Helpers {
+  fun run(o: Any) {}
+  fun go() {}
+}
+
+fun helper() = 1
+=== src/h/Util.kt
+package h
+
+object Util {
+  fun go() {}
+  fun only() {}
+}
+=== src/u/Use.kt
+package u
+
+import h.Helpers.run
+import h.Util
+import h.helper
+
+class Use {
+  fun run() {}
+  fun test() {
+    run(1)
+    Util.only()
+    Util.go()
+    helper()
+  }
+}
+=== expected
+symbol src/h/Helpers.kt:3 Helpers class
+symbol src/h/Helpers.kt:4 run method
+symbol src/h/Helpers.kt:5 go method
+symbol src/h/Helpers.kt:8 helper function
+symbol src/h/Util.kt:3 Util class
+symbol src/h/Util.kt:4 go method
+symbol src/h/Util.kt:5 only method
+symbol src/u/Use.kt:7 Use class
+symbol src/u/Use.kt:8 run method
+symbol src/u/Use.kt:9 test method
+edge src/h/Helpers.kt:4 Helpers defines run -> src/h/Helpers.kt:4 run EXTRACTED 1
+edge src/h/Helpers.kt:5 Helpers defines go -> src/h/Helpers.kt:5 go EXTRACTED 1
+edge src/h/Util.kt:4 Util defines go -> src/h/Util.kt:4 go EXTRACTED 1
+edge src/h/Util.kt:5 Util defines only -> src/h/Util.kt:5 only EXTRACTED 1
+edge src/u/Use.kt:3 src/u/Use.kt imports Helpers -> src/h/Helpers.kt:3 Helpers EXTRACTED 1
+edge src/u/Use.kt:3 src/u/Use.kt imports run -> src/h/Helpers.kt:4 run EXTRACTED 1
+edge src/u/Use.kt:4 src/u/Use.kt imports Util -> src/h/Util.kt:3 Util EXTRACTED 1
+edge src/u/Use.kt:5 src/u/Use.kt imports helper -> src/h/Helpers.kt:8 helper EXTRACTED 1
+edge src/u/Use.kt:8 Use defines run -> src/u/Use.kt:8 run EXTRACTED 1
+edge src/u/Use.kt:9 Use defines test -> src/u/Use.kt:9 test EXTRACTED 1
+edge src/u/Use.kt:10 test calls run -> src/h/Helpers.kt:4 run EXTRACTED 1
+edge src/u/Use.kt:11 test calls Util.only -> src/h/Util.kt:5 only EXTRACTED 1
+edge src/u/Use.kt:11 test references Util -> src/h/Util.kt:3 Util EXTRACTED 1
+edge src/u/Use.kt:12 test calls Util.go -> src/h/Util.kt:4 go EXTRACTED 1
+edge src/u/Use.kt:12 test references Util -> src/h/Util.kt:3 Util EXTRACTED 1
+edge src/u/Use.kt:13 test calls helper -> src/h/Helpers.kt:8 helper EXTRACTED 1

@@ -1,0 +1,8 @@
+=== src/a.ts
+export function helper() { return 1; }
+=== src/b.ts
+export function go() { return helper(); }
+=== expected
+symbol src/a.ts:1 helper function
+symbol src/b.ts:1 go function
+edge src/b.ts:1 go calls helper -> src/a.ts:1 helper INFERRED 0.95

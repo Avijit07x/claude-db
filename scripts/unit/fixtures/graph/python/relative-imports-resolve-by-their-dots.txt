@@ -1,0 +1,22 @@
+=== pkg/__init__.py
+=== pkg/core.py
+class Engine:
+    pass
+=== pkg/sub/__init__.py
+=== pkg/sub/deep.py
+from ..core import Engine
+from .. import core
+from . import other
+
+core.Engine()
+=== pkg/sub/other.py
+def other():
+    return 1
+=== expected
+symbol pkg/core.py:1 Engine class
+symbol pkg/sub/other.py:1 other function
+edge pkg/sub/deep.py:1 pkg/sub/deep.py imports Engine -> pkg/core.py:1 Engine EXTRACTED 1
+edge pkg/sub/deep.py:2 pkg/sub/deep.py imports core -> nothing EXTRACTED 1
+edge pkg/sub/deep.py:3 pkg/sub/deep.py imports other -> nothing EXTRACTED 1
+edge pkg/sub/deep.py:5 pkg/sub/deep.py calls core.Engine -> pkg/core.py:1 Engine EXTRACTED 1
+edge pkg/sub/deep.py:5 pkg/sub/deep.py references core -> nothing EXTRACTED 1

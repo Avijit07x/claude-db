@@ -1,0 +1,20 @@
+=== src/core/util.ts
+export abstract class Klass {}
+=== src/core/index.ts
+export * as util from './util';
+=== src/use.ts
+import { util } from './core/index';
+export type T = typeof util.Klass;
+export const x = util.Klass;
+=== expected
+symbol src/core/util.ts:1 Klass class
+symbol src/use.ts:2 T type
+symbol src/use.ts:3 x const
+edge src/core/index.ts:1 src/core/index.ts imports ./util -> nothing EXTRACTED 1
+edge src/core/index.ts:1 src/core/index.ts imports * -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports ./core/index -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports util -> nothing EXTRACTED 1
+edge src/use.ts:2 src/use.ts references Klass -> src/core/util.ts:1 Klass EXTRACTED 1
+edge src/use.ts:2 src/use.ts references util -> nothing EXTRACTED 1
+edge src/use.ts:3 src/use.ts references Klass -> src/core/util.ts:1 Klass EXTRACTED 1
+edge src/use.ts:3 src/use.ts references util -> nothing EXTRACTED 1

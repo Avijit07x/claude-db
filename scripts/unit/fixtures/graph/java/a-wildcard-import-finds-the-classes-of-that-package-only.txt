@@ -1,0 +1,24 @@
+=== src/m/Item.java
+package m;
+
+public class Item {}
+=== src/m/Other.java
+package m;
+
+public class Other {}
+=== src/u/Use.java
+package u;
+
+import m.*;
+
+public class Use {
+  Item a;
+  Other b;
+  Missing c;
+}
+=== expected
+symbol src/m/Item.java:3 Item class
+symbol src/m/Other.java:3 Other class
+symbol src/u/Use.java:5 Use class
+edge src/u/Use.java:6 Use references Item -> src/m/Item.java:3 Item EXTRACTED 1
+edge src/u/Use.java:7 Use references Other -> src/m/Other.java:3 Other EXTRACTED 1

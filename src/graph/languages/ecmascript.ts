@@ -12,6 +12,7 @@ const SHARED_REFERENCES: ReferenceRule[] = [
   { kind: 'call_expression', field: ['function', 'property'], relation: 'calls' },
   { kind: 'call_expression', field: ['function', 'object'], relation: 'references' },
   { kind: 'new_expression', field: ['constructor'], relation: 'calls' },
+  { kind: 'new_expression', field: ['constructor', 'property'], relation: 'calls' },
   { kind: 'import_statement', field: ['source'], relation: 'imports' },
   { kind: 'export_statement', field: ['source'], relation: 'imports' },
 ];
@@ -42,6 +43,12 @@ const TYPED_REFERENCES: ReferenceRule[] = [
     field: [],
     relation: 'references',
     excludeParents: TYPE_DECLARATION_SITES,
+  },
+  {
+    kind: 'member_expression',
+    field: ['property'],
+    relation: 'references',
+    objectKinds: ['satisfies_expression', 'as_expression'],
   },
 ];
 

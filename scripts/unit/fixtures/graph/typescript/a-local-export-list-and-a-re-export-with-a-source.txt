@@ -1,0 +1,20 @@
+=== src/a.ts
+export function alpha() { return 1; }
+=== src/b.ts
+import { alpha } from './a';
+function own() { return 1; }
+export { alpha, own as renamed };
+export { alpha as again } from './a';
+=== expected
+symbol src/a.ts:1 alpha function
+symbol src/b.ts:2 own function
+symbol src/b.ts:3 renamed const
+symbol src/b.ts:4 again const
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports alpha -> src/a.ts:1 alpha EXTRACTED 1
+edge src/b.ts:3 renamed aliases own -> src/b.ts:2 own EXTRACTED 1
+edge src/b.ts:3 src/b.ts references alpha -> src/a.ts:1 alpha EXTRACTED 1
+edge src/b.ts:3 src/b.ts references own -> src/b.ts:2 own EXTRACTED 1
+edge src/b.ts:4 again aliases alpha -> src/a.ts:1 alpha EXTRACTED 1
+edge src/b.ts:4 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:4 src/b.ts imports alpha -> src/a.ts:1 alpha EXTRACTED 1

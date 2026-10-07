@@ -19,7 +19,7 @@ export default async function run() {
   const store = await createStore(join(dir, 'memory.db'));
   await store.init();
 
-  const scan = scanRepository({ root: repo, project: repo, known: new Map() });
+  const scan = await scanRepository({ root: repo, project: repo });
   await store.upsertGraph({ symbols: scan.symbols, edges: scan.edges, files: scan.files });
 
   const usages = await queryGraph(store, repo, { mode: 'usages', symbol: 'beta', limit: 50 });

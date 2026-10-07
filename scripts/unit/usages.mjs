@@ -4,7 +4,7 @@ import { seedUsagesRepo } from '../lib/repo.mjs';
 export default async function run() {
   {
     const { execFileSync } = await import('node:child_process');
-    const { readFileSync, writeFileSync, rmSync } = await import('node:fs');
+    const { existsSync, readFileSync, writeFileSync, rmSync } = await import('node:fs');
     const { join } = await import('node:path');
     const { findUsages } = await import('../../dist/usages/index.js');
 
@@ -219,7 +219,8 @@ export default async function run() {
     const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'buffer' })
       .toString('utf8')
       .split('\0')
-      .filter((name) => /\.(ts|mjs|js|json|sql|md)$/.test(name));
+      .filter((name) => /\.(ts|mjs|js|json|sql|md)$/.test(name))
+      .filter((name) => existsSync(join(process.cwd(), name)));
     const binaryToGit = tracked.filter((name) =>
       readFileSync(join(process.cwd(), name)).includes(0),
     );

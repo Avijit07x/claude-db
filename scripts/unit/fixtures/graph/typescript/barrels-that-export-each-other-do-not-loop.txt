@@ -1,0 +1,19 @@
+=== src/a.ts
+export * from './b';
+export function fromA() { return 1; }
+=== src/b.ts
+export * from './a';
+export function fromB() { return 2; }
+=== src/use.ts
+import { fromA, fromB, missing } from './a';
+=== expected
+symbol src/a.ts:2 fromA function
+symbol src/b.ts:2 fromB function
+edge src/a.ts:1 src/a.ts imports ./b -> nothing EXTRACTED 1
+edge src/a.ts:1 src/a.ts imports * -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports * -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports ./a -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports fromA -> src/a.ts:2 fromA EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports fromB -> src/b.ts:2 fromB EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports missing -> nothing EXTRACTED 1

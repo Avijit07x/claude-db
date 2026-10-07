@@ -172,12 +172,15 @@ re-parses files whose contents changed.
 
 `find_usages` then answers in four modes, over MCP as well as the CLI:
 
-| mode             | answers                                                     |
-| ---------------- | ----------------------------------------------------------- |
-| `text` (default) | live `git grep`; needs no scan and is never stale           |
-| `usages`         | what references this symbol, with the relation on each line |
-| `explain`        | that, plus what the symbol itself reaches                   |
-| `path`           | how two symbols connect                                     |
+| mode               | answers                                                     |
+| ------------------ | ----------------------------------------------------------- |
+| `usages` (default) | what references this symbol, with the relation on each line |
+| `explain`          | that, plus what the symbol itself reaches                   |
+| `path`             | how two symbols connect                                     |
+| `text`             | live `git grep`; needs no scan                              |
+
+`usages` ends with the lines `git grep` finds that the graph could not link, so
+it never shows less than a plain search.
 
 ```
 Shortest path (4 hops):
@@ -194,8 +197,7 @@ so it is labelled rather than presented as fact.
 **A stored index can go stale, and this one is not allowed to.** Every graph
 query hashes the working tree first and re-parses whatever changed before
 answering, so it cannot report a line the source has already moved past. The
-SessionStart hook does the same refresh in the background for repositories that
-have been scanned, but correctness does not depend on it having run.
+hooks refresh in the background instead, so they never wait.
 
 Traversal is keyed on symbol id rather than name. Keying by name would merge
 every same-named symbol into one node, and a repository with a `run` in each

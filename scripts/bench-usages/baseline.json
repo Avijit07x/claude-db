@@ -1,0 +1,733 @@
+{
+  "machine": "linux-x64-11th Gen Intel(R) Core(TM) i5-11400H @ 2.70GHz-12",
+  "date": "2026-10-07",
+  "results": [
+    {
+      "name": "claude-db",
+      "language": "typescript",
+      "commit": "6b5788b6e2f5899d41bbc522fbdc8ce26682e908",
+      "files": 309,
+      "note": "422 exported declarations sampled",
+      "buckets": {
+        "import": {
+          "total": 831,
+          "linked": 831,
+          "covered": 831
+        },
+        "use": {
+          "total": 1625,
+          "linked": 1625,
+          "covered": 1625
+        },
+        "reexport": {
+          "total": 94,
+          "linked": 94,
+          "covered": 94
+        }
+      },
+      "extra": {
+        "checked": 2558,
+        "extra": 8
+      },
+      "scanMs": 815,
+      "refreshMs": 60,
+      "hookMs": 117
+    },
+    {
+      "name": "zustand",
+      "language": "typescript",
+      "commit": "d7a5583cffd80af515f7dfb69583c95cbdc9e2ce",
+      "files": 51,
+      "note": "20 exported declarations sampled",
+      "buckets": {
+        "use": {
+          "total": 281,
+          "linked": 281,
+          "covered": 281
+        },
+        "import": {
+          "total": 45,
+          "linked": 45,
+          "covered": 45
+        },
+        "reexport": {
+          "total": 11,
+          "linked": 11,
+          "covered": 11
+        }
+      },
+      "extra": {
+        "checked": 337,
+        "extra": 0
+      },
+      "scanMs": 259,
+      "refreshMs": 32,
+      "hookMs": 111
+    },
+    {
+      "name": "zod",
+      "language": "typescript",
+      "commit": "0b216ef674e297ebe41d8bf902262e56f8755822",
+      "files": 525,
+      "note": "394 exported declarations sampled",
+      "buckets": {
+        "use": {
+          "total": 2796,
+          "linked": 2749,
+          "covered": 2787
+        },
+        "import": {
+          "total": 122,
+          "linked": 122,
+          "covered": 122
+        },
+        "reexport": {
+          "total": 50,
+          "linked": 50,
+          "covered": 50
+        }
+      },
+      "extra": {
+        "checked": 2311,
+        "extra": 309
+      },
+      "scanMs": 3501,
+      "refreshMs": 316,
+      "hookMs": 105
+    },
+    {
+      "name": "core",
+      "language": "typescript",
+      "commit": "4ab865a848a1da3d10fb674f857e5fff13094644",
+      "files": 527,
+      "note": "442 exported declarations sampled",
+      "buckets": {
+        "import": {
+          "total": 1433,
+          "linked": 1433,
+          "covered": 1433
+        },
+        "use": {
+          "total": 6125,
+          "linked": 6113,
+          "covered": 6125
+        },
+        "reexport": {
+          "total": 212,
+          "linked": 212,
+          "covered": 212
+        }
+      },
+      "extra": {
+        "checked": 8020,
+        "extra": 360
+      },
+      "scanMs": 3701,
+      "refreshMs": 244,
+      "hookMs": 142
+    },
+    {
+      "name": "trpc",
+      "language": "typescript",
+      "commit": "d756e591a5e37ef20b8d75ecd4d736c195497289",
+      "files": 1063,
+      "note": "472 exported declarations sampled",
+      "buckets": {
+        "use": {
+          "total": 2173,
+          "linked": 2168,
+          "covered": 2173
+        },
+        "reexport": {
+          "total": 294,
+          "linked": 294,
+          "covered": 294
+        },
+        "import": {
+          "total": 789,
+          "linked": 789,
+          "covered": 789
+        }
+      },
+      "extra": {
+        "checked": 3286,
+        "extra": 41
+      },
+      "scanMs": 2781,
+      "refreshMs": 218,
+      "hookMs": 147
+    },
+    {
+      "name": "py_flask",
+      "language": "python",
+      "commit": "d73fa1cdcbd8b1465c151db8924ba58b1dd14e35",
+      "files": 86,
+      "note": "Python ast",
+      "buckets": {
+        "use": {
+          "total": 974,
+          "linked": 974,
+          "covered": 974
+        },
+        "import": {
+          "total": 201,
+          "linked": 201,
+          "covered": 201
+        }
+      },
+      "extra": {
+        "checked": 1177,
+        "extra": 2
+      },
+      "scanMs": 339,
+      "refreshMs": 36,
+      "hookMs": 112
+    },
+    {
+      "name": "py_requests",
+      "language": "python",
+      "commit": "611c6162cbc4ac2020a2f91c7cfa4f3abf9bbb60",
+      "files": 37,
+      "note": "Python ast",
+      "buckets": {
+        "import": {
+          "total": 200,
+          "linked": 200,
+          "covered": 200
+        },
+        "use": {
+          "total": 934,
+          "linked": 934,
+          "covered": 934
+        }
+      },
+      "extra": {
+        "checked": 1135,
+        "extra": 1
+      },
+      "scanMs": 225,
+      "refreshMs": 30,
+      "hookMs": 106
+    },
+    {
+      "name": "py_httpx",
+      "language": "python",
+      "commit": "b5addb64f0161ff6bfe94c124ef76f6a1fba5254",
+      "files": 60,
+      "note": "Python ast",
+      "buckets": {
+        "import": {
+          "total": 137,
+          "linked": 137,
+          "covered": 137
+        },
+        "use": {
+          "total": 2016,
+          "linked": 2016,
+          "covered": 2016
+        }
+      },
+      "extra": {
+        "checked": 2159,
+        "extra": 6
+      },
+      "scanMs": 312,
+      "refreshMs": 31,
+      "hookMs": 109
+    },
+    {
+      "name": "py_rich",
+      "language": "python",
+      "commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+      "files": 213,
+      "note": "Python ast",
+      "buckets": {
+        "import": {
+          "total": 897,
+          "linked": 897,
+          "covered": 897
+        },
+        "use": {
+          "total": 4703,
+          "linked": 4703,
+          "covered": 4703
+        }
+      },
+      "extra": {
+        "checked": 5617,
+        "extra": 17
+      },
+      "scanMs": 737,
+      "refreshMs": 78,
+      "hookMs": 126
+    },
+    {
+      "name": "py_pydantic",
+      "language": "python",
+      "commit": "895c0c285c5cb4c0c7c7a4619a80941c12f2c75f",
+      "files": 608,
+      "note": "Python ast",
+      "buckets": {
+        "use": {
+          "total": 13559,
+          "linked": 13559,
+          "covered": 13559
+        },
+        "import": {
+          "total": 930,
+          "linked": 930,
+          "covered": 930
+        }
+      },
+      "extra": {
+        "checked": 23352,
+        "extra": 8863
+      },
+      "scanMs": 4546,
+      "refreshMs": 322,
+      "hookMs": 148
+    },
+    {
+      "name": "py_fastapi",
+      "language": "python",
+      "commit": "94918c1d40afb27065c64d523219ed2ad9822f76",
+      "files": 1175,
+      "note": "Python ast",
+      "buckets": {
+        "import": {
+          "total": 1575,
+          "linked": 1575,
+          "covered": 1575
+        },
+        "use": {
+          "total": 5778,
+          "linked": 5778,
+          "covered": 5778
+        }
+      },
+      "extra": {
+        "checked": 7435,
+        "extra": 82
+      },
+      "scanMs": 1956,
+      "refreshMs": 125,
+      "hookMs": 158
+    },
+    {
+      "name": "go_chi",
+      "language": "go",
+      "commit": "167e1e3bd039d060696b99c8da4e876ae04f42c1",
+      "files": 84,
+      "note": "text checker: go.mod and package lines",
+      "buckets": {
+        "package use": {
+          "total": 147,
+          "linked": 146,
+          "covered": 147
+        }
+      },
+      "extra": null,
+      "scanMs": 254,
+      "refreshMs": 29,
+      "hookMs": 109
+    },
+    {
+      "name": "go_gin",
+      "language": "go",
+      "commit": "43fe48e8a0f44af783116cdb010725e6bb50255f",
+      "files": 99,
+      "note": "text checker: go.mod and package lines",
+      "buckets": {
+        "package use": {
+          "total": 110,
+          "linked": 106,
+          "covered": 110
+        }
+      },
+      "extra": null,
+      "scanMs": 526,
+      "refreshMs": 51,
+      "hookMs": 115
+    },
+    {
+      "name": "go_cobra",
+      "language": "go",
+      "commit": "adbc8813901bba65827259daa8e22ff94ec1f30e",
+      "files": 36,
+      "note": "text checker: go.mod and package lines",
+      "buckets": {
+        "package use": {
+          "total": 63,
+          "linked": 61,
+          "covered": 63
+        }
+      },
+      "extra": null,
+      "scanMs": 219,
+      "refreshMs": 26,
+      "hookMs": 115
+    },
+    {
+      "name": "go_testify",
+      "language": "go",
+      "commit": "87a7b9d57689f6579db2da795ab8deeab29cb724",
+      "files": 66,
+      "note": "text checker: go.mod and package lines",
+      "buckets": {
+        "package use": {
+          "total": 718,
+          "linked": 718,
+          "covered": 718
+        }
+      },
+      "extra": null,
+      "scanMs": 490,
+      "refreshMs": 36,
+      "hookMs": 113
+    },
+    {
+      "name": "go_client_golang",
+      "language": "go",
+      "commit": "de866d63fa67a78f723397d33624b89a439dbe73",
+      "files": 164,
+      "note": "text checker: go.mod and package lines",
+      "buckets": {
+        "package use": {
+          "total": 1161,
+          "linked": 1161,
+          "covered": 1161
+        }
+      },
+      "extra": null,
+      "scanMs": 669,
+      "refreshMs": 55,
+      "hookMs": 116
+    },
+    {
+      "name": "go_viper",
+      "language": "go",
+      "commit": "528f7416c4b56a4948673984b190bf8713f0c3c4",
+      "files": 33,
+      "note": "text checker: go.mod and package lines",
+      "buckets": {
+        "package use": {
+          "total": 59,
+          "linked": 59,
+          "covered": 59
+        }
+      },
+      "extra": null,
+      "scanMs": 140,
+      "refreshMs": 18,
+      "hookMs": 118
+    },
+    {
+      "name": "rs_ripgrep",
+      "language": "rust",
+      "commit": "3fce3b5bb0236da2df6d99672afb8a719642eca7",
+      "files": 115,
+      "note": "text checker: mod tree and use paths",
+      "buckets": {
+        "import": {
+          "total": 381,
+          "linked": 381,
+          "covered": 381
+        },
+        "use": {
+          "total": 1672,
+          "linked": 1667,
+          "covered": 1672
+        }
+      },
+      "extra": null,
+      "scanMs": 1012,
+      "refreshMs": 94,
+      "hookMs": 115
+    },
+    {
+      "name": "rs_clap",
+      "language": "rust",
+      "commit": "ccc89b83875474399e9d9d70841163f6319d1a41",
+      "files": 385,
+      "note": "text checker: mod tree and use paths",
+      "buckets": {
+        "import": {
+          "total": 522,
+          "linked": 520,
+          "covered": 522
+        },
+        "use": {
+          "total": 2667,
+          "linked": 2636,
+          "covered": 2665
+        }
+      },
+      "extra": null,
+      "scanMs": 1624,
+      "refreshMs": 157,
+      "hookMs": 141
+    },
+    {
+      "name": "rs_serde",
+      "language": "rust",
+      "commit": "6693a89cca77e0151437da1c7f890090b9ebf04c",
+      "files": 208,
+      "note": "text checker: mod tree and use paths",
+      "buckets": {
+        "import": {
+          "total": 155,
+          "linked": 155,
+          "covered": 155
+        },
+        "use": {
+          "total": 852,
+          "linked": 834,
+          "covered": 852
+        }
+      },
+      "extra": null,
+      "scanMs": 941,
+      "refreshMs": 74,
+      "hookMs": 113
+    },
+    {
+      "name": "java_gson",
+      "language": "java",
+      "commit": "845664ba1c307e6c1910d07cfed2f622e0ad8df1",
+      "files": 264,
+      "note": "JDK compiler API",
+      "buckets": {
+        "import": {
+          "total": 1159,
+          "linked": 1159,
+          "covered": 1159
+        },
+        "type": {
+          "total": 8307,
+          "linked": 8304,
+          "covered": 8306
+        },
+        "method": {
+          "total": 8534,
+          "linked": 8504,
+          "covered": 8534
+        }
+      },
+      "extra": {
+        "checked": 17994,
+        "extra": 103
+      },
+      "scanMs": 1598,
+      "refreshMs": 128,
+      "hookMs": 131
+    },
+    {
+      "name": "java_commons-lang",
+      "language": "java",
+      "commit": "682a8ff5cddfeedecb98f62ac7c8d94b5ff65f33",
+      "files": 629,
+      "note": "JDK compiler API",
+      "buckets": {
+        "import": {
+          "total": 807,
+          "linked": 807,
+          "covered": 807
+        },
+        "type": {
+          "total": 31541,
+          "linked": 31503,
+          "covered": 31540
+        },
+        "method": {
+          "total": 37416,
+          "linked": 36812,
+          "covered": 37416
+        }
+      },
+      "extra": {
+        "checked": 71324,
+        "extra": 2337
+      },
+      "scanMs": 5413,
+      "refreshMs": 404,
+      "hookMs": 156
+    },
+    {
+      "name": "java_retrofit",
+      "language": "java",
+      "commit": "50b452440d680b36c94de7467506852597fa474f",
+      "files": 386,
+      "note": "JDK compiler API",
+      "buckets": {
+        "type": {
+          "total": 5859,
+          "linked": 5852,
+          "covered": 5859
+        },
+        "import": {
+          "total": 646,
+          "linked": 646,
+          "covered": 646
+        },
+        "method": {
+          "total": 3782,
+          "linked": 3739,
+          "covered": 3782
+        }
+      },
+      "extra": {
+        "checked": 11301,
+        "extra": 1084
+      },
+      "scanMs": 3583,
+      "refreshMs": 187,
+      "hookMs": 153
+    },
+    {
+      "name": "java_jackson-core",
+      "language": "java",
+      "commit": "064bdad95ce5d00747526d6b4a4061d3f1d0681f",
+      "files": 426,
+      "note": "JDK compiler API",
+      "buckets": {
+        "import": {
+          "total": 1652,
+          "linked": 1652,
+          "covered": 1652
+        },
+        "type": {
+          "total": 13319,
+          "linked": 13288,
+          "covered": 13319
+        },
+        "method": {
+          "total": 24605,
+          "linked": 23931,
+          "covered": 24605
+        }
+      },
+      "extra": {
+        "checked": 38706,
+        "extra": 329
+      },
+      "scanMs": 2300,
+      "refreshMs": 169,
+      "hookMs": 137
+    },
+    {
+      "name": "java_spring-petclinic",
+      "language": "java",
+      "commit": "500158f732419217507c7656904b8e6aa1bcc0d6",
+      "files": 59,
+      "note": "JDK compiler API",
+      "buckets": {
+        "import": {
+          "total": 24,
+          "linked": 24,
+          "covered": 24
+        },
+        "type": {
+          "total": 240,
+          "linked": 240,
+          "covered": 240
+        },
+        "method": {
+          "total": 310,
+          "linked": 310,
+          "covered": 310
+        }
+      },
+      "extra": {
+        "checked": 572,
+        "extra": 7
+      },
+      "scanMs": 141,
+      "refreshMs": 24,
+      "hookMs": 106
+    },
+    {
+      "name": "kt_okhttp",
+      "language": "kotlin",
+      "commit": "42e5888d45623662c138ed27e80ea28bbe0aa5cc",
+      "files": 692,
+      "note": "text checker: package and import lines",
+      "buckets": {
+        "import": {
+          "total": 2436,
+          "linked": 2436,
+          "covered": 2436
+        },
+        "imported": {
+          "total": 4409,
+          "linked": 4406,
+          "covered": 4409
+        },
+        "package": {
+          "total": 5966,
+          "linked": 5910,
+          "covered": 5966
+        }
+      },
+      "extra": null,
+      "scanMs": 4218,
+      "refreshMs": 278,
+      "hookMs": 153
+    },
+    {
+      "name": "kt_kotlinx.coroutines",
+      "language": "kotlin",
+      "commit": "bd2e9a1b90400fb7b2fa4f8731e7d8148799ab73",
+      "files": 1106,
+      "note": "text checker: package and import lines",
+      "buckets": {
+        "package": {
+          "total": 1925,
+          "linked": 1924,
+          "covered": 1925
+        },
+        "import": {
+          "total": 130,
+          "linked": 130,
+          "covered": 130
+        },
+        "imported": {
+          "total": 150,
+          "linked": 150,
+          "covered": 150
+        }
+      },
+      "extra": null,
+      "scanMs": 3373,
+      "refreshMs": 242,
+      "hookMs": 144
+    },
+    {
+      "name": "kt_koin",
+      "language": "kotlin",
+      "commit": "dc86ef8dd8fbe8564fb7453c03f5b738da3450bb",
+      "files": 571,
+      "note": "text checker: package and import lines",
+      "buckets": {
+        "import": {
+          "total": 1933,
+          "linked": 1933,
+          "covered": 1933
+        },
+        "imported": {
+          "total": 6621,
+          "linked": 6553,
+          "covered": 6621
+        },
+        "package": {
+          "total": 2126,
+          "linked": 2123,
+          "covered": 2126
+        }
+      },
+      "extra": null,
+      "scanMs": 1543,
+      "refreshMs": 125,
+      "hookMs": 138
+    }
+  ]
+}

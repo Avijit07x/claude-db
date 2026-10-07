@@ -1,0 +1,24 @@
+=== Cargo.toml
+[workspace]
+members = ["core", "app"]
+=== core/Cargo.toml
+[package]
+name = "my-core"
+authors = ["a"]
+version = "1"
+=== core/src/lib.rs
+pub fn base() {}
+=== app/Cargo.toml
+[package]
+name = "app"
+=== app/src/main.rs
+use my_core::base;
+
+fn go() {
+    base();
+}
+=== expected
+symbol app/src/main.rs:3 go function
+symbol core/src/lib.rs:1 base function
+edge app/src/main.rs:1 app/src/main.rs imports base -> core/src/lib.rs:1 base EXTRACTED 1
+edge app/src/main.rs:4 go calls base -> core/src/lib.rs:1 base EXTRACTED 1

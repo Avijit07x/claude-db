@@ -1,5 +1,15 @@
 import type { MemoryStore } from '../../store/adapter.js';
-import { currentHashes, scanRepository } from '../scan/index.js';
+import { currentHashes, saveScan, scanRepository } from '../scan/index.js';
+
+function changesOnDisk(
+  root: string,
+  stored: ReadonlyMap<string, string>,
+): ReadonlyMap<string, string> | null {
+  const current = currentHashes(root);
+  for (const [path, hash] of current) if (stored.get(path) !== hash) return current;
+  for (const path of stored.keys()) if (!current.has(path)) return current;
+  return null;
+}
 
 export async function refreshGraph(
   store: MemoryStore,
@@ -7,22 +17,10 @@ export async function refreshGraph(
   project: string,
 ): Promise<string[]> {
   const stored = new Map((await store.scannedFiles(project)).map((file) => [file.path, file.hash]));
-  const current = currentHashes(root);
+  const hashes = changesOnDisk(root, stored);
+  if (!hashes) return [];
 
-  const changed = [...current.entries()]
-    .filter(([path, hash]) => stored.get(path) !== hash)
-    .map(([path]) => path);
-  const deleted = [...stored.keys()].filter((path) => !current.has(path));
-
-  if (deleted.length > 0) await store.removeGraph(project, deleted);
-  if (changed.length === 0) return deleted;
-
-  const scan = scanRepository({ root, project, known: new Map() });
-  await store.removeGraph(project, scan.changed);
-  await store.upsertGraph({
-    symbols: scan.symbols,
-    edges: scan.edges,
-    files: scan.files,
-  });
-  return [...deleted, ...changed];
+  const scan = await scanRepository({ root, project, stored, hashes, saveCacheLater: true });
+  await saveScan(store, project, scan);
+  return [...scan.removed, ...scan.changed];
 }

@@ -1,0 +1,25 @@
+=== package.json
+{ "name": "root", "private": true }
+=== packages/a/package.json
+{ "name": "@org/a", "main": "./dist/index.js" }
+=== packages/a/src/index.ts
+export function alpha() { return 1; }
+=== packages/a/src/util.ts
+export function beta() { return 2; }
+=== apps/web/src/x.ts
+import { alpha } from '@org/a';
+import { beta } from '@org/a/util';
+import { gone } from '@org/missing';
+alpha();
+beta();
+=== expected
+symbol packages/a/src/index.ts:1 alpha function
+symbol packages/a/src/util.ts:1 beta function
+edge apps/web/src/x.ts:1 apps/web/src/x.ts imports @org/a -> nothing EXTRACTED 1
+edge apps/web/src/x.ts:1 apps/web/src/x.ts imports alpha -> packages/a/src/index.ts:1 alpha EXTRACTED 1
+edge apps/web/src/x.ts:2 apps/web/src/x.ts imports @org/a/util -> nothing EXTRACTED 1
+edge apps/web/src/x.ts:2 apps/web/src/x.ts imports beta -> packages/a/src/util.ts:1 beta EXTRACTED 1
+edge apps/web/src/x.ts:3 apps/web/src/x.ts imports @org/missing -> nothing EXTRACTED 1
+edge apps/web/src/x.ts:3 apps/web/src/x.ts imports gone -> nothing EXTRACTED 1
+edge apps/web/src/x.ts:4 apps/web/src/x.ts calls alpha -> packages/a/src/index.ts:1 alpha EXTRACTED 1
+edge apps/web/src/x.ts:5 apps/web/src/x.ts calls beta -> packages/a/src/util.ts:1 beta EXTRACTED 1

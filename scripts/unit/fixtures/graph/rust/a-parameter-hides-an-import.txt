@@ -1,0 +1,18 @@
+=== Cargo.toml
+[package]
+name = "app"
+version = "0.1.0"
+=== src/lib.rs
+mod util;
+=== src/util.rs
+pub fn helper() {}
+=== src/user.rs
+use crate::util::helper;
+
+fn go(helper: i32) -> i32 {
+    helper
+}
+=== expected
+symbol src/user.rs:3 go function
+symbol src/util.rs:1 helper function
+edge src/user.rs:1 src/user.rs imports helper -> src/util.rs:1 helper EXTRACTED 1

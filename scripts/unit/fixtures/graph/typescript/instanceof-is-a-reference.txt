@@ -1,0 +1,10 @@
+=== src/a.ts
+class Effect {}
+export const ok = (x) => x instanceof Effect;
+export const n = new Effect();
+=== expected
+symbol src/a.ts:1 Effect class
+symbol src/a.ts:2 ok const
+symbol src/a.ts:3 n const
+edge src/a.ts:2 src/a.ts references Effect -> src/a.ts:1 Effect EXTRACTED 1
+edge src/a.ts:3 src/a.ts calls Effect -> src/a.ts:1 Effect EXTRACTED 1

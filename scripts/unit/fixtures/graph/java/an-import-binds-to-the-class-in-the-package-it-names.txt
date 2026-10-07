@@ -1,0 +1,23 @@
+=== a/src/com/x/Item.java
+package com.x;
+
+public class Item {}
+=== b/src/com/y/Item.java
+package com.y;
+
+public class Item {}
+=== c/src/com/z/Use.java
+package com.z;
+
+import com.y.Item;
+
+public class Use {
+  Item field = new Item();
+}
+=== expected
+symbol a/src/com/x/Item.java:3 Item class
+symbol b/src/com/y/Item.java:3 Item class
+symbol c/src/com/z/Use.java:5 Use class
+edge c/src/com/z/Use.java:3 c/src/com/z/Use.java imports Item -> b/src/com/y/Item.java:3 Item EXTRACTED 1
+edge c/src/com/z/Use.java:6 Use calls Item -> b/src/com/y/Item.java:3 Item EXTRACTED 1
+edge c/src/com/z/Use.java:6 Use references Item -> b/src/com/y/Item.java:3 Item EXTRACTED 1

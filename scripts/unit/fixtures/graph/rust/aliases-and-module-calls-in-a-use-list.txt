@@ -1,0 +1,37 @@
+=== Cargo.toml
+[package]
+name = "app"
+version = "0.1.0"
+=== src/lib.rs
+pub mod util;
+=== src/util.rs
+pub struct Thing;
+
+impl Thing {
+    pub fn make() -> Thing { Thing }
+}
+
+pub fn run() {}
+=== src/user.rs
+use crate::util::{self, Thing as T, run};
+
+fn go(x: &T) {
+    util::run();
+    run();
+}
+=== expected
+symbol src/user.rs:3 go function
+symbol src/util.rs:1 Thing class
+symbol src/util.rs:4 make function
+symbol src/util.rs:7 run function
+edge src/user.rs:1 src/user.rs imports run -> src/util.rs:7 run EXTRACTED 1
+edge src/user.rs:1 src/user.rs imports Thing -> src/util.rs:1 Thing EXTRACTED 1
+edge src/user.rs:1 src/user.rs imports util -> nothing EXTRACTED 1
+edge src/user.rs:3 go references Thing -> src/util.rs:1 Thing EXTRACTED 1
+edge src/user.rs:4 go calls util::run -> src/util.rs:7 run EXTRACTED 1
+edge src/user.rs:4 go references run -> src/util.rs:7 run EXTRACTED 1
+edge src/user.rs:4 go references util -> nothing EXTRACTED 1
+edge src/user.rs:5 go calls run -> src/util.rs:7 run EXTRACTED 1
+edge src/util.rs:3 src/util.rs references Thing -> src/util.rs:1 Thing EXTRACTED 1
+edge src/util.rs:4 make references Thing -> src/util.rs:1 Thing EXTRACTED 1
+edge src/util.rs:4 make references Thing -> src/util.rs:1 Thing EXTRACTED 1
