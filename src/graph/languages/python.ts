@@ -11,7 +11,15 @@ export const python: LanguageSpec = {
   references: [
     { kind: 'call', field: ['function'], relation: 'calls' },
     { kind: 'call', field: ['function', 'attribute'], relation: 'calls' },
-    { kind: 'import_from_statement', field: ['module_name'], relation: 'imports' },
-    { kind: 'class_definition', field: ['superclasses'], relation: 'extends' },
+    {
+      kind: 'class_definition',
+      field: ['superclasses'],
+      relation: 'extends',
+      listOf: [
+        { kind: 'identifier' },
+        { kind: 'attribute' },
+        { kind: 'subscript', field: 'value' },
+      ],
+    },
   ],
 };

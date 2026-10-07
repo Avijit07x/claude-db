@@ -1,0 +1,77 @@
+=== src/a/Store.kt
+package a
+
+open class Base {
+  fun close() {}
+}
+
+class Store : Base() {
+  fun find(id: String): Item? = null
+  companion object {
+    fun create(): Store = Store()
+  }
+}
+
+class Item {
+  fun name(): String = ""
+}
+
+fun String.shout(): String = this
+=== src/b/Other.kt
+package b
+
+class Other {
+  fun find(id: String): Any? = null
+  fun close() {}
+}
+=== src/b/Use.kt
+package b
+
+import a.Store
+import a.shout
+
+class Use(private val store: Store) {
+  fun run(s: Store) {
+    s.find("x")?.name()
+    this.store.close()
+    val made = Store.create()
+    made.close()
+    "x".shout()
+  }
+}
+=== expected
+symbol src/a/Store.kt:3 Base class
+symbol src/a/Store.kt:4 close method
+symbol src/a/Store.kt:7 Store class
+symbol src/a/Store.kt:8 find method
+symbol src/a/Store.kt:10 create method
+symbol src/a/Store.kt:14 Item class
+symbol src/a/Store.kt:15 name method
+symbol src/a/Store.kt:18 shout function
+symbol src/b/Other.kt:3 Other class
+symbol src/b/Other.kt:4 find method
+symbol src/b/Other.kt:5 close method
+symbol src/b/Use.kt:6 Use class
+symbol src/b/Use.kt:7 run method
+edge src/a/Store.kt:4 Base defines close -> src/a/Store.kt:4 close EXTRACTED 1
+edge src/a/Store.kt:7 Store extends Base -> src/a/Store.kt:3 Base EXTRACTED 1
+edge src/a/Store.kt:8 find references Item -> src/a/Store.kt:14 Item EXTRACTED 1
+edge src/a/Store.kt:8 Store defines find -> src/a/Store.kt:8 find EXTRACTED 1
+edge src/a/Store.kt:10 create calls Store -> src/a/Store.kt:7 Store EXTRACTED 1
+edge src/a/Store.kt:10 create references Store -> src/a/Store.kt:7 Store EXTRACTED 1
+edge src/a/Store.kt:10 Store defines create -> src/a/Store.kt:10 create EXTRACTED 1
+edge src/a/Store.kt:15 Item defines name -> src/a/Store.kt:15 name EXTRACTED 1
+edge src/b/Other.kt:4 Other defines find -> src/b/Other.kt:4 find EXTRACTED 1
+edge src/b/Other.kt:5 Other defines close -> src/b/Other.kt:5 close EXTRACTED 1
+edge src/b/Use.kt:3 src/b/Use.kt imports Store -> src/a/Store.kt:7 Store EXTRACTED 1
+edge src/b/Use.kt:4 src/b/Use.kt imports shout -> src/a/Store.kt:18 shout EXTRACTED 1
+edge src/b/Use.kt:6 Use references Store -> src/a/Store.kt:7 Store EXTRACTED 1
+edge src/b/Use.kt:7 run references Store -> src/a/Store.kt:7 Store EXTRACTED 1
+edge src/b/Use.kt:7 Use defines run -> src/b/Use.kt:7 run EXTRACTED 1
+edge src/b/Use.kt:8 run calls name -> src/a/Store.kt:15 name EXTRACTED 1
+edge src/b/Use.kt:8 run calls s.find -> src/a/Store.kt:8 find EXTRACTED 1
+edge src/b/Use.kt:9 run calls close -> src/a/Store.kt:4 close EXTRACTED 1
+edge src/b/Use.kt:10 run calls Store.create -> src/a/Store.kt:10 create EXTRACTED 1
+edge src/b/Use.kt:10 run references Store -> src/a/Store.kt:7 Store EXTRACTED 1
+edge src/b/Use.kt:11 run calls made.close -> src/a/Store.kt:4 close EXTRACTED 1
+edge src/b/Use.kt:12 run calls shout -> src/a/Store.kt:18 shout EXTRACTED 1

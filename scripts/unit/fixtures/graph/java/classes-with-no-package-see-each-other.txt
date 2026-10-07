@@ -1,0 +1,11 @@
+=== Plain.java
+public class Plain {}
+=== Use.java
+public class Use {
+  Plain p = new Plain();
+}
+=== expected
+symbol Plain.java:1 Plain class
+symbol Use.java:1 Use class
+edge Use.java:2 Use calls Plain -> Plain.java:1 Plain EXTRACTED 1
+edge Use.java:2 Use references Plain -> Plain.java:1 Plain EXTRACTED 1

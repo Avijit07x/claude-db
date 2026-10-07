@@ -1,0 +1,17 @@
+=== src/a.ts
+export function alpha() { return 1; }
+export type Shape = { a: number };
+=== src/b.ts
+import { alpha } from './a.js';
+=== src/lib/index.ts
+export function viaIndex() {}
+=== src/use.ts
+import { viaIndex } from './lib';
+=== expected
+symbol src/a.ts:1 alpha function
+symbol src/a.ts:2 Shape type
+symbol src/lib/index.ts:1 viaIndex function
+edge src/b.ts:1 src/b.ts imports ./a.js -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports alpha -> src/a.ts:1 alpha EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports ./lib -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports viaIndex -> src/lib/index.ts:1 viaIndex EXTRACTED 1

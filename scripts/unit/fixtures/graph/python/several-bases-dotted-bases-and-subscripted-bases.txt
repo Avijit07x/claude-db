@@ -1,0 +1,39 @@
+=== bases.py
+class A:
+    pass
+
+class B:
+    pass
+
+class M(type):
+    pass
+
+class C(A, B, metaclass=M):
+    pass
+=== lib/models.py
+class Base:
+    pass
+=== use.py
+from lib import models
+from typing import Generic
+
+class D(models.Base, Generic[int]):
+    pass
+=== expected
+symbol bases.py:1 A class
+symbol bases.py:4 B class
+symbol bases.py:7 M class
+symbol bases.py:10 C class
+symbol lib/models.py:1 Base class
+symbol use.py:4 D class
+edge bases.py:7 M extends type -> nothing EXTRACTED 1
+edge bases.py:10 C extends A -> bases.py:1 A EXTRACTED 1
+edge bases.py:10 C extends B -> bases.py:4 B EXTRACTED 1
+edge bases.py:10 C references M -> bases.py:7 M EXTRACTED 1
+edge use.py:1 use.py imports models -> nothing EXTRACTED 1
+edge use.py:2 use.py imports Generic -> nothing EXTRACTED 1
+edge use.py:4 D extends Generic -> nothing EXTRACTED 1
+edge use.py:4 D extends models.Base -> lib/models.py:1 Base EXTRACTED 1
+edge use.py:4 D references Base -> lib/models.py:1 Base EXTRACTED 1
+edge use.py:4 D references Generic -> nothing EXTRACTED 1
+edge use.py:4 D references models -> nothing EXTRACTED 1

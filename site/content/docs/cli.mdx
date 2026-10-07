@@ -31,13 +31,14 @@ Every command is also available as `cdb`. `claude-db --version` prints the versi
 
 ## Code graph
 
-| Command                                  | What it does                                           |
-| ---------------------------------------- | ------------------------------------------------------ |
-| `claude-db scan [--force]`               | Build the code graph for this repo                     |
-| `claude-db usages [--mode <m>] <symbol>` | What uses a symbol: live `git grep`, or the code graph |
+| Command                                  | What it does                                            |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `claude-db scan [--force]`               | Build the code graph for this repo                      |
+| `claude-db usages [--mode <m>] <symbol>` | What uses a symbol: the code graph plus live `git grep` |
+| `claude-db languages`                    | Which languages are read with real syntax               |
 
-Modes are `text`, `usages`, `explain` and `path`. See [Code graph](/docs/code-graph) for what each
-one answers.
+Modes are `usages` (the default), `explain`, `path` and `text`. See [Code graph](/docs/code-graph) for
+what each one answers.
 
 ## Database
 

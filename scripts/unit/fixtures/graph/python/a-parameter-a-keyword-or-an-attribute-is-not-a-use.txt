@@ -1,0 +1,19 @@
+=== models.py
+class User:
+    pass
+
+def name():
+    return 1
+=== main.py
+from models import User, name
+
+def make(name, other):
+    other.name = 1
+    return dict(name=other.name)
+=== expected
+symbol main.py:3 make function
+symbol models.py:1 User class
+symbol models.py:4 name function
+edge main.py:1 main.py imports name -> models.py:4 name EXTRACTED 1
+edge main.py:1 main.py imports User -> models.py:1 User EXTRACTED 1
+edge main.py:5 make calls dict -> nothing EXTRACTED 1

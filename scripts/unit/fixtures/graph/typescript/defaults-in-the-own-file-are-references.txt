@@ -1,0 +1,12 @@
+=== src/a.ts
+export function inspect() { return 1; }
+export function check(run = inspect, { read = inspect } = {}) { return run; }
+function other() { const nested = inspect; return nested; }
+=== expected
+symbol src/a.ts:1 inspect function
+symbol src/a.ts:2 check function
+symbol src/a.ts:3 nested const
+symbol src/a.ts:3 other function
+edge src/a.ts:2 check references inspect -> src/a.ts:1 inspect EXTRACTED 1
+edge src/a.ts:2 check references inspect -> src/a.ts:1 inspect EXTRACTED 1
+edge src/a.ts:3 other defines nested -> src/a.ts:3 nested EXTRACTED 1

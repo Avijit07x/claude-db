@@ -1,0 +1,31 @@
+=== go.mod
+module example.com/app
+
+go 1.22
+=== util/util.go
+package util
+
+type Thing struct{}
+
+type Base struct{}
+
+var Default = 1
+=== main.go
+package main
+
+import "example.com/app/util"
+
+type T struct{ util.Base }
+
+func use() *util.Thing {
+	x := &util.Thing{}
+	return x
+}
+=== expected
+symbol main.go:5 T type
+symbol main.go:7 use function
+symbol util/util.go:3 Thing type
+symbol util/util.go:5 Base type
+edge main.go:5 main.go references Base -> util/util.go:5 Base EXTRACTED 1
+edge main.go:7 use references Thing -> util/util.go:3 Thing EXTRACTED 1
+edge main.go:8 use references Thing -> util/util.go:3 Thing EXTRACTED 1

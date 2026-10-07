@@ -1,0 +1,17 @@
+=== src/a.ts
+enum Dir { Up, Down }
+class Box { static count = 1; static make() { return 1; } }
+export const go = (d) => d === Dir.Up || Dir.Down;
+export const n = Box.count + Box.make();
+=== expected
+symbol src/a.ts:1 Dir enum
+symbol src/a.ts:2 Box class
+symbol src/a.ts:2 make method
+symbol src/a.ts:3 go const
+symbol src/a.ts:4 n const
+edge src/a.ts:2 Box defines make -> src/a.ts:2 make EXTRACTED 1
+edge src/a.ts:3 src/a.ts references Dir -> src/a.ts:1 Dir EXTRACTED 1
+edge src/a.ts:3 src/a.ts references Dir -> src/a.ts:1 Dir EXTRACTED 1
+edge src/a.ts:4 src/a.ts calls Box.make -> src/a.ts:2 make EXTRACTED 1
+edge src/a.ts:4 src/a.ts references Box -> src/a.ts:2 Box EXTRACTED 1
+edge src/a.ts:4 src/a.ts references Box -> src/a.ts:2 Box EXTRACTED 1

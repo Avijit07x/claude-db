@@ -1,0 +1,14 @@
+=== flask/__init__.py
+from .globals import app_ctx as app_ctx
+=== flask/globals.py
+app_ctx = object()
+=== conftest.py
+from flask import app_ctx
+
+def app_ctx():
+    return 1
+=== expected
+symbol conftest.py:3 app_ctx function
+edge conftest.py:1 conftest.py imports app_ctx -> nothing EXTRACTED 1
+edge flask/__init__.py:1 flask/__init__.py imports app_ctx -> conftest.py:3 app_ctx INFERRED 0.95
+edge flask/globals.py:1 flask/globals.py calls object -> nothing EXTRACTED 1

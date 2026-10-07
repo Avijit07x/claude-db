@@ -1,0 +1,36 @@
+=== src/checks.ts
+function _max() { return 1; }
+export { _max as maxLength };
+export function trim() { return 2; }
+=== src/box.ts
+export class Box { maxLength() { return 2; } }
+=== src/index.ts
+export * from './checks';
+=== src/top.ts
+export * from './index';
+=== src/use.ts
+import * as z from './top';
+import { trim } from './index';
+export const a = z.maxLength();
+export const b = trim();
+=== expected
+symbol src/box.ts:1 Box class
+symbol src/box.ts:1 maxLength method
+symbol src/checks.ts:1 _max function
+symbol src/checks.ts:2 maxLength const
+symbol src/checks.ts:3 trim function
+symbol src/use.ts:3 a const
+symbol src/use.ts:4 b const
+edge src/box.ts:1 Box defines maxLength -> src/box.ts:1 maxLength EXTRACTED 1
+edge src/checks.ts:2 maxLength aliases _max -> src/checks.ts:1 _max EXTRACTED 1
+edge src/checks.ts:2 src/checks.ts references _max -> src/checks.ts:1 _max EXTRACTED 1
+edge src/index.ts:1 src/index.ts imports ./checks -> nothing EXTRACTED 1
+edge src/index.ts:1 src/index.ts imports * -> nothing EXTRACTED 1
+edge src/top.ts:1 src/top.ts imports ./index -> nothing EXTRACTED 1
+edge src/top.ts:1 src/top.ts imports * -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports ./top -> nothing EXTRACTED 1
+edge src/use.ts:2 src/use.ts imports ./index -> nothing EXTRACTED 1
+edge src/use.ts:2 src/use.ts imports trim -> src/checks.ts:3 trim EXTRACTED 1
+edge src/use.ts:3 src/use.ts calls z.maxLength -> src/checks.ts:2 maxLength EXTRACTED 1
+edge src/use.ts:3 src/use.ts references z -> nothing EXTRACTED 1
+edge src/use.ts:4 src/use.ts calls trim -> src/checks.ts:3 trim EXTRACTED 1

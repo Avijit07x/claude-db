@@ -12,6 +12,5 @@ export const go: LanguageSpec = {
   references: [
     { kind: 'call_expression', field: ['function'], relation: 'calls' },
     { kind: 'call_expression', field: ['function', 'field'], relation: 'calls' },
-    { kind: 'import_spec', field: ['path'], relation: 'imports' },
   ],
 };

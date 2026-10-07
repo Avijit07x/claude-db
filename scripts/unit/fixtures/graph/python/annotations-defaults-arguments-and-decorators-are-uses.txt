@@ -1,0 +1,23 @@
+=== models.py
+class User:
+    pass
+
+def deco(fn):
+    return fn
+=== main.py
+from models import User, deco
+
+@deco
+def load(u: User, User2=User):
+    return isinstance(u, User)
+=== expected
+symbol main.py:4 load function
+symbol models.py:1 User class
+symbol models.py:4 deco function
+edge main.py:1 main.py imports deco -> models.py:4 deco EXTRACTED 1
+edge main.py:1 main.py imports User -> models.py:1 User EXTRACTED 1
+edge main.py:3 main.py references deco -> models.py:4 deco EXTRACTED 1
+edge main.py:4 load references User -> models.py:1 User EXTRACTED 1
+edge main.py:4 load references User -> models.py:1 User EXTRACTED 1
+edge main.py:5 load calls isinstance -> nothing EXTRACTED 1
+edge main.py:5 load references User -> models.py:1 User EXTRACTED 1

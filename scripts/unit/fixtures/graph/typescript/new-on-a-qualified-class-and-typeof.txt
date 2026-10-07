@@ -1,0 +1,16 @@
+=== src/a.ts
+export class Base {}
+function helper() { return 1; }
+export type H = typeof helper;
+=== src/b.ts
+import * as ns from './a';
+export const b = new ns.Base();
+=== expected
+symbol src/a.ts:1 Base class
+symbol src/a.ts:2 helper function
+symbol src/a.ts:3 H type
+symbol src/b.ts:2 b const
+edge src/a.ts:3 src/a.ts references helper -> src/a.ts:2 helper EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:2 src/b.ts calls ns.Base -> src/a.ts:1 Base EXTRACTED 1
+edge src/b.ts:2 src/b.ts references Base -> src/a.ts:1 Base EXTRACTED 1

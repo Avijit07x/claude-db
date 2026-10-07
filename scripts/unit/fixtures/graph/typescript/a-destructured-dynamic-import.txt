@@ -1,0 +1,17 @@
+=== src/m.ts
+export class Heavy {}
+export function tool() {}
+=== src/use.ts
+async function load() {
+  const { Heavy, tool: run } = await import('./m.js');
+  return new Heavy(run);
+}
+=== expected
+symbol src/m.ts:1 Heavy class
+symbol src/m.ts:2 tool function
+symbol src/use.ts:1 load function
+edge src/use.ts:2 load calls import -> nothing EXTRACTED 1
+edge src/use.ts:2 load imports Heavy -> src/m.ts:1 Heavy EXTRACTED 1
+edge src/use.ts:2 load imports tool -> src/m.ts:2 tool EXTRACTED 1
+edge src/use.ts:3 load calls Heavy -> src/m.ts:1 Heavy EXTRACTED 1
+edge src/use.ts:3 load references tool -> src/m.ts:2 tool EXTRACTED 1

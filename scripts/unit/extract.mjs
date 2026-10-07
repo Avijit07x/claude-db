@@ -60,27 +60,42 @@ end
   const basicFor = (path, source) =>
     extractFile({ path, spec: languageFor(path), source, hash: 'x' }, '/p');
 
-  const java = basicFor(
-    'Patient.java',
-    'public class Patient extends BaseRecord {\n' +
-      '    public List<Survey> findSurveys() {\n' +
-      '        return SurveyRepository.forPatient(this);\n' +
-      '    }\n' +
+  const scala = basicFor(
+    'Patient.scala',
+    'class Patient extends BaseRecord {\n' +
+      '  def findSurveys(): List[Survey] = {\n' +
+      '    SurveyRepository.forPatient(this)\n' +
+      '  }\n' +
       '}\n',
   );
   const named = (result, name) => result.symbols.find((s) => s.name === name);
-  check('a language with no grammar pack still parses', java.symbols.length > 0);
-  check('java class is a symbol', named(java, 'Patient')?.kind === 'class');
-  check('java method is a symbol', named(java, 'findSurveys')?.kind === 'function');
-  check('the symbol carries the real language label', named(java, 'Patient')?.lang === 'java');
+  check('a language with no grammar pack still parses', scala.symbols.length > 0);
+  check('scala class is a symbol', named(scala, 'Patient')?.kind === 'class');
+  check('scala method is a symbol', named(scala, 'findSurveys')?.kind === 'function');
+  check('the symbol carries the real language label', named(scala, 'Patient')?.lang === 'scala');
   check(
     'a call inside it becomes a weak reference',
-    java.references.some((r) => r.name === 'forPatient' && r.weak === true),
-    JSON.stringify(java.references.map((r) => r.name)),
+    scala.references.some((r) => r.name === 'forPatient' && r.weak === true),
+    JSON.stringify(scala.references.map((r) => r.name)),
   );
   check(
     'the weak reference is attributed to the enclosing declaration',
-    java.references.find((r) => r.name === 'forPatient')?.from?.name === 'findSurveys',
+    scala.references.find((r) => r.name === 'forPatient')?.from?.name === 'findSurveys',
+  );
+
+  const minifiedSource =
+    Array.from({ length: 3000 }, (_, i) => `function f${i}(){return 1}`).join(';') +
+    ';var apiKey = "sk-abcdefghijklmnopqrstuvwxyz012345";';
+  const began = Date.now();
+  const minified = basicFor('bundle.min.js', minifiedSource);
+  check(
+    'a minified file with one very long line is read in under a second',
+    Date.now() - began < 1000 && minified.symbols.length >= 3000,
+    `${Date.now() - began} ms`,
+  );
+  check(
+    'and no signature carries the secret on that line',
+    minified.symbols.every((symbol) => !symbol.signature.includes('sk-abcdefghijkl')),
   );
 
   const swift = basicFor(
@@ -142,7 +157,7 @@ export function Screen() {
   );
   check(
     'a rendered component attributes to the enclosing function',
-    jsx.references.find((r) => r.name === 'Card')?.from?.name === 'Screen',
+    rendered('Card')?.from?.name === 'Screen',
   );
   check('calls in a tsx file still extract', !!jsx.references.find((r) => r.name === 'title'));
 

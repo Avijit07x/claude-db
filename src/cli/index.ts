@@ -13,6 +13,7 @@ import { cmdCatchup } from './commands/catchup.js';
 import { cmdDistill } from './commands/distill.js';
 import { cmdPick } from './commands/pick.js';
 import { cmdScan, cmdUsages } from './commands/graph.js';
+import { cmdLanguages } from './commands/languages.js';
 import { cmdSeed } from './commands/seed.js';
 import { cmdAdoption } from './commands/adoption.js';
 import { cmdView } from './commands/view.js';
@@ -112,6 +113,9 @@ async function run(): Promise<void> {
       break;
     case 'scan':
       await cmdScan(args);
+      break;
+    case 'languages':
+      cmdLanguages(args);
       break;
     case 'sync':
       await cmdSync(args);

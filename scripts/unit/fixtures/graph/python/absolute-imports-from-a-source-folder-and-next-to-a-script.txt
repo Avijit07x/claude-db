@@ -1,0 +1,23 @@
+=== src/pkg/__init__.py
+=== src/pkg/core.py
+def work():
+    return 1
+=== tests/test_core.py
+from pkg.core import work
+
+work()
+=== scripts/run.py
+import helper
+from helper import assist
+
+assist()
+=== scripts/helper.py
+def assist():
+    return 1
+=== expected
+symbol scripts/helper.py:1 assist function
+symbol src/pkg/core.py:1 work function
+edge scripts/run.py:2 scripts/run.py imports assist -> scripts/helper.py:1 assist EXTRACTED 1
+edge scripts/run.py:4 scripts/run.py calls assist -> scripts/helper.py:1 assist EXTRACTED 1
+edge tests/test_core.py:1 tests/test_core.py imports work -> src/pkg/core.py:1 work EXTRACTED 1
+edge tests/test_core.py:3 tests/test_core.py calls work -> src/pkg/core.py:1 work EXTRACTED 1

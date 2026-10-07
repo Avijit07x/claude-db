@@ -1,0 +1,22 @@
+=== src/anon.ts
+export default () => 1;
+=== src/named.ts
+const impl = 1;
+export { impl as default };
+=== src/use.ts
+import thing from './anon';
+import other from './named';
+thing();
+other;
+=== expected
+symbol src/anon.ts:1 default const
+symbol src/named.ts:1 impl const
+symbol src/named.ts:2 default const
+edge src/named.ts:2 default aliases impl -> src/named.ts:1 impl EXTRACTED 1
+edge src/named.ts:2 src/named.ts references impl -> src/named.ts:1 impl EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports ./anon -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports thing -> src/anon.ts:1 default EXTRACTED 1
+edge src/use.ts:2 src/use.ts imports ./named -> nothing EXTRACTED 1
+edge src/use.ts:2 src/use.ts imports other -> src/named.ts:2 default EXTRACTED 1
+edge src/use.ts:3 src/use.ts calls thing -> src/anon.ts:1 default EXTRACTED 1
+edge src/use.ts:4 src/use.ts references other -> src/named.ts:2 default EXTRACTED 1

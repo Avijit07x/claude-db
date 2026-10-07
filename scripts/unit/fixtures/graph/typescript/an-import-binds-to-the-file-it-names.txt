@@ -1,0 +1,11 @@
+=== src/c.ts
+export function run() { return 1; }
+=== src/d.ts
+export function run() { return 2; }
+=== src/use.ts
+import { run } from './c';
+=== expected
+symbol src/c.ts:1 run function
+symbol src/d.ts:1 run function
+edge src/use.ts:1 src/use.ts imports ./c -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports run -> src/c.ts:1 run EXTRACTED 1

@@ -1,0 +1,14 @@
+=== src/a.ts
+export function Button() { return 1; }
+export default Button;
+=== src/react.ts
+import React from 'react';
+export const x = React;
+=== expected
+symbol src/a.ts:1 Button function
+symbol src/a.ts:2 default const
+symbol src/react.ts:2 x const
+edge src/a.ts:2 default aliases Button -> src/a.ts:1 Button EXTRACTED 1
+edge src/react.ts:1 src/react.ts imports react -> nothing EXTRACTED 1
+edge src/react.ts:1 src/react.ts imports React -> nothing EXTRACTED 1
+edge src/react.ts:2 src/react.ts references React -> nothing EXTRACTED 1

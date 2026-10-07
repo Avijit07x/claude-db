@@ -2,21 +2,14 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { grammarSignature } from '../grammars.js';
 import { BASIC_FINGERPRINT, LANGUAGES, languageFor } from '../languages/index.js';
-import type { LanguageSpec } from '../languages/index.js';
+import type { SourceFile } from '../types.js';
 
 const MAX_BUFFER = 64 * 1024 * 1024;
 const MAX_FILE_BYTES = 1024 * 1024;
 
-export interface SourceFile {
-  unreadable?: boolean;
-  path: string;
-  spec: LanguageSpec;
-  source: string;
-  hash: string;
-}
-
-export const SCAN_VERSION = 5;
+export const SCAN_VERSION = 7;
 
 const RULES_FINGERPRINT = createHash('sha256')
   .update(
@@ -28,7 +21,7 @@ const RULES_FINGERPRINT = createHash('sha256')
   .digest('hex')
   .slice(0, 12);
 
-const CACHE_KEY = `v${SCAN_VERSION}:${RULES_FINGERPRINT}\n`;
+export const CACHE_KEY = `v${SCAN_VERSION}:${RULES_FINGERPRINT}:${grammarSignature()}\n`;
 
 export function hashOf(bytes: Buffer): string {
   return createHash('sha256').update(CACHE_KEY).update(bytes).digest('hex').slice(0, 32);

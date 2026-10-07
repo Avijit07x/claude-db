@@ -1,0 +1,28 @@
+=== src/f/Factory.java
+package f;
+
+public class Factory {
+  public static class Feature {}
+}
+=== src/f/Json.java
+package f;
+
+public class Json extends Factory {}
+=== src/u/Use.java
+package u;
+
+import f.Json;
+
+public class Use {
+  Json.Feature x;
+}
+=== expected
+symbol src/f/Factory.java:3 Factory class
+symbol src/f/Factory.java:4 Feature class
+symbol src/f/Json.java:3 Json class
+symbol src/u/Use.java:5 Use class
+edge src/f/Factory.java:4 Factory defines Feature -> src/f/Factory.java:4 Feature EXTRACTED 1
+edge src/f/Json.java:3 Json extends Factory -> src/f/Factory.java:3 Factory EXTRACTED 1
+edge src/u/Use.java:3 src/u/Use.java imports Json -> src/f/Json.java:3 Json EXTRACTED 1
+edge src/u/Use.java:6 Use references Feature -> src/f/Factory.java:4 Feature EXTRACTED 1
+edge src/u/Use.java:6 Use references Json -> src/f/Json.java:3 Json EXTRACTED 1

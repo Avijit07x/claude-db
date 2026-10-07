@@ -1,0 +1,31 @@
+=== src/o/Outer.kt
+package o
+
+class Outer {
+  class Inner
+}
+=== src/o/Second.kt
+package o
+
+class Second {
+  class Inner
+}
+=== src/u/Use.kt
+package u
+
+import o.Second
+
+class Use(val a: Second.Inner, val b: o.Outer.Inner)
+=== expected
+symbol src/o/Outer.kt:3 Outer class
+symbol src/o/Outer.kt:4 Inner class
+symbol src/o/Second.kt:3 Second class
+symbol src/o/Second.kt:4 Inner class
+symbol src/u/Use.kt:5 Use class
+edge src/o/Outer.kt:4 Outer defines Inner -> src/o/Outer.kt:4 Inner EXTRACTED 1
+edge src/o/Second.kt:4 Second defines Inner -> src/o/Second.kt:4 Inner EXTRACTED 1
+edge src/u/Use.kt:3 src/u/Use.kt imports Second -> src/o/Second.kt:3 Second EXTRACTED 1
+edge src/u/Use.kt:5 Use references Inner -> src/o/Outer.kt:4 Inner EXTRACTED 1
+edge src/u/Use.kt:5 Use references Inner -> src/o/Second.kt:4 Inner EXTRACTED 1
+edge src/u/Use.kt:5 Use references Outer -> src/o/Outer.kt:3 Outer EXTRACTED 1
+edge src/u/Use.kt:5 Use references Second -> src/o/Second.kt:3 Second EXTRACTED 1

@@ -1,0 +1,16 @@
+=== ns/inner/tools.py
+def tool():
+    return 1
+=== ns/user.py
+from ns.inner.tools import tool
+from .inner import tools
+
+tool()
+tools.tool()
+=== expected
+symbol ns/inner/tools.py:1 tool function
+edge ns/user.py:1 ns/user.py imports tool -> ns/inner/tools.py:1 tool EXTRACTED 1
+edge ns/user.py:2 ns/user.py imports tools -> nothing EXTRACTED 1
+edge ns/user.py:4 ns/user.py calls tool -> ns/inner/tools.py:1 tool EXTRACTED 1
+edge ns/user.py:5 ns/user.py calls tools.tool -> ns/inner/tools.py:1 tool EXTRACTED 1
+edge ns/user.py:5 ns/user.py references tools -> nothing EXTRACTED 1

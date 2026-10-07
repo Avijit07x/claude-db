@@ -56,6 +56,26 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Build the grammar packages
+        run: node scripts/grammars.mjs build --out grammar-packages
+
+      - name: Publish the grammar packages
+        run: |
+          for dir in grammar-packages/*/; do
+            NAME="$(node -p "require('./${dir}package.json').name")"
+            VERSION="$(node -p "require('./${dir}package.json').version")"
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "$NAME@$VERSION is already on npm"
+            else
+              npm publish "./$dir" --provenance --access public
+            fi
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Depend on the grammar packages
+        run: node scripts/grammars.mjs link
+
       - name: Publish to npm
         run: npm publish --provenance --access public
         env:

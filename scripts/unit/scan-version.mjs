@@ -1,9 +1,20 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { newRepo } from '../lib/repo.mjs';
 import { SCAN_VERSION, currentHashes, hashOf, scanRepository } from '../../dist/graph/index.js';
+import { cacheHome } from '../../dist/graph/scan/cache.js';
+import { scopeToken } from '../../dist/util/scope.js';
+
+function writeOldCache(repo, bytes) {
+  mkdirSync(cacheHome(), { recursive: true });
+  const entry = { hash: hashOf(bytes), symbols: [], references: [], edgesHash: '' };
+  writeFileSync(
+    join(cacheHome(), `${scopeToken(repo)}.json`),
+    JSON.stringify({ key: 'v0:older-scanner\n', project: repo, files: { 'a.ts': entry } }),
+  );
+}
 
 export default async function run() {
   const { repo, git } = newRepo('scanver-');
@@ -22,7 +33,6 @@ export default async function run() {
     hashOf(bytes) !== createHash('sha256').update(bytes).digest('hex').slice(0, 32),
   );
 
-  // A cache written by an older extractor: content hashes with no version mixed in.
   const stale = new Map();
   for (const [path] of currentHashes(repo)) {
     stale.set(
@@ -33,19 +43,24 @@ export default async function run() {
         .slice(0, 32),
     );
   }
-  const upgraded = scanRepository({ root: repo, project: repo, known: stale });
+  writeOldCache(repo, bytes);
+  const upgraded = await scanRepository({ root: repo, project: repo, stored: stale });
   check(
-    'an upgrade reparses instead of serving the old graph',
-    upgraded.skipped === 0 && upgraded.changed.length > 0,
+    'an extraction cache from an older scanner is not trusted, so an upgrade reparses',
+    upgraded.skipped === 0 && upgraded.changed.length > 0 && upgraded.symbols.length > 0,
     `parsed ${upgraded.changed.length}, skipped ${upgraded.skipped}`,
   );
-
-  // With a current cache, skipping must still work or every scan gets slow.
-  const fresh = new Map(upgraded.files.map((f) => [f.path, f.hash]));
-  const again = scanRepository({ root: repo, project: repo, known: fresh });
   check(
-    'an unchanged file is still skipped',
-    again.changed.length === 0 && again.skipped > 0,
-    `parsed ${again.changed.length}, skipped ${again.skipped}`,
+    'and the rows the older scanner stored are rewritten',
+    upgraded.rewrite.includes('a.ts'),
+    upgraded.rewrite.join(','),
+  );
+
+  const fresh = new Map(upgraded.files.map((f) => [f.path, f.hash]));
+  const again = await scanRepository({ root: repo, project: repo, stored: fresh });
+  check(
+    'an unchanged file is still skipped and nothing is rewritten',
+    again.changed.length === 0 && again.skipped > 0 && again.rewrite.length === 0,
+    `parsed ${again.changed.length}, skipped ${again.skipped}, rewrite ${again.rewrite.length}`,
   );
 }

@@ -1,0 +1,28 @@
+=== src/a/Marker.java
+package a;
+
+public @interface Marker {}
+=== src/a/Service.java
+package a;
+
+public @interface Service {}
+=== src/u/Use.java
+package u;
+
+import a.Marker;
+
+@Marker
+@a.Service
+public class Use {
+  @Override
+  public String toString() { return ""; }
+}
+=== expected
+symbol src/a/Marker.java:3 Marker interface
+symbol src/a/Service.java:3 Service interface
+symbol src/u/Use.java:7 Use class
+symbol src/u/Use.java:9 toString method
+edge src/u/Use.java:3 src/u/Use.java imports Marker -> src/a/Marker.java:3 Marker EXTRACTED 1
+edge src/u/Use.java:5 Use references Marker -> src/a/Marker.java:3 Marker EXTRACTED 1
+edge src/u/Use.java:6 Use references Service -> src/a/Service.java:3 Service EXTRACTED 1
+edge src/u/Use.java:8 Use defines toString -> src/u/Use.java:9 toString EXTRACTED 1

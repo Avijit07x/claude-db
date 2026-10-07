@@ -1,0 +1,18 @@
+=== List.py
+class List:
+    pass
+=== path.py
+def path():
+    return 1
+=== main.py
+from typing import List
+from os import path
+
+x: List = path
+=== expected
+symbol List.py:1 List class
+symbol path.py:1 path function
+edge main.py:1 main.py imports List -> nothing EXTRACTED 1
+edge main.py:2 main.py imports path -> nothing EXTRACTED 1
+edge main.py:4 main.py references List -> nothing EXTRACTED 1
+edge main.py:4 main.py references path -> nothing EXTRACTED 1

@@ -1,0 +1,7 @@
+=== src/b.ts
+import { default as Zip } from 'jszip';
+Zip();
+=== expected
+edge src/b.ts:1 src/b.ts imports jszip -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports Zip -> nothing EXTRACTED 1
+edge src/b.ts:2 src/b.ts calls Zip -> nothing EXTRACTED 1

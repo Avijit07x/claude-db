@@ -1,0 +1,24 @@
+=== Cargo.toml
+[package]
+name = "app"
+version = "0.1.0"
+=== src/lib.rs
+mod a;
+=== src/a/mod.rs
+pub mod b;
+pub mod c;
+=== src/a/b.rs
+use super::c::deep;
+use self::inner::x;
+
+pub fn go() {
+    deep();
+}
+=== src/a/c.rs
+pub fn deep() {}
+=== expected
+symbol src/a/b.rs:4 go function
+symbol src/a/c.rs:1 deep function
+edge src/a/b.rs:1 src/a/b.rs imports deep -> src/a/c.rs:1 deep EXTRACTED 1
+edge src/a/b.rs:2 src/a/b.rs imports x -> nothing EXTRACTED 1
+edge src/a/b.rs:5 go calls deep -> src/a/c.rs:1 deep EXTRACTED 1

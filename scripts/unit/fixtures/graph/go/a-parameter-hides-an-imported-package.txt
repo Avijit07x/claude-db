@@ -1,0 +1,28 @@
+=== go.mod
+module example.com/app
+
+go 1.22
+=== util/util.go
+package util
+
+func Do() {}
+=== main.go
+package main
+
+import "example.com/app/util"
+
+func run(util Thing) {
+	util.Do()
+}
+
+type Thing struct{}
+
+func (Thing) Do() {}
+=== expected
+symbol main.go:5 run function
+symbol main.go:9 Thing type
+symbol main.go:11 Do method
+symbol util/util.go:3 Do function
+edge main.go:5 run references Thing -> main.go:9 Thing EXTRACTED 1
+edge main.go:6 run calls util.Do -> main.go:11 Do EXTRACTED 1
+edge main.go:11 Do references Thing -> main.go:9 Thing EXTRACTED 1

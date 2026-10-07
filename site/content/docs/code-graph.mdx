@@ -13,17 +13,19 @@ A scan takes about a second on a mid-size repository. Re-running only re-parses 
 
 Ask the same question four ways, over MCP as `find_usages` or in the terminal as `claude-db usages`:
 
-| Mode      | Answers                                                             |
-| --------- | ------------------------------------------------------------------- |
-| `text`    | Live `git grep`. Needs no scan, is never stale, and is the default. |
-| `usages`  | What references this symbol, with the relation on each line.        |
-| `explain` | That, plus what the symbol itself reaches.                          |
-| `path`    | How two symbols connect.                                            |
+| Mode               | Answers                                               |
+| ------------------ | ----------------------------------------------------- |
+| `usages` (default) | What uses the symbol, with the relation on each line. |
+| `explain`          | That, plus what the symbol itself reaches.            |
+| `path`             | How two symbols connect.                              |
+| `text`             | Live `git grep` only. Needs no scan.                  |
 
 ```bash
 claude-db usages --mode explain closeObservations
 claude-db usages --mode path cmdScan observationId
 ```
+
+`usages` and `explain` also list who imports the symbol. Lines that `git grep` finds but the graph cannot link come last, so nothing a search would find is lost.
 
 <Path hops={4} nodes={['cmdScan', 'scanRepository', 'extractFile', 'symbolId', 'observationId']} />
 
@@ -37,5 +39,7 @@ Every graph query checks the working tree first and re-parses what changed, so a
 
 ## Languages
 
-- **Parsed:** TypeScript, TSX, JavaScript, Python, Go, Rust and Ruby. The parser ships with the package, so nothing compiles at install. These get real syntax: definitions, `calls`, `imports`, `extends` and `implements`.
-- **Read by pattern:** about 30 more, including Java, C, C++, C#, Swift, Kotlin, PHP and SQL. Declarations are found by pattern and every edge is tagged `INFERRED`. A reference that matches no declaration produces no edge, not a guess.
+- **Parsed:** TypeScript, TSX, JavaScript, Python, Go, Rust, Java, Kotlin and Ruby. These get real syntax: definitions, `calls`, `imports`, `extends` and `implements`. The grammars ship with the package, so nothing compiles or downloads. On a platform without them, such as Alpine Linux, these languages are read by pattern.
+- **Imports followed:** all of these except Ruby, through path aliases, re-exports and workspace packages, so two symbols with one name in different modules stay apart.
+- **Method calls followed:** Java and Kotlin. `x.method()` reaches the method of the declared type of `x`, through parent classes and chained calls.
+- **Read by pattern:** about 30 more, including C, C++, C#, Swift, PHP and SQL. Declarations are found by pattern and every edge is tagged `INFERRED`. A reference that matches no declaration produces no edge, not a guess.

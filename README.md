@@ -26,8 +26,9 @@ gives Claude the right part of it at the right time.
   chat ends, and the next chat starts by seeing them.
 - **Recalls what fits.** Each prompt gets the one or two earlier memories that
   match it, and nothing when none fit.
-- **Maps your code.** Who defines or calls a symbol is answered in one call,
-  instead of grep and reading files.
+- **Maps your code.** Who defines, calls or imports a symbol is answered in one
+  call, instead of grep and reading files. It follows imports in TypeScript,
+  JavaScript, Python, Go, Rust, Java and Kotlin.
 - **Keeps it yours.** SQLite on your machine by default, or Postgres or MongoDB
   to share across machines. No cloud, no subscription.
 
@@ -91,8 +92,8 @@ npm test
 npm run lint
 ```
 
-[CONTRIBUTING.md](./CONTRIBUTING.md) has the conventions, the test setup, how to
-add a language to the code graph, and how releases are made. Security reports go
+[CONTRIBUTING.md](./CONTRIBUTING.md) has the setup, the rules and the pull request
+checklist, with links to adding a language and to releasing. Security reports go
 through [SECURITY.md](./SECURITY.md), privately.
 
 ## License

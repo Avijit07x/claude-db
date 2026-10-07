@@ -1,0 +1,23 @@
+=== go.mod
+module example.com/app
+
+go 1.22
+=== strings/Println.go
+package strings
+
+func Println() {}
+=== main.go
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("x")
+}
+
+func Println() {}
+=== expected
+symbol main.go:5 main function
+symbol main.go:9 Println function
+symbol strings/Println.go:3 Println function
+edge main.go:6 main calls fmt.Println -> nothing EXTRACTED 1

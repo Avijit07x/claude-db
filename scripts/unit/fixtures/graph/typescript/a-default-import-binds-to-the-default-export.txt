@@ -1,0 +1,12 @@
+=== src/a.ts
+export default function alpha() { return 1; }
+=== src/b.ts
+import foo from './a';
+foo();
+=== expected
+symbol src/a.ts:1 alpha function
+symbol src/a.ts:1 default const
+edge src/a.ts:1 default aliases alpha -> src/a.ts:1 alpha EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports foo -> src/a.ts:1 default EXTRACTED 1
+edge src/b.ts:2 src/b.ts calls foo -> src/a.ts:1 default EXTRACTED 1

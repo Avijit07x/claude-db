@@ -63,9 +63,13 @@ jobs:
 
       - name: Verify the packed tarball is installable
         run: |
+          node scripts/grammars.mjs build --out grammar-packages --platform current
+          npm pack ./grammar-packages/*/
           npm pack
           npm install -g ./claude-db-*.tgz
           claude-db doctor
+          claude-db languages
+          ! claude-db languages | grep -q 'read by pattern'
           cdb --help || true
 
   adapters:

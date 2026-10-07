@@ -1,0 +1,15 @@
+=== src/a.ts
+export class Survey { static where() {} }
+=== src/b.ts
+import { Survey } from './a';
+Survey.where();
+function f(Survey) { return 1; }
+=== expected
+symbol src/a.ts:1 Survey class
+symbol src/a.ts:1 where method
+symbol src/b.ts:3 f function
+edge src/a.ts:1 Survey defines where -> src/a.ts:1 where EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports Survey -> src/a.ts:1 Survey EXTRACTED 1
+edge src/b.ts:2 src/b.ts calls Survey.where -> src/a.ts:1 where EXTRACTED 1
+edge src/b.ts:2 src/b.ts references Survey -> src/a.ts:1 Survey EXTRACTED 1

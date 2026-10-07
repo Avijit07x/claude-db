@@ -1,0 +1,8 @@
+=== src/a.js
+export function alpha() { return 1; }
+=== src/b.jsx
+import { alpha } from './a.js';
+=== expected
+symbol src/a.js:1 alpha function
+edge src/b.jsx:1 src/b.jsx imports ./a.js -> nothing EXTRACTED 1
+edge src/b.jsx:1 src/b.jsx imports alpha -> src/a.js:1 alpha EXTRACTED 1

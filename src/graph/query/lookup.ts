@@ -2,6 +2,9 @@ import type { MemoryStore } from '../../store/adapter.js';
 import type { CodeEdge, CodeSymbol } from '../../types.js';
 import { shortestPath } from './path.js';
 import { suggestFor } from './suggest.js';
+import type { TextMatches } from './text.js';
+
+const ALIAS_DEPTH = 3;
 
 export type GraphMode = 'usages' | 'explain' | 'path';
 
@@ -16,6 +19,7 @@ export interface GraphAnswer {
   refreshed: string[];
   empty: boolean;
   suggestions: string[];
+  text?: TextMatches;
 }
 
 export interface GraphQuery {
@@ -23,6 +27,30 @@ export interface GraphQuery {
   symbol: string;
   target?: string;
   limit: number;
+}
+
+const aliasIds = (edges: CodeEdge[]): string[] =>
+  edges.filter((edge) => edge.relation === 'aliases').map((edge) => edge.srcId);
+
+async function throughAliases(
+  store: MemoryStore,
+  project: string,
+  inbound: CodeEdge[],
+  limit: number,
+): Promise<CodeEdge[]> {
+  const seen = new Set(inbound.map((edge) => edge.id));
+  const found: CodeEdge[] = [];
+  let frontier = aliasIds(inbound);
+
+  for (let depth = 0; depth < ALIAS_DEPTH && frontier.length > 0; depth += 1) {
+    const fresh = (await store.findEdges({ project, dstIds: frontier, limit })).filter(
+      (edge) => !seen.has(edge.id),
+    );
+    for (const edge of fresh) seen.add(edge.id);
+    found.push(...fresh);
+    frontier = aliasIds(fresh);
+  }
+  return found;
 }
 
 export async function queryGraph(
@@ -57,10 +85,11 @@ export async function queryGraph(
   });
 
   const ids = answer.definitions.map((symbol) => symbol.id);
+  const edgeLimit = Math.max(query.limit * 10, 500);
   const edges = await store.findEdges({
     project,
     ...(ids.length > 0 ? { srcIds: ids, dstIds: ids } : { dstName: query.symbol }),
-    limit: Math.max(query.limit * 10, 500),
+    limit: edgeLimit,
   });
 
   const idSet = new Set(ids);
@@ -69,7 +98,8 @@ export async function queryGraph(
     edge.dstName.endsWith(`.${query.symbol}`) ||
     (edge.dstId !== '' && idSet.has(edge.dstId));
 
-  answer.inbound = edges.filter(pointsAtSymbol);
+  const direct = edges.filter(pointsAtSymbol);
+  answer.inbound = [...direct, ...(await throughAliases(store, project, direct, edgeLimit))];
   answer.outbound = edges.filter((edge) => idSet.has(edge.srcId) && !pointsAtSymbol(edge));
   answer.empty = answer.definitions.length === 0 && answer.inbound.length === 0;
   if (answer.empty) answer.suggestions = await suggestFor(store, project, query.symbol);

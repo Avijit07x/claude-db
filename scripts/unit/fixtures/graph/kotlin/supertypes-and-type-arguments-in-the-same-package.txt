@@ -1,0 +1,30 @@
+=== src/p/Base.kt
+package p
+
+open class Base
+=== src/p/Contract.kt
+package p
+
+interface Contract
+interface Wider : Contract
+=== src/p/Child.kt
+package p
+
+class Child : Base(), Contract {
+  val items: List<Base> = emptyList()
+}
+=== src/q/List.kt
+package q
+
+class List
+=== expected
+symbol src/p/Base.kt:3 Base class
+symbol src/p/Child.kt:3 Child class
+symbol src/p/Contract.kt:3 Contract class
+symbol src/p/Contract.kt:4 Wider class
+symbol src/q/List.kt:3 List class
+edge src/p/Child.kt:3 Child extends Base -> src/p/Base.kt:3 Base EXTRACTED 1
+edge src/p/Child.kt:3 Child implements Contract -> src/p/Contract.kt:3 Contract EXTRACTED 1
+edge src/p/Child.kt:4 Child calls emptyList -> nothing EXTRACTED 1
+edge src/p/Child.kt:4 Child references Base -> src/p/Base.kt:3 Base EXTRACTED 1
+edge src/p/Contract.kt:4 Wider extends Contract -> src/p/Contract.kt:3 Contract EXTRACTED 1

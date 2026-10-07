@@ -1,0 +1,27 @@
+=== src/p/Base.java
+package p;
+
+public class Base {}
+=== src/p/Child.java
+package p;
+
+import java.util.List;
+
+public class Child extends Base implements Runnable {
+  List<Base> items;
+  public void run() {}
+}
+=== src/q/List.java
+package q;
+
+public class List {}
+=== expected
+symbol src/p/Base.java:3 Base class
+symbol src/p/Child.java:5 Child class
+symbol src/p/Child.java:7 run method
+symbol src/q/List.java:3 List class
+edge src/p/Child.java:3 src/p/Child.java imports List -> nothing EXTRACTED 1
+edge src/p/Child.java:5 Child extends Base -> src/p/Base.java:3 Base EXTRACTED 1
+edge src/p/Child.java:6 Child references Base -> src/p/Base.java:3 Base EXTRACTED 1
+edge src/p/Child.java:6 Child references List -> nothing EXTRACTED 1
+edge src/p/Child.java:7 Child defines run -> src/p/Child.java:7 run EXTRACTED 1

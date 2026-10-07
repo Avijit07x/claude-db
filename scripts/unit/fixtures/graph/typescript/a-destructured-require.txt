@@ -1,0 +1,9 @@
+=== src/a.js
+export function alpha() { return 1; }
+=== src/b.js
+const { alpha, beta: other } = require('./a');
+=== expected
+symbol src/a.js:1 alpha function
+edge src/b.js:1 src/b.js calls require -> nothing EXTRACTED 1
+edge src/b.js:1 src/b.js imports alpha -> src/a.js:1 alpha EXTRACTED 1
+edge src/b.js:1 src/b.js imports beta -> nothing EXTRACTED 1

@@ -81,7 +81,7 @@ export interface TimelineQuery {
 export type SymbolKind = 'function' | 'class' | 'interface' | 'type' | 'enum' | 'const' | 'method';
 
 export type EdgeRelation =
-  'calls' | 'imports' | 'extends' | 'implements' | 'references' | 'defines';
+  'calls' | 'imports' | 'extends' | 'implements' | 'references' | 'defines' | 'aliases';
 
 export type EdgeConfidence = 'EXTRACTED' | 'INFERRED';
 

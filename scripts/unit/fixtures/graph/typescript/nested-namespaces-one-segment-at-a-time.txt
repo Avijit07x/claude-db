@@ -1,0 +1,25 @@
+=== src/core.ts
+export class $Err {}
+export function make() { return 1; }
+=== src/index.ts
+export * as core from './core';
+=== src/use.ts
+import * as z from './index';
+export const a = expect(z.core.$Err);
+export type T = typeof z.core.$Err;
+export const b = z.core.make();
+export const c = z.core.nothing.deep;
+=== expected
+symbol src/core.ts:1 $Err class
+symbol src/core.ts:2 make function
+symbol src/use.ts:2 a const
+symbol src/use.ts:3 T type
+symbol src/use.ts:4 b const
+symbol src/use.ts:5 c const
+edge src/index.ts:1 src/index.ts imports ./core -> nothing EXTRACTED 1
+edge src/index.ts:1 src/index.ts imports * -> nothing EXTRACTED 1
+edge src/use.ts:1 src/use.ts imports ./index -> nothing EXTRACTED 1
+edge src/use.ts:2 src/use.ts calls expect -> nothing EXTRACTED 1
+edge src/use.ts:2 src/use.ts references $Err -> src/core.ts:1 $Err EXTRACTED 1
+edge src/use.ts:3 src/use.ts references $Err -> src/core.ts:1 $Err EXTRACTED 1
+edge src/use.ts:4 src/use.ts calls z.core.make -> src/core.ts:2 make EXTRACTED 1

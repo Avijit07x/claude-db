@@ -51,7 +51,7 @@ export default async function run() {
   git('add', '-A');
   git('commit', '-qm', 'seed');
 
-  const scan = scanRepository({ root: repo, project: repo, known: new Map() });
+  const scan = await scanRepository({ root: repo, project: repo });
   const named = (name) => scan.symbols.filter((s) => s.name === name);
 
   check('scan finds a class', named('Widget')[0]?.kind === 'class', named('Widget')[0]?.kind);
@@ -87,8 +87,8 @@ export default async function run() {
     helperEdge?.srcName,
   );
   check(
-    'a cross-file match is INFERRED, not claimed as read',
-    helperEdge?.confidence === 'INFERRED' && helperEdge?.score < 1,
+    'a call to a symbol the file imports by path is read, not guessed',
+    helperEdge?.confidence === 'EXTRACTED' && helperEdge?.score === 1,
     `${helperEdge?.confidence} ${helperEdge?.score}`,
   );
 
@@ -110,21 +110,21 @@ export default async function run() {
     String(external?.dstId),
   );
 
-  const again = scanRepository({ root: repo, project: repo, known: new Map() });
+  const again = await scanRepository({ root: repo, project: repo });
   check(
     'ids are content-derived, so a rescan replaces rather than duplicates',
     again.symbols[0]?.id === scan.symbols[0]?.id,
   );
 
   const hashes = new Map(scan.files.map((f) => [f.path, f.hash]));
-  const cached = scanRepository({ root: repo, project: repo, known: hashes });
+  const cached = await scanRepository({ root: repo, project: repo, stored: hashes });
   check('an unchanged file is skipped', cached.changed.length === 0, cached.skipped);
 
   writeFileSync(
     join(repo, 'src', 'helper.ts'),
     'export function helper(n) {\n  return n + 1;\n}\n',
   );
-  const partial = scanRepository({ root: repo, project: repo, known: hashes });
+  const partial = await scanRepository({ root: repo, project: repo, stored: hashes });
   check(
     'only the changed file is re-parsed',
     partial.changed.length === 1 && partial.changed[0] === 'src/helper.ts',
@@ -132,7 +132,7 @@ export default async function run() {
   );
 
   writeFileSync(join(repo, 'src', 'fresh.ts'), 'export function fresh() {}\n');
-  const untracked = scanRepository({ root: repo, project: repo, known: new Map() });
+  const untracked = await scanRepository({ root: repo, project: repo });
   check(
     'a never-committed file is scanned',
     untracked.symbols.some((s) => s.name === 'fresh'),

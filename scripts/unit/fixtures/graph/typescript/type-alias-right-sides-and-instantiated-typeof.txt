@@ -1,0 +1,12 @@
+=== src/a.ts
+interface Shape { a: number }
+function helper() { return 1; }
+export type Alias = Shape;
+export type Fn = typeof helper<number>;
+=== expected
+symbol src/a.ts:1 Shape interface
+symbol src/a.ts:2 helper function
+symbol src/a.ts:3 Alias type
+symbol src/a.ts:4 Fn type
+edge src/a.ts:3 src/a.ts references Shape -> src/a.ts:1 Shape EXTRACTED 1
+edge src/a.ts:4 src/a.ts references helper -> src/a.ts:2 helper EXTRACTED 1

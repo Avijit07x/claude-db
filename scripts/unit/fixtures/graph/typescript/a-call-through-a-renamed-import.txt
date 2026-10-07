@@ -1,0 +1,10 @@
+=== src/a.ts
+export function remember() { return 1; }
+=== src/b.ts
+import { remember as record } from './a';
+record();
+=== expected
+symbol src/a.ts:1 remember function
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports remember -> src/a.ts:1 remember EXTRACTED 1
+edge src/b.ts:2 src/b.ts calls remember -> src/a.ts:1 remember EXTRACTED 1

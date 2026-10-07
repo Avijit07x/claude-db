@@ -1,0 +1,31 @@
+=== go.mod
+module example.com/app
+
+go 1.22
+=== a/a.go
+package a
+
+func New() int { return 1 }
+=== b/b.go
+package b
+
+func New() int { return 2 }
+=== main.go
+package main
+
+import (
+	"fmt"
+	"example.com/app/a"
+	bee "example.com/app/b"
+)
+
+func main() {
+	fmt.Println(a.New(), bee.New())
+}
+=== expected
+symbol a/a.go:3 New function
+symbol b/b.go:3 New function
+symbol main.go:9 main function
+edge main.go:10 main calls a.New -> a/a.go:3 New EXTRACTED 1
+edge main.go:10 main calls bee.New -> b/b.go:3 New EXTRACTED 1
+edge main.go:10 main calls fmt.Println -> nothing EXTRACTED 1

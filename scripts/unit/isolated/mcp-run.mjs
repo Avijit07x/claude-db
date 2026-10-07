@@ -12,6 +12,7 @@ import { embedObservations } from '../../../dist/capture/index.js';
 import { toShortId } from '../../../dist/util/shortid.js';
 
 const server = new URL('../../../dist/mcp/server.js', import.meta.url).pathname;
+const cli = new URL('../../../dist/cli/index.js', import.meta.url).pathname;
 mkdirSync(join(homedir(), 'shop', 'src'), { recursive: true });
 const project = realpathSync(join(homedir(), 'shop'));
 writeFileSync(
@@ -136,6 +137,19 @@ try {
     'find_usages finds a symbol in the repository without a scan',
     usages.includes('src/feed.ts'),
     usages.slice(0, 200),
+  );
+  report(
+    'with no graph yet, the default answer says it fell back to text',
+    usages.includes('No code graph for this project yet'),
+    usages.slice(0, 200),
+  );
+
+  execFileSync(process.execPath, ['--no-warnings', cli, 'scan'], { cwd: project, stdio: 'ignore' });
+  const graphed = await call('find_usages', { symbol: 'reconnectFeed' });
+  report(
+    'after a scan, the default answer comes from the graph',
+    graphed.includes('Source: src/feed.ts:1') && graphed.includes('Referenced by (1)'),
+    graphed.slice(0, 300),
   );
 } finally {
   await client.close();

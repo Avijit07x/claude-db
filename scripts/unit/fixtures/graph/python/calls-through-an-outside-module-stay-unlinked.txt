@@ -1,0 +1,8 @@
+=== jsonio.py
+import json as _json
+
+def dumps(value):
+    return _json.dumps(value)
+=== expected
+symbol jsonio.py:3 dumps function
+edge jsonio.py:4 dumps calls _json.dumps -> nothing EXTRACTED 1

@@ -1,0 +1,34 @@
+=== pkg/__init__.py
+from .core import Engine
+from . import util
+from .extra import *
+=== pkg/core.py
+class Engine:
+    pass
+=== pkg/util.py
+def helper():
+    return 1
+=== pkg/extra.py
+def more():
+    return 1
+=== main.py
+from pkg import Engine, more
+from pkg import util
+
+util.helper()
+Engine()
+more()
+=== expected
+symbol pkg/core.py:1 Engine class
+symbol pkg/extra.py:1 more function
+symbol pkg/util.py:1 helper function
+edge main.py:1 main.py imports Engine -> pkg/core.py:1 Engine EXTRACTED 1
+edge main.py:1 main.py imports more -> pkg/extra.py:1 more EXTRACTED 1
+edge main.py:2 main.py imports util -> nothing EXTRACTED 1
+edge main.py:4 main.py calls util.helper -> pkg/util.py:1 helper EXTRACTED 1
+edge main.py:4 main.py references util -> nothing EXTRACTED 1
+edge main.py:5 main.py calls Engine -> pkg/core.py:1 Engine EXTRACTED 1
+edge main.py:6 main.py calls more -> pkg/extra.py:1 more EXTRACTED 1
+edge pkg/__init__.py:1 pkg/__init__.py imports Engine -> pkg/core.py:1 Engine EXTRACTED 1
+edge pkg/__init__.py:2 pkg/__init__.py imports util -> nothing EXTRACTED 1
+edge pkg/__init__.py:3 pkg/__init__.py imports * -> nothing EXTRACTED 1

@@ -1,9 +1,15 @@
 import { createRequire } from 'node:module';
-import { DYNAMIC_LANGUAGES } from './languages/index.js';
+import { GRAMMARS, loadGrammar } from './grammars.js';
+
+export interface AstPosition {
+  line: number;
+  column: number;
+  index: number;
+}
 
 export interface AstRange {
-  start: { line: number; column: number };
-  end: { line: number; column: number };
+  start: AstPosition;
+  end: AstPosition;
 }
 
 export interface AstNode {
@@ -12,7 +18,8 @@ export interface AstNode {
   range(): AstRange;
   field(name: string): AstNode | null;
   parent(): AstNode | null;
-  findAll(matcher: { rule: { kind: string } }): AstNode[];
+  children(): AstNode[];
+  findAll(matcher: { rule: Record<string, unknown> }): AstNode[];
 }
 
 interface AstGrepModule {
@@ -41,9 +48,9 @@ export function loadParser(): AstGrepModule {
   }
 
   const dynamic: Record<string, unknown> = {};
-  for (const name of DYNAMIC_LANGUAGES) {
-    const mod = require(`@ast-grep/lang-${name}`) as { default?: unknown };
-    dynamic[name] = mod.default ?? mod;
+  for (const name of GRAMMARS) {
+    const grammar = loadGrammar(name);
+    if (grammar) dynamic[name] = grammar;
   }
   parser.registerDynamicLanguage(dynamic);
 

@@ -1,0 +1,52 @@
+=== src/h/Helpers.java
+package h;
+
+public class Helpers {
+  public static void run(Object o) {}
+  public static void go() {}
+}
+=== src/h/Util.java
+package h;
+
+public class Util {
+  public static void go() {}
+  public static void only() {}
+}
+=== src/u/Use.java
+package u;
+
+import static h.Helpers.run;
+import h.Util;
+
+public class Use {
+  void run() {}
+  void test() {
+    run(1);
+    Util.only();
+    Util.go();
+  }
+}
+=== expected
+symbol src/h/Helpers.java:3 Helpers class
+symbol src/h/Helpers.java:4 run method
+symbol src/h/Helpers.java:5 go method
+symbol src/h/Util.java:3 Util class
+symbol src/h/Util.java:4 go method
+symbol src/h/Util.java:5 only method
+symbol src/u/Use.java:6 Use class
+symbol src/u/Use.java:7 run method
+symbol src/u/Use.java:8 test method
+edge src/h/Helpers.java:4 Helpers defines run -> src/h/Helpers.java:4 run EXTRACTED 1
+edge src/h/Helpers.java:5 Helpers defines go -> src/h/Helpers.java:5 go EXTRACTED 1
+edge src/h/Util.java:4 Util defines go -> src/h/Util.java:4 go EXTRACTED 1
+edge src/h/Util.java:5 Util defines only -> src/h/Util.java:5 only EXTRACTED 1
+edge src/u/Use.java:3 src/u/Use.java imports Helpers -> src/h/Helpers.java:3 Helpers EXTRACTED 1
+edge src/u/Use.java:3 src/u/Use.java imports run -> src/h/Helpers.java:4 run EXTRACTED 1
+edge src/u/Use.java:4 src/u/Use.java imports Util -> src/h/Util.java:3 Util EXTRACTED 1
+edge src/u/Use.java:7 Use defines run -> src/u/Use.java:7 run EXTRACTED 1
+edge src/u/Use.java:8 Use defines test -> src/u/Use.java:8 test EXTRACTED 1
+edge src/u/Use.java:9 test calls run -> src/h/Helpers.java:4 run EXTRACTED 1
+edge src/u/Use.java:10 test calls Util.only -> src/h/Util.java:5 only EXTRACTED 1
+edge src/u/Use.java:10 test references Util -> src/h/Util.java:3 Util EXTRACTED 1
+edge src/u/Use.java:11 test calls Util.go -> src/h/Util.java:4 go EXTRACTED 1
+edge src/u/Use.java:11 test references Util -> src/h/Util.java:3 Util EXTRACTED 1

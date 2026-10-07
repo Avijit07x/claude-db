@@ -1,0 +1,21 @@
+=== go.mod
+module example.com/app
+
+go 1.22
+=== one/helper.go
+package one
+
+func Run() int { return 1 }
+=== one/user.go
+package one
+
+func Use() int { return Run() }
+=== two/helper.go
+package two
+
+func Run() int { return 2 }
+=== expected
+symbol one/helper.go:3 Run function
+symbol one/user.go:3 Use function
+symbol two/helper.go:3 Run function
+edge one/user.go:3 Use calls Run -> one/helper.go:3 Run EXTRACTED 1

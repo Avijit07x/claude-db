@@ -1,0 +1,14 @@
+=== src/a.ts
+export function alpha() { return 1; }
+export type Shape = { a: number };
+=== src/b.ts
+import type { Shape } from './a';
+=== src/c.ts
+import { type Shape } from './a';
+=== expected
+symbol src/a.ts:1 alpha function
+symbol src/a.ts:2 Shape type
+edge src/b.ts:1 src/b.ts imports ./a -> nothing EXTRACTED 1
+edge src/b.ts:1 src/b.ts imports Shape -> src/a.ts:2 Shape EXTRACTED 1
+edge src/c.ts:1 src/c.ts imports ./a -> nothing EXTRACTED 1
+edge src/c.ts:1 src/c.ts imports Shape -> src/a.ts:2 Shape EXTRACTED 1

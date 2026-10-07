@@ -1,0 +1,30 @@
+=== go.mod
+module example.com/app/v2
+=== tools/tools.go
+package tools
+
+func Make() {}
+=== sub/go.mod
+module example.com/sub
+=== sub/x/x.go
+package x
+
+func Make() {}
+=== main.go
+package main
+
+import (
+	"example.com/app/v2/tools"
+	"example.com/sub/x"
+)
+
+func main() {
+	tools.Make()
+	x.Make()
+}
+=== expected
+symbol main.go:8 main function
+symbol sub/x/x.go:3 Make function
+symbol tools/tools.go:3 Make function
+edge main.go:9 main calls tools.Make -> tools/tools.go:3 Make EXTRACTED 1
+edge main.go:10 main calls x.Make -> sub/x/x.go:3 Make EXTRACTED 1

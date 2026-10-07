@@ -429,7 +429,7 @@ ends it hit, and what it left uncommitted (up to 8 lines).
 ## 10. The code graph and `find_usages`
 
 **What.** `claude-db scan` parses your source files and stores every **symbol** (function, class, method,
-type, constant) and every **edge** between them (calls, imports, extends, implements, references, defines).
+type, constant) and every **edge** between them (calls, imports, extends, implements, references, defines, aliases).
 
 **Why.** "Who calls this?" is the question Claude asks before editing, renaming or deleting. Answering it with
 grep and reading files costs many tokens and cannot tell a call from an import. The graph answers in one call,
@@ -451,12 +451,15 @@ measured 2.0 times cheaper than grep and reading on eight real symbols.
 
 **Four modes of `find_usages`:**
 
-| Mode             | Answers                                       | Needs a scan |
-| ---------------- | --------------------------------------------- | ------------ |
-| `text` (default) | live `git grep`, never stale                  | No           |
-| `usages`         | what references the symbol, with the relation | Yes          |
-| `explain`        | that, plus what the symbol itself reaches     | Yes          |
-| `path`           | the shortest chain between two symbols        | Yes          |
+| Mode               | Answers                                                               | Needs a scan |
+| ------------------ | --------------------------------------------------------------------- | ------------ |
+| `usages` (default) | what references each definition, then the grep lines the graph missed | Yes          |
+| `explain`          | that, plus what the symbol itself reaches                             | Yes          |
+| `path`             | the shortest chain between two symbols                                | Yes          |
+| `text`             | live `git grep` only                                                  | No           |
+
+Each definition gets its own list of callers. Lines `git grep` finds that the graph could not link come last, so
+the answer never shows less than a plain search.
 
 **Example: `usages`.**
 
@@ -478,14 +481,17 @@ Shortest path (4 hops):
   cmdScan --> scanRepository --> extractFile --> symbolId --> observationId
 ```
 
-**Never stale.** Every graph query hashes the working tree first and re-parses only the files that changed,
-so it cannot report a line the source has moved past.
+**Never stale.** Every graph query hashes the working tree first and refreshes when anything changed. A refresh
+parses only the changed files, reads the rest from a per-project cache in `~/.claude-memory/graph-cache/`, and
+links every reference again, so other files see a symbol that was added or removed. The scan yields after each
+file, because Node frees ast-grep's native trees only when the event loop turns.
 
 **The grep helper.** The `prefer-usages.js` hook watches for Claude running `grep`, `rg` or the Grep tool on
 a code symbol that the graph knows. By default it **blocks** that grep and puts the graph's answer in the
 reason, so Claude sees the callers and inherits at once and nothing needs re-running. It shows at most two
-symbols and 14 lines each, and ends with "more via find_usages". A grep for plain text, or for a name the
-graph does not know, runs as normal.
+symbols and 14 lines each, and ends with "more via find_usages", followed by up to six text matches the graph
+could not link. A grep for plain text, or for a name the graph does not know, runs as normal. When files
+changed since the last scan, the hook says so and refreshes in the background, so it never waits.
 
 | `CLAUDE_DB_USAGES_HOOK` | What happens                                               |
 | ----------------------- | ---------------------------------------------------------- |
@@ -493,8 +499,24 @@ graph does not know, runs as normal.
 | `directive`             | The grep runs, and the graph answer is added as context    |
 | `off`                   | The hook does nothing                                      |
 
-**Known gaps** (measured, with plans in [find-usages-accuracy.md](./find-usages-accuracy.md)): the graph does
-not yet list the files that import a symbol, and it merges symbols that share a name.
+**Imports.** A name that a file imports is bound to the symbol in the module it came from, so `usages` lists
+the importing files in an `Imported by` group and a call through an alias reaches the right symbol even when
+another module has one with the same name. This is built once, in `src/graph/modules/`, and each language adds
+a small adapter: how its imports are written, how a module name maps to a file (`tsconfig` and `package.json`
+for TypeScript and JavaScript, package folders for Python, `go.mod` for Go, the `mod` tree and `Cargo.toml`
+for Rust, the `package` line of each file for Java and Kotlin), and which identifiers count as a use. A name from outside the repository is never matched to a
+symbol of the same name inside it. Go imports whole packages, so its `usages` has no `Imported by` group.
+Grammars ship in one package per platform (`claude-db-grammars-<platform>`, built by `scripts/grammars.mjs`); where
+none installs, those languages are read by pattern. In Java and Kotlin, `x.method()` is bound through the declared
+type of `x`, its parent classes and the return type of a chained call (`scan/receivers.ts`); a call on a value of
+unknown type stays `INFERRED`.
+`export { a as b }` creates a symbol `b` with an `aliases` edge to `a`, and `usages a` follows those edges up
+to three levels, so it lists the users of `b` too. Measurements: `npm run bench:usages`, against compilers and
+independent checkers on pinned public repositories.
+
+**Known gaps** (measured, with the plan in [plan-code-graph.md](./plan-code-graph.md)): the graph
+merges symbols that share a name when no import says which one is meant, and it does not follow an imported
+name in the other languages it only reads by pattern.
 
 **The `/cdb-scan` skill** is the second pass. After `claude-db scan` builds the graph, the skill writes five
 notes: stack, layout, conventions, workflows and architecture. They are tagged `inferred`, because they are
@@ -541,6 +563,7 @@ the instruction file holds for the whole chat, so recall becomes the default.
 | Haiku      | `distill [on\|off] [--backfill]`     | Facts: status, switch, or build now for waiting chats             |
 |            | `pick [on\|off]`                     | Picks: status or switch                                           |
 | Code graph | `scan [--force]`                     | Build or refresh the graph                                        |
+|            | `languages [add\|remove <name>]`     | Show the languages read with real syntax; add or remove a grammar |
 |            | `usages [--mode m] <symbol>`         | Ask the graph or `git grep`                                       |
 | Data       | `export`, `import`, `sync <url>`     | Back up, restore, or two-way merge with another database          |
 |            | `use <url>`                          | Switch database, after checking it answers                        |
@@ -711,7 +734,7 @@ src/
  ├── search/       keyword + vector fusion, recency, stopwords        (database-independent)
  ├── facts/        distill (Haiku), fact model, rendering, budget, import of Claude's own memory files
  ├── pick/         pick prompt, run, worker, pending files
- ├── graph/        parser, languages, scan, query (usages / explain / path), refresh
+ ├── graph/        parser, languages, scan, modules (imports per language), query (usages / explain / path), refresh
  ├── usages/       the live git-grep mode
  ├── store/        one adapter interface + sqlite/, postgres/, mongo/
  ├── embed/        builtin hashing embedder, optional transformers embedder
@@ -768,22 +791,22 @@ through one shared function, so the output format stays in one place.
 
 ## 21. Words used in this project
 
-| Word        | Meaning                                                                              |
-| ----------- | ------------------------------------------------------------------------------------ |
-| Observation | One saved record of a turn: kind, title, body, files, commands                       |
-| Fact        | A short lasting lesson (rule, decision, dead end, to do, fact) with a stable key     |
-| Project     | The git repository root of the folder you work in                                    |
-| Session     | One Claude Code chat                                                                 |
-| Hook        | A small script Claude Code runs at a fixed moment                                    |
-| MCP server  | A helper Claude Code starts, which Claude can call as tools                          |
-| Pick        | The one or two notes Haiku chooses to show with a prompt                             |
-| Candidate   | One of the ten notes the search offers to the picker                                 |
-| Distill     | Turn a finished chat into facts                                                      |
-| Backfill    | Distill every chat that is still waiting                                             |
-| Symbol      | A named piece of code: function, class, method, type, constant                       |
-| Edge        | A link between two symbols: calls, imports, extends, implements, references, defines |
-| EXTRACTED   | An edge read literally from the syntax                                               |
-| INFERRED    | An edge matched by name across files, with a score                                   |
-| Embedding   | A list of numbers that stands for the meaning of a text, used for vector search      |
-| Redaction   | Replacing secrets with a marker before saving                                        |
-| Pause       | The wait after a failed Haiku call: 1 hour, then 6 hours, then a day                 |
+| Word        | Meaning                                                                                       |
+| ----------- | --------------------------------------------------------------------------------------------- |
+| Observation | One saved record of a turn: kind, title, body, files, commands                                |
+| Fact        | A short lasting lesson (rule, decision, dead end, to do, fact) with a stable key              |
+| Project     | The git repository root of the folder you work in                                             |
+| Session     | One Claude Code chat                                                                          |
+| Hook        | A small script Claude Code runs at a fixed moment                                             |
+| MCP server  | A helper Claude Code starts, which Claude can call as tools                                   |
+| Pick        | The one or two notes Haiku chooses to show with a prompt                                      |
+| Candidate   | One of the ten notes the search offers to the picker                                          |
+| Distill     | Turn a finished chat into facts                                                               |
+| Backfill    | Distill every chat that is still waiting                                                      |
+| Symbol      | A named piece of code: function, class, method, type, constant                                |
+| Edge        | A link between two symbols: calls, imports, extends, implements, references, defines, aliases |
+| EXTRACTED   | An edge read literally from the syntax                                                        |
+| INFERRED    | An edge matched by name across files, with a score                                            |
+| Embedding   | A list of numbers that stands for the meaning of a text, used for vector search               |
+| Redaction   | Replacing secrets with a marker before saving                                                 |
+| Pause       | The wait after a failed Haiku call: 1 hour, then 6 hours, then a day                          |

@@ -1,0 +1,38 @@
+=== Cargo.toml
+[package]
+name = "app"
+version = "0.1.0"
+=== src/lib.rs
+mod prelude;
+mod util;
+=== src/util.rs
+pub fn helper() {}
+=== src/prelude.rs
+pub use crate::util::*;
+=== src/main.rs
+use app::prelude::helper;
+use app::util;
+
+fn go() {
+    helper();
+    util::helper();
+}
+=== tests/it.rs
+use app::util::helper;
+
+fn t() {
+    helper();
+}
+=== expected
+symbol src/main.rs:4 go function
+symbol src/util.rs:1 helper function
+symbol tests/it.rs:3 t function
+edge src/main.rs:1 src/main.rs imports helper -> src/util.rs:1 helper EXTRACTED 1
+edge src/main.rs:2 src/main.rs imports util -> nothing EXTRACTED 1
+edge src/main.rs:5 go calls helper -> src/util.rs:1 helper EXTRACTED 1
+edge src/main.rs:6 go calls util::helper -> src/util.rs:1 helper EXTRACTED 1
+edge src/main.rs:6 go references helper -> src/util.rs:1 helper EXTRACTED 1
+edge src/main.rs:6 go references util -> nothing EXTRACTED 1
+edge src/prelude.rs:1 src/prelude.rs imports * -> nothing EXTRACTED 1
+edge tests/it.rs:1 tests/it.rs imports helper -> src/util.rs:1 helper EXTRACTED 1
+edge tests/it.rs:4 t calls helper -> src/util.rs:1 helper EXTRACTED 1

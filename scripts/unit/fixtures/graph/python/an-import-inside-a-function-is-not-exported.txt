@@ -1,0 +1,15 @@
+=== a.py
+def run():
+    return 1
+=== main.py
+def go():
+    from a import run
+    return run()
+=== other.py
+from main import run
+=== expected
+symbol a.py:1 run function
+symbol main.py:1 go function
+edge main.py:2 go imports run -> a.py:1 run EXTRACTED 1
+edge main.py:3 go calls run -> a.py:1 run EXTRACTED 1
+edge other.py:1 other.py imports run -> a.py:1 run INFERRED 0.95

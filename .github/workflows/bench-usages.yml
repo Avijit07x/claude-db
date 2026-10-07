@@ -1,0 +1,49 @@
+name: Usages benchmark
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  accuracy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/claude-db-bench
+          key: bench-usages-${{ hashFiles('scripts/bench-usages/corpus.json') }}
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Compare with the baseline
+        run: npm run bench:usages -- --check --runs 1 --dir ~/.cache/claude-db-bench --out bench-usages.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-usages
+          path: bench-usages.json

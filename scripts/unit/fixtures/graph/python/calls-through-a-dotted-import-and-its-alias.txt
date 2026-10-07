@@ -1,0 +1,14 @@
+=== pkg/__init__.py
+=== pkg/util.py
+def helper():
+    return 1
+=== main.py
+import pkg.util
+import pkg.util as u
+
+pkg.util.helper()
+u.helper()
+=== expected
+symbol pkg/util.py:1 helper function
+edge main.py:4 main.py calls pkg.util.helper -> pkg/util.py:1 helper EXTRACTED 1
+edge main.py:5 main.py calls u.helper -> pkg/util.py:1 helper EXTRACTED 1

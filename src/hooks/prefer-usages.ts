@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 import { createContext } from '../context.js';
-import { formatGraph, queryGraph } from '../graph/index.js';
+import type { RecallContext } from '../context.js';
+import { addText, answerQuery, formatGraph, formatText } from '../graph/index.js';
+import type { GraphAnswer } from '../graph/query/lookup.js';
+import { staleFiles } from '../graph/query/stale.js';
+import type { MemoryStore } from '../store/adapter.js';
+import { repoRootFor } from '../usages/index.js';
 import { DECLARED, isSymbol, isWord, symbolsGreppedIn } from './grep-symbols.js';
+import { refreshGraphInBackground } from './graph-refresh.js';
 import { readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
@@ -10,6 +16,8 @@ silenceSqliteWarning();
 
 const MAX_SYMBOLS = 2;
 const MAX_LINES = 14;
+const TEXT_LINES = 6;
+const EDGE_LIMIT = 20;
 
 function requested(payload: {
   tool_name?: string;
@@ -32,6 +40,62 @@ function trim(answer: string): string {
   return [...lines.slice(0, MAX_LINES), `  ... more via find_usages`].join('\n');
 }
 
+const answers = (answer: GraphAnswer, symbol: string): boolean =>
+  !answer.empty && (isSymbol(symbol) || answer.definitions.some((d) => DECLARED.has(d.kind)));
+
+function block(answer: GraphAnswer, root: string): string {
+  const graph = trim(formatGraph(answer, root, { text: false }));
+  return [graph, ...formatText(answer.text, TEXT_LINES)].join('\n');
+}
+
+const staleNote = (count: number): string =>
+  `(${count} file(s) changed since the last scan and are being re-read in the background, ` +
+  'so lines in them may have moved. The text matches are live.)';
+
+async function freshnessNote(store: MemoryStore, project: string): Promise<string | null> {
+  try {
+    const root = repoRootFor(project);
+    const stale = staleFiles(root, await store.scannedFiles(project));
+    if (stale.length === 0) return null;
+    refreshGraphInBackground(project, root);
+    return staleNote(stale.length);
+  } catch {
+    return null;
+  }
+}
+
+interface Answered {
+  named: string[];
+  blocks: string[];
+}
+
+async function answerSymbols(
+  ctx: RecallContext,
+  project: string,
+  symbols: string[],
+): Promise<Answered> {
+  const answered: Answered = { named: [], blocks: [] };
+  for (const symbol of symbols) {
+    const answer = await answerQuery({
+      store: ctx.store,
+      root: project,
+      project,
+      query: { mode: 'usages', symbol, limit: EDGE_LIMIT },
+      refresh: false,
+      text: false,
+    });
+    if (!answers(answer, symbol)) continue;
+    addText(answer, project);
+    answered.named.push(symbol);
+    answered.blocks.push(block(answer, project));
+  }
+  if (answered.blocks.length > 0) {
+    const note = await freshnessNote(ctx.store, project);
+    if (note) answered.blocks.push(note);
+  }
+  return answered;
+}
+
 await runHook(async () => {
   const mode = process.env['CLAUDE_DB_USAGES_HOOK'] ?? 'deny';
   if (mode === 'off') return;
@@ -42,19 +106,13 @@ await runHook(async () => {
 
   const project = resolveProject(payload.cwd);
   const ctx = await createContext();
-  const blocks: string[] = [];
-  const named: string[] = [];
+  let answered: Answered;
   try {
-    for (const symbol of symbols) {
-      const answer = await queryGraph(ctx.store, project, { mode: 'usages', symbol, limit: 20 });
-      if (answer.empty) continue;
-      if (!isSymbol(symbol) && !answer.definitions.some((d) => DECLARED.has(d.kind))) continue;
-      named.push(symbol);
-      blocks.push(trim(formatGraph(answer, project)));
-    }
+    answered = await answerSymbols(ctx, project, symbols);
   } finally {
     await ctx.close();
   }
+  const { named, blocks } = answered;
   if (blocks.length === 0) return;
 
   const names = named.map((s) => `\`${s}\``).join(', ');

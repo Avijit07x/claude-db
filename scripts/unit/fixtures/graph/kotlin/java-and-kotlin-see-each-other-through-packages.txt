@@ -1,0 +1,31 @@
+=== src/j/Shared.java
+package j;
+
+public class Shared {}
+=== src/j/Back.kt
+package j
+
+class Back
+=== src/k/Use.kt
+package k
+
+import j.Shared
+
+class Use(val s: Shared)
+=== src/k/UseJava.java
+package k;
+
+import j.Back;
+
+public class UseJava {
+  Back b;
+}
+=== expected
+symbol src/j/Back.kt:3 Back class
+symbol src/j/Shared.java:3 Shared class
+symbol src/k/Use.kt:5 Use class
+symbol src/k/UseJava.java:5 UseJava class
+edge src/k/Use.kt:3 src/k/Use.kt imports Shared -> src/j/Shared.java:3 Shared EXTRACTED 1
+edge src/k/Use.kt:5 Use references Shared -> src/j/Shared.java:3 Shared EXTRACTED 1
+edge src/k/UseJava.java:3 src/k/UseJava.java imports Back -> src/j/Back.kt:3 Back EXTRACTED 1
+edge src/k/UseJava.java:6 UseJava references Back -> src/j/Back.kt:3 Back EXTRACTED 1
