@@ -6,6 +6,7 @@ import { scopeFilter, visibleFilter } from './filters.js';
 import type { VectorCache } from './filters.js';
 import * as searchOps from './search.js';
 import { cosine } from '../../util/vector.js';
+import { noProjects } from '../project-scope.js';
 
 export async function searchVector(
   observations: Collection<ObservationDoc>,
@@ -13,6 +14,7 @@ export async function searchVector(
   vector: number[],
   query: SearchQuery,
 ): Promise<ObservationIndexEntry[]> {
+  if (noProjects(query.project)) return [];
   if (cache.atlasVectorIndex === null) {
     cache.atlasVectorIndex = await searchOps.hasAtlasVectorIndex(observations);
   }

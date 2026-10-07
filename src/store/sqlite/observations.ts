@@ -4,10 +4,11 @@ import type { ProjectSummary } from '../adapter.js';
 import { foreignNames, isWholeScope } from '../adapter.js';
 import type { Row } from './rows.js';
 import { toObservation } from './rows.js';
-import { removeWhere } from './filters.js';
+import { projectClause, removeWhere } from './filters.js';
 import { partitionIds } from '../../util/shortid.js';
 import { packVector } from '../../util/vector.js';
 import { scopeToken } from '../../util/scope.js';
+import { noProjects } from '../project-scope.js';
 
 export async function insertObservations(
   db: DatabaseSync,
@@ -72,6 +73,7 @@ export async function getObservations(db: DatabaseSync, ids: string[]): Promise<
 }
 
 export async function remove(db: DatabaseSync, filter: RemoveFilter): Promise<number> {
+  if (noProjects(filter.project)) return 0;
   if (filter.ids?.length === 0) return 0;
 
   const { where, params } = removeWhere(filter);
@@ -85,8 +87,10 @@ export async function remove(db: DatabaseSync, filter: RemoveFilter): Promise<nu
   try {
     db.prepare(`DELETE FROM observations ${where}`).run(...(params as never[]));
     if (wipe) {
-      const scope = filter.project ? 'WHERE project = ?' : '';
-      const scopeParams = (filter.project ? [filter.project] : []) as never[];
+      const wipeParams: unknown[] = [];
+      const wipeClause = projectClause('project', filter.project, wipeParams);
+      const scope = wipeClause ? `WHERE ${wipeClause}` : '';
+      const scopeParams = wipeParams as never[];
       db.prepare(`DELETE FROM sessions ${scope}`).run(...scopeParams);
       for (const table of ['symbols', 'symbol_edges', 'scanned_files']) {
         db.prepare(`DELETE FROM ${table} ${scope}`).run(...scopeParams);
@@ -103,13 +107,12 @@ export async function remove(db: DatabaseSync, filter: RemoveFilter): Promise<nu
 }
 
 export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observation[]> {
+  if (noProjects(filter.project)) return [];
   const conditions: string[] = [];
   const params: unknown[] = [];
 
-  if (filter.project) {
-    conditions.push('project = ?');
-    params.push(filter.project);
-  }
+  const project = projectClause('project', filter.project, params);
+  if (project) conditions.push(project);
   if (filter.sessionId) {
     conditions.push('session_id = ?');
     params.push(filter.sessionId);

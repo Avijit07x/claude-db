@@ -3,7 +3,7 @@ export const TSV_EXPRESSION = `
   setweight(to_tsvector('english', coalesce(tags::text, '')), 'B') ||
   setweight(to_tsvector('english', coalesce(body, '')), 'C')`;
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const DDL = `
       CREATE TABLE IF NOT EXISTS claude_db_meta (
@@ -48,6 +48,14 @@ export const DDL = `
 
       ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at   BIGINT;
       ALTER TABLE sessions ADD COLUMN IF NOT EXISTS distilled_at BIGINT;
+
+      CREATE TABLE IF NOT EXISTS project_links (
+        folder      TEXT   NOT NULL,
+        project_key TEXT   NOT NULL,
+        first_seen  BIGINT NOT NULL,
+        PRIMARY KEY (folder, project_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_project_links_key ON project_links(project_key);
 
       CREATE TABLE IF NOT EXISTS symbols (
         id        TEXT PRIMARY KEY,

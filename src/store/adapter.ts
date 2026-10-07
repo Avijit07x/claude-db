@@ -5,6 +5,7 @@ import type {
   ListFilter,
   Observation,
   ObservationIndexEntry,
+  ProjectFilter,
   RemoveFilter,
   ScannedFile,
   SearchQuery,
@@ -26,9 +27,12 @@ export interface MemoryStore {
   close(): Promise<void>;
   ping(): Promise<boolean>;
 
+  linkProject(folder: string, key: string, now?: number): Promise<void>;
+  projectScope(folder: string): Promise<string[]>;
+
   upsertSession(session: Session): Promise<void>;
   getSession(id: string): Promise<Session | null>;
-  recentSessions(project: string, limit: number): Promise<Session[]>;
+  recentSessions(project: ProjectFilter, limit: number): Promise<Session[]>;
 
   sessionProjects(): Promise<string[]>;
   clearSummary(id: string): Promise<boolean>;
@@ -72,7 +76,7 @@ export function isWholeScope(filter: RemoveFilter): boolean {
 }
 
 const OURS =
-  /^(claude_db_meta|sessions|observations|symbols|symbol_edges|scanned_files)(_fts(_\w+)?)?$/;
+  /^(claude_db_meta|sessions|observations|symbols|symbol_edges|scanned_files|project_links)(_fts(_\w+)?)?$/;
 
 export function foreignNames(names: string[]): string[] {
   return names.filter((name) => name.length > 0 && !OURS.test(name));

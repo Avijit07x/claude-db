@@ -1,11 +1,21 @@
-import type { SearchQuery } from '../../types.js';
+import type { ProjectFilter, SearchQuery } from '../../types.js';
+import { projectsOf } from '../project-scope.js';
+
+export function projectClause(
+  filter: ProjectFilter | undefined,
+  values: unknown[],
+  column = 'project',
+): string | null {
+  const projects = projectsOf(filter);
+  if (projects.length === 0) return null;
+  values.push(projects);
+  return `${column} = ANY($${values.length}::text[])`;
+}
 
 export function appendScope(query: SearchQuery, conditions: string[], values: unknown[]): void {
   conditions.push("status <> 'replaced'");
-  if (query.project) {
-    values.push(query.project);
-    conditions.push(`project = $${values.length}`);
-  }
+  const project = projectClause(query.project, values);
+  if (project) conditions.push(project);
   if (query.kind) {
     values.push(query.kind);
     conditions.push(`kind = $${values.length}`);

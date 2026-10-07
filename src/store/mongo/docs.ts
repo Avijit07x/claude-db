@@ -68,6 +68,13 @@ export interface ScannedFileDoc extends Doc {
   scannedAt: number;
 }
 
+export interface ProjectLinkDoc extends Doc {
+  _id: string;
+  folder: string;
+  projectKey: string;
+  firstSeen: number;
+}
+
 export function upsertsOf<T extends object>(rows: T[], idOf: (row: T) => string): Doc[] {
   return rows.map((row) => {
     const replacement: Record<string, unknown> = { ...row, _id: idOf(row) };

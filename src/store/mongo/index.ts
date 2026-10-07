@@ -4,6 +4,7 @@ import type { VectorCache } from './filters.js';
 import * as observationsOps from './observations.js';
 import * as sessionsOps from './sessions.js';
 import * as graphOps from './graph.js';
+import * as projectLinksOps from './project-links.js';
 import type {
   CodeEdge,
   CodeSymbol,
@@ -11,6 +12,7 @@ import type {
   ListFilter,
   Observation,
   ObservationIndexEntry,
+  ProjectFilter,
   RemoveFilter,
   ScannedFile,
   SearchQuery,
@@ -20,7 +22,14 @@ import type {
 } from '../../types.js';
 import type { Collection, Db, Doc, MongoClient } from './driver.js';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
-import { EdgeDoc, ObservationDoc, ScannedFileDoc, SessionDoc, SymbolDoc } from './docs.js';
+import {
+  EdgeDoc,
+  ObservationDoc,
+  ProjectLinkDoc,
+  ScannedFileDoc,
+  SessionDoc,
+  SymbolDoc,
+} from './docs.js';
 import { databaseNameFrom } from './helpers.js';
 import { foreignNames } from '../adapter.js';
 import { importMongo } from './driver.js';
@@ -38,6 +47,7 @@ export class MongoStore implements MemoryStore {
     private readonly symbols: Collection<SymbolDoc>,
     private readonly edges: Collection<EdgeDoc>,
     private readonly scanned: Collection<ScannedFileDoc>,
+    private readonly links: Collection<ProjectLinkDoc>,
   ) {}
 
   static async create(uri: string): Promise<MongoStore> {
@@ -53,6 +63,7 @@ export class MongoStore implements MemoryStore {
       db.collection<SymbolDoc>('symbols'),
       db.collection<EdgeDoc>('symbol_edges'),
       db.collection<ScannedFileDoc>('scanned_files'),
+      db.collection<ProjectLinkDoc>('project_links'),
     );
   }
 
@@ -70,6 +81,8 @@ export class MongoStore implements MemoryStore {
     await this.edges.createIndex({ project: 1, dstId: 1 });
     await this.edges.createIndex({ project: 1, file: 1 });
     await this.scanned.createIndex({ project: 1, path: 1 }, { unique: true });
+    await this.links.createIndex({ folder: 1, projectKey: 1 }, { unique: true });
+    await this.links.createIndex({ projectKey: 1 });
   }
 
   async close(): Promise<void> {
@@ -81,6 +94,14 @@ export class MongoStore implements MemoryStore {
     return res['ok'] === 1;
   }
 
+  async linkProject(folder: string, key: string, now = Date.now()): Promise<void> {
+    return projectLinksOps.linkProject(this.links, folder, key, now);
+  }
+
+  async projectScope(folder: string): Promise<string[]> {
+    return projectLinksOps.projectScope(this.links, folder);
+  }
+
   async upsertSession(session: Session): Promise<void> {
     return sessionsOps.upsertSession(this.sessions, session);
   }
@@ -89,7 +110,7 @@ export class MongoStore implements MemoryStore {
     return sessionsOps.getSession(this.sessions, id);
   }
 
-  async recentSessions(project: string, limit: number): Promise<Session[]> {
+  async recentSessions(project: ProjectFilter, limit: number): Promise<Session[]> {
     return sessionsOps.recentSessions(this.sessions, project, limit);
   }
 

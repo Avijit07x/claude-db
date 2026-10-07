@@ -2,6 +2,7 @@ import * as observationsOps from './observations.js';
 import * as searchOps from './search.js';
 import * as sessionsOps from './sessions.js';
 import * as graphOps from './graph.js';
+import * as projectLinksOps from './project-links.js';
 import type {
   CodeEdge,
   CodeSymbol,
@@ -9,6 +10,7 @@ import type {
   ListFilter,
   Observation,
   ObservationIndexEntry,
+  ProjectFilter,
   RemoveFilter,
   ScannedFile,
   SearchQuery,
@@ -88,6 +90,14 @@ export class SqliteStore implements MemoryStore {
     return this.db.prepare('SELECT 1 AS ok').get() !== undefined;
   }
 
+  async linkProject(folder: string, key: string, now = Date.now()): Promise<void> {
+    return projectLinksOps.linkProject(this.db, folder, key, now);
+  }
+
+  async projectScope(folder: string): Promise<string[]> {
+    return projectLinksOps.projectScope(this.db, folder);
+  }
+
   async upsertSession(session: Session): Promise<void> {
     return sessionsOps.upsertSession(this.db, session);
   }
@@ -96,7 +106,7 @@ export class SqliteStore implements MemoryStore {
     return sessionsOps.getSession(this.db, id);
   }
 
-  async recentSessions(project: string, limit: number): Promise<Session[]> {
+  async recentSessions(project: ProjectFilter, limit: number): Promise<Session[]> {
     return sessionsOps.recentSessions(this.db, project, limit);
   }
 

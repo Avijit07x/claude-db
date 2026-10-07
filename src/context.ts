@@ -5,6 +5,8 @@ import { createEmbedder, NoopEmbedder } from './embed/index.js';
 import { SearchService } from './search/index.js';
 import type { MemoryStore } from './store/adapter.js';
 import { createStore } from './store/index.js';
+import { createScopeResolver } from './store/project-resolver.js';
+import { withProjectScope } from './store/scoped-store.js';
 
 export interface RecallContext {
   config: Config;
@@ -17,8 +19,12 @@ export interface RecallContext {
 export async function createContext(overrides?: Partial<Config>): Promise<RecallContext> {
   const config = { ...loadConfig(), ...overrides };
 
-  const store = await createStore(config.database);
-  await store.init();
+  const raw = await createStore(config.database);
+  await raw.init();
+  const store = withProjectScope(
+    raw,
+    createScopeResolver({ store: raw, remote: config.project.remote }),
+  );
 
   let pending: Promise<Embedder> | null = null;
   const embedder = (): Promise<Embedder> => {

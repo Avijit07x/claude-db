@@ -1,6 +1,6 @@
 import type { RecallContext } from '../context.js';
 import { openWork } from '../capture/progress.js';
-import { FACT_SESSION, factType } from '../facts/model.js';
+import { FACT_SESSION, factType, onePerKey } from '../facts/model.js';
 import { handoffBodyLines, newestHandoff } from '../facts/handoff.js';
 import type { GitState } from './git-state.js';
 import { readGitState } from './git-state.js';
@@ -38,8 +38,8 @@ export async function gatherCatchup(
     newest: true,
     limit: FACTS_SCANNED,
   });
-  const todos = facts
-    .filter((obs) => obs.status !== 'replaced' && factType(obs) === 'todo')
+  const todos = onePerKey(facts.filter((obs) => obs.status !== 'replaced'))
+    .filter((obs) => factType(obs) === 'todo')
     .slice(0, TODOS)
     .map((obs) => obs.title);
 

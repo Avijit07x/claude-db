@@ -125,8 +125,13 @@ export async function cmdStatus(): Promise<void> {
     console.log(`mcp      : ${mcpFile ? `registered (${mcpFile})` : 'NOT REGISTERED'}`);
     console.log(`sessions : ${sessions.length} recorded for this project`);
 
-    const saved = (await ctx.store.listProjects()).find((entry) => entry.project === project);
-    const lastSaved = saved?.lastActive ?? 0;
+    const names = await ctx.store.projectScope(project);
+    const lastSaved = Math.max(
+      0,
+      ...(await ctx.store.listProjects())
+        .filter((entry) => names.includes(entry.project))
+        .map((entry) => entry.lastActive),
+    );
     const worked = workedAt(project);
     console.log(`worked   : ${worked.last > 0 ? ago(worked.last) : 'never'}`);
     console.log(`recorded : ${lastSaved > 0 ? ago(lastSaved) : 'never'}`);

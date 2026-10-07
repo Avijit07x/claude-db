@@ -39,9 +39,11 @@ export interface ObservationIndexEntry {
   snippet?: string;
 }
 
+export type ProjectFilter = string | readonly string[];
+
 export interface SearchQuery {
   text: string;
-  project?: string;
+  project?: ProjectFilter;
   kind?: ObservationKind;
   tag?: string;
   since?: number;
@@ -54,13 +56,13 @@ export interface SearchQuery {
 
 export interface RemoveFilter {
   ids?: string[];
-  project?: string;
+  project?: ProjectFilter;
   kind?: ObservationKind;
   before?: number;
 }
 
 export interface ListFilter {
-  project?: string;
+  project?: ProjectFilter;
   sessionId?: string;
   kind?: ObservationKind;
   status?: ObservationStatus;

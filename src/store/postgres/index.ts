@@ -5,6 +5,7 @@ import * as searchOps from './search.js';
 import * as observationsOps from './observations.js';
 import * as sessionsOps from './sessions.js';
 import * as graphOps from './graph.js';
+import * as projectLinksOps from './project-links.js';
 import type {
   CodeEdge,
   CodeSymbol,
@@ -12,6 +13,7 @@ import type {
   ListFilter,
   Observation,
   ObservationIndexEntry,
+  ProjectFilter,
   RemoveFilter,
   ScannedFile,
   SearchQuery,
@@ -130,6 +132,14 @@ export class PostgresStore implements MemoryStore {
     return res.rowCount === 1;
   }
 
+  async linkProject(folder: string, key: string, now = Date.now()): Promise<void> {
+    return projectLinksOps.linkProject(this.pool, folder, key, now);
+  }
+
+  async projectScope(folder: string): Promise<string[]> {
+    return projectLinksOps.projectScope(this.pool, folder);
+  }
+
   async upsertSession(session: Session): Promise<void> {
     return sessionsOps.upsertSession(this.pool, session);
   }
@@ -142,7 +152,7 @@ export class PostgresStore implements MemoryStore {
     return sessionsOps.sessionProjects(this.pool);
   }
 
-  async recentSessions(project: string, limit: number): Promise<Session[]> {
+  async recentSessions(project: ProjectFilter, limit: number): Promise<Session[]> {
     return sessionsOps.recentSessions(this.pool, project, limit);
   }
 

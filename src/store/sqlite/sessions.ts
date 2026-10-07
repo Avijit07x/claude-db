@@ -1,8 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { Session } from '../../types.js';
+import type { ProjectFilter, Session } from '../../types.js';
+import { projectClause } from './filters.js';
 import type { Row } from './rows.js';
 import { toSession } from './rows.js';
 import { summaryTime } from '../session-time.js';
+import { noProjects } from '../project-scope.js';
 
 export async function upsertSession(db: DatabaseSync, session: Session): Promise<void> {
   db.prepare(
@@ -41,16 +43,19 @@ export async function getSession(db: DatabaseSync, id: string): Promise<Session 
 
 export async function recentSessions(
   db: DatabaseSync,
-  project: string,
+  project: ProjectFilter,
   limit: number,
 ): Promise<Session[]> {
+  if (noProjects(project)) return [];
+  const params: unknown[] = [];
+  const scope = projectClause('project', project, params) ?? '1 = 1';
   const rows = db
     .prepare(
       `SELECT * FROM sessions
-         WHERE project = ? AND summary IS NOT NULL
+         WHERE ${scope} AND summary IS NOT NULL
          ORDER BY started_at DESC LIMIT ?`,
     )
-    .all(project, limit) as Row[];
+    .all(...(params as never[]), limit) as Row[];
   return rows.map(toSession);
 }
 
