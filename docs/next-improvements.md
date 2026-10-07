@@ -52,8 +52,9 @@ tried today, and no pause is active.
 
 **What was verified.**
 
-- `doctor` prints `claude   : <path> (from <source>)`. With no `claude` it prints `NOT FOUND`, the fix, and
-  exits 1 when facts or picks are on. Tested with an empty `PATH` and no saved path.
+- `doctor` prints `claude   : <path> (from <source>)`. With no `claude` it prints `NOT FOUND` and the fix, and
+  still exits 0, because it is a warning. It first exited 1, which failed the packed-install check in CI, where
+  there is no `claude`. Tested with an empty `PATH` and no saved path.
 - `doctor --deep` makes one Haiku call, not counted against the daily limits, and reports it. Tested for
   success, a failed call and no binary.
 - `status` shows the warning for a chat past a day, and not for one under a day, a day with a call tried, or
@@ -155,8 +156,10 @@ because the plan asked for "one line per chat" there. The facts count in each li
 
 ## 3. Test the parent-process lookup on macOS
 
-**Status: built, not done yet.** The check passes on Linux here. It is done only when CI passes it on
-`macos-latest`, which has not run.
+**Status: fixed after the first CI run, waiting for the second.** CI on `macos-latest` showed that `ps` prints
+only the program name (`node`, `claude`), not a path. The lookup now returns nothing for a bare name and
+leaves it to the `PATH` search, and the check only requires an existing file when the path is absolute. It is
+done when the next CI run passes on `macos-latest`.
 
 **Problem.** The 0.10.3 lookup reads `/proc` on Linux and runs `ps` on macOS. Only the Linux path was tried
 on a real machine. The macOS path is covered by logic tests with a fake process table, not by a real `ps`.

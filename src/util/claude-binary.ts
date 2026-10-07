@@ -8,7 +8,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, delimiter, join } from 'node:path';
+import { basename, delimiter, isAbsolute, join } from 'node:path';
 import { CONFIG_DIR } from '../config/dir.js';
 
 const REMEMBERED_FILE = join(CONFIG_DIR, 'claude-binary');
@@ -63,7 +63,7 @@ export function findClaudeAncestor(
   for (let depth = 0; depth < MAX_ANCESTORS && pid > 1; depth++) {
     const info = inspect(pid);
     if (!info) return null;
-    if (isClaude(info.exe)) return info.exe;
+    if (isClaude(info.exe)) return isAbsolute(info.exe) ? info.exe : null;
     pid = info.parent;
   }
   return null;

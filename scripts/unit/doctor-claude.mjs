@@ -133,8 +133,8 @@ export default async function run() {
 
     const none = runOrphaned(work, 'doctor', base);
     check(
-      'doctor says claude was not found and exits non-zero',
-      none.stdout.includes('claude   : NOT FOUND') && none.status === 1,
+      'doctor says claude was not found and still exits zero, because it is a warning',
+      none.stdout.includes('claude   : NOT FOUND') && none.status === 0,
       `exit ${none.status}`,
     );
 

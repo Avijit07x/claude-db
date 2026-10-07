@@ -17,12 +17,12 @@ export async function linkProject(
 export async function projectScope(db: DatabaseSync, folder: string): Promise<string[]> {
   const rows = db
     .prepare(
-      `SELECT project_key AS value FROM project_links WHERE folder = ?1
+      `SELECT project_key AS value FROM project_links WHERE folder = ?
        UNION
        SELECT folder AS value FROM project_links
-        WHERE project_key IN (SELECT project_key FROM project_links WHERE folder = ?1)`,
+        WHERE project_key IN (SELECT project_key FROM project_links WHERE folder = ?)`,
     )
-    .all(folder) as Row[];
+    .all(folder, folder) as Row[];
   return orderScope(
     folder,
     rows.map((row) => String(row['value'])),
