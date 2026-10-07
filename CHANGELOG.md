@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.1
+
+### Changed
+
+- **Memories shown with a prompt are picked by Haiku 5.5.** When the account or provider cannot use it, the
+  pick falls back to `haiku` on its own. `claude-db pick` shows both. Turning chats into facts still uses
+  `haiku`.
+
 ## 0.12.0
 
 ### Added
