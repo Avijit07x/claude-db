@@ -1,7 +1,9 @@
 import type { Pool } from './driver.js';
-import type { Session } from '../../types.js';
+import type { ProjectFilter, Session } from '../../types.js';
+import { projectClause } from './filters.js';
 import { toSession } from './rows.js';
 import { summaryTime } from '../session-time.js';
+import { noProjects } from '../project-scope.js';
 
 export async function upsertSession(pool: Pool, session: Session): Promise<void> {
   await pool.query(
@@ -41,14 +43,18 @@ export async function clearSummary(pool: Pool, id: string): Promise<boolean> {
 
 export async function recentSessions(
   pool: Pool,
-  project: string,
+  project: ProjectFilter,
   limit: number,
 ): Promise<Session[]> {
+  if (noProjects(project)) return [];
+  const values: unknown[] = [];
+  const scope = projectClause(project, values) ?? 'TRUE';
+  values.push(limit);
   const res = await pool.query(
     `SELECT * FROM sessions
-       WHERE project = $1 AND summary IS NOT NULL
-       ORDER BY started_at DESC LIMIT $2`,
-    [project, limit],
+       WHERE ${scope} AND summary IS NOT NULL
+       ORDER BY started_at DESC LIMIT $${values.length}`,
+    values,
   );
   return res.rows.map(toSession);
 }

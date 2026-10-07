@@ -1,5 +1,13 @@
 import type { Doc } from './driver.js';
-import type { SearchQuery } from '../../types.js';
+import type { ProjectFilter, SearchQuery } from '../../types.js';
+import { projectsOf } from '../project-scope.js';
+
+export function projectMatch(filter: ProjectFilter | undefined): Doc {
+  const projects = projectsOf(filter);
+  if (projects.length === 0) return {};
+  const [only] = projects;
+  return { project: projects.length === 1 ? only : { $in: projects } };
+}
 
 export interface VectorCache {
   atlasVectorIndex: boolean | null;
@@ -7,7 +15,7 @@ export interface VectorCache {
 
 export function scopeFilter(query: SearchQuery): Doc {
   const filter: Record<string, unknown> = {};
-  if (query.project) filter['project'] = query.project;
+  Object.assign(filter, projectMatch(query.project));
   if (query.kind) filter['kind'] = query.kind;
   if (query.tag) filter['tags'] = query.tag;
   if (query.since !== undefined || query.until !== undefined) {

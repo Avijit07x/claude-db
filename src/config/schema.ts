@@ -14,6 +14,15 @@ export const ConfigSchema = z.object({
 
   updates: z.enum(['auto', 'notify', 'off']).default('notify'),
 
+  project: z
+    .object({
+      remote: z
+        .string()
+        .regex(/^[A-Za-z0-9._-]+$/)
+        .default('origin'),
+    })
+    .prefault({}),
+
   capture: z
     .object({
       tools: z.array(z.string()).default(['Edit', 'Write', 'Bash', 'NotebookEdit']),

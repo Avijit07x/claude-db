@@ -9,11 +9,13 @@ import type { Row } from './rows.js';
 import { toBuffer, toIndexEntry } from './rows.js';
 import { TAG_PREDICATE, appendScope, toMatchExpression } from './filters.js';
 import { cosine, unpackVector } from '../../util/vector.js';
+import { noProjects } from '../project-scope.js';
 
 export async function searchKeyword(
   db: DatabaseSync,
   query: SearchQuery,
 ): Promise<ObservationIndexEntry[]> {
+  if (noProjects(query.project)) return [];
   const match = toMatchExpression(query.text, query.project);
   if (match === null) return [];
 
@@ -62,6 +64,7 @@ export async function searchVector(
   vector: number[],
   query: SearchQuery,
 ): Promise<ObservationIndexEntry[]> {
+  if (noProjects(query.project)) return [];
   const conditions = ['embedding IS NOT NULL'];
   const params: unknown[] = [];
   appendScope(query, conditions, params, '');

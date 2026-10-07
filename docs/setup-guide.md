@@ -183,6 +183,7 @@ want to change.
 | `inject.perPrompt`     | `true`   | Show related memory with prompts at all                          | you want memory only at the start of a chat                 |
 | `inject.minOverlap`    | `2`      | Meaningful words a memory must share with the prompt             | almost never; 2 was the best floor measured                 |
 | `inject.promptResults` | `2`      | Most memories shown with one prompt                              | you want more or fewer lines                                |
+| `project.remote`       | `origin` | The git remote that names a project                              | your main remote is not `origin` (a fork's `upstream`)      |
 | `updates`              | `notify` | `notify`, `auto` or `off`                                        | you want updates installed for you, or never checked        |
 | `embeddings.provider`  | `auto`   | `auto`, `local`, `builtin` or `none`                             | you install the optional embedding model, or want none      |
 
@@ -265,9 +266,12 @@ was installed, since neither ships by default. `use` checks the database answers
 address, and warns if the database already holds tables that are not claude-db's. Give it a database
 of its own.
 
-- **Projects are matched by folder path.** Two machines share a project's memory when the project is
-  at the same path on both. If a repository lives at a different path on another machine, run
-  `claude-db merge <old-path> --yes` from the new location to bring the old memory across.
+- **Projects are matched by git remote.** A repository with an `origin` remote is one project wherever it
+  is cloned, so `github.com/acme/shop` on your laptop and on your Mac share memory. `ssh` and `https`
+  addresses of the same repository match, and any token in the address is never stored. A folder with no
+  remote is matched by its path, as before. A fork has its own remote, so it is its own project. Set
+  `project.remote` to use a remote other than `origin`. Memory saved before this, under a folder path, is
+  still found and is not moved. `claude-db merge <old-path> --yes` still works for a folder with no remote.
 - **Personal rules stay personal.** A rule about how you like to work is filed under your git email,
   so it follows you into every project and never reaches a teammate on a shared database. Set
   `git config user.email` so it is filed under the right name. Everything else belongs to the
@@ -320,7 +324,7 @@ how to switch that off with `claude-db distill off`.
 | `doctor` says `registered 2x`                     | Run `claude-db install` again. It replaces its own entries                                                                                                                                                                       |
 | Install stops with a Node version message         | Upgrade to Node 22.16 or newer                                                                                                                                                                                                   |
 | `reachable: no`                                   | For Postgres or MongoDB, install the driver (`npm install -g pg` or `npm install -g mongodb`) and check `CLAUDE_DB_URL` is not set to something old                                                                              |
-| A moved repository looks empty                    | Memory is filed by folder path. Run `claude-db merge <old-path> --yes`                                                                                                                                                           |
+| A moved repository looks empty                    | A repository with a remote keeps its memory. With no remote, run `claude-db merge <old-path> --yes`                                                                                                                              |
 | Search got worse after adding the embedding model | Run `claude-db reembed`                                                                                                                                                                                                          |
 
 The [troubleshooting page](https://claude-db.vercel.app/docs/troubleshooting) covers the rest.

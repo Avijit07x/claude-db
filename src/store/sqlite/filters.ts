@@ -1,8 +1,22 @@
-import type { RemoveFilter, SearchQuery } from '../../types.js';
+import type { ProjectFilter, RemoveFilter, SearchQuery } from '../../types.js';
+import { projectsOf } from '../project-scope.js';
 import { partitionIds } from '../../util/shortid.js';
 import { resolve } from 'node:path';
 import { scopeToken } from '../../util/scope.js';
 import { meaningfulTokens } from '../../search/stopwords.js';
+
+export function projectClause(
+  column: string,
+  filter: ProjectFilter | undefined,
+  params: unknown[],
+): string | null {
+  const projects = projectsOf(filter);
+  if (projects.length === 0) return null;
+  params.push(...projects);
+  return projects.length === 1
+    ? `${column} = ?`
+    : `${column} IN (${projects.map(() => '?').join(',')})`;
+}
 
 export function removeWhere(filter: RemoveFilter): { where: string; params: unknown[] } {
   const conditions: string[] = [];
@@ -21,10 +35,8 @@ export function removeWhere(filter: RemoveFilter): { where: string; params: unkn
     }
     conditions.push(`(${alternatives.join(' OR ')})`);
   }
-  if (filter.project) {
-    conditions.push('project = ?');
-    params.push(filter.project);
-  }
+  const project = projectClause('project', filter.project, params);
+  if (project) conditions.push(project);
   if (filter.kind) {
     conditions.push('kind = ?');
     params.push(filter.kind);
@@ -50,10 +62,8 @@ export function appendScope(
   prefix: string,
 ): void {
   conditions.push(`${prefix}status != 'replaced'`);
-  if (query.project) {
-    conditions.push(`${prefix}project = ?`);
-    params.push(query.project);
-  }
+  const project = projectClause(`${prefix}project`, query.project, params);
+  if (project) conditions.push(project);
   if (query.kind) {
     conditions.push(`${prefix}kind = ?`);
     params.push(query.kind);
@@ -78,10 +88,16 @@ export function appendScope(
   }
 }
 
-export function toMatchExpression(text: string, project?: string): string | null {
+function scopeExpression(filter: ProjectFilter | undefined): string | null {
+  const tokens = projectsOf(filter).map(scopeToken);
+  if (tokens.length === 0) return null;
+  return tokens.length === 1 ? `scope:${tokens[0]}` : `scope:(${tokens.join(' OR ')})`;
+}
+
+export function toMatchExpression(text: string, project?: ProjectFilter): string | null {
   const tokens = meaningfulTokens(text);
 
-  const scope = project ? `scope:${scopeToken(project)}` : null;
+  const scope = scopeExpression(project);
 
   if (tokens.length === 0) return null;
 

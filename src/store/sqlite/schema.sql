@@ -102,3 +102,12 @@ CREATE TABLE IF NOT EXISTS scanned_files (
   scanned_at INTEGER NOT NULL,
   PRIMARY KEY (project, path)
 );
+
+CREATE TABLE IF NOT EXISTS project_links (
+  folder      TEXT NOT NULL,
+  project_key TEXT NOT NULL,
+  first_seen  INTEGER NOT NULL,
+  PRIMARY KEY (folder, project_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_links_key ON project_links(project_key);

@@ -2,6 +2,7 @@ import type { Pool } from './driver.js';
 import type { ObservationIndexEntry, SearchQuery } from '../../types.js';
 import { appendScope } from './filters.js';
 import { toIndexEntry } from './rows.js';
+import { noProjects } from '../project-scope.js';
 
 export async function searchVector(
   pool: Pool,
@@ -10,6 +11,7 @@ export async function searchVector(
   vector: number[],
   query: SearchQuery,
 ): Promise<ObservationIndexEntry[]> {
+  if (noProjects(query.project)) return [];
   if (!vectorEnabled || vectorDims !== vector.length) return [];
 
   const conditions = ['embedding IS NOT NULL'];

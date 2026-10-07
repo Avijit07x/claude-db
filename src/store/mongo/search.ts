@@ -3,11 +3,13 @@ import type { ObservationIndexEntry, SearchQuery, TimelineQuery } from '../../ty
 import type { ObservationDoc } from './docs.js';
 import { toIndexEntry } from './docs.js';
 import { scopeFilter, visibleFilter } from './filters.js';
+import { noProjects } from '../project-scope.js';
 
 export async function searchKeyword(
   observations: Collection<ObservationDoc>,
   query: SearchQuery,
 ): Promise<ObservationIndexEntry[]> {
+  if (noProjects(query.project)) return [];
   const filter: Doc = {
     $text: { $search: query.text },
     ...scopeFilter(query),

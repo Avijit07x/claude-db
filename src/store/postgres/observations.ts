@@ -9,7 +9,9 @@ import type {
 import type { ProjectSummary } from '../adapter.js';
 import { foreignNames, isWholeScope } from '../adapter.js';
 import { partitionIds } from '../../util/shortid.js';
+import { projectClause } from './filters.js';
 import { toIndexEntry, toObservation } from './rows.js';
+import { noProjects } from '../project-scope.js';
 
 export async function getObservations(pool: Pool, ids: string[]): Promise<Observation[]> {
   if (ids.length === 0) return [];
@@ -32,6 +34,7 @@ export async function getObservations(pool: Pool, ids: string[]): Promise<Observ
 }
 
 export async function remove(pool: Pool, filter: RemoveFilter): Promise<number> {
+  if (noProjects(filter.project)) return 0;
   if (filter.ids?.length === 0) return 0;
 
   const conditions: string[] = [];
@@ -50,10 +53,8 @@ export async function remove(pool: Pool, filter: RemoveFilter): Promise<number> 
     }
     conditions.push(`(${alternatives.join(' OR ')})`);
   }
-  if (filter.project) {
-    values.push(filter.project);
-    conditions.push(`project = $${values.length}`);
-  }
+  const project = projectClause(filter.project, values);
+  if (project) conditions.push(project);
   if (filter.kind) {
     values.push(filter.kind);
     conditions.push(`kind = $${values.length}`);
@@ -73,8 +74,9 @@ export async function remove(pool: Pool, filter: RemoveFilter): Promise<number> 
     );
     await client.query(`DELETE FROM observations ${where}`, values);
     if (isWholeScope(filter)) {
-      const scope = filter.project ? 'WHERE project = $1' : '';
-      const scopeValues = filter.project ? [filter.project] : [];
+      const scopeValues: unknown[] = [];
+      const wipeClause = projectClause(filter.project, scopeValues);
+      const scope = wipeClause ? `WHERE ${wipeClause}` : '';
       for (const table of ['sessions', 'symbols', 'symbol_edges', 'scanned_files']) {
         await client.query(`DELETE FROM ${table} ${scope}`, scopeValues);
       }
@@ -90,13 +92,12 @@ export async function remove(pool: Pool, filter: RemoveFilter): Promise<number> 
 }
 
 export async function list(pool: Pool, filter: ListFilter): Promise<Observation[]> {
+  if (noProjects(filter.project)) return [];
   const conditions: string[] = [];
   const values: unknown[] = [];
 
-  if (filter.project) {
-    values.push(filter.project);
-    conditions.push(`project = $${values.length}`);
-  }
+  const project = projectClause(filter.project, values);
+  if (project) conditions.push(project);
   if (filter.sessionId) {
     values.push(filter.sessionId);
     conditions.push(`session_id = $${values.length}`);

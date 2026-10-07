@@ -4,8 +4,10 @@ import type { ProjectSummary } from '../adapter.js';
 import { isWholeScope } from '../adapter.js';
 import type { EdgeDoc, ObservationDoc, ScannedFileDoc, SessionDoc, SymbolDoc } from './docs.js';
 import { toDoc, toObservation } from './docs.js';
+import { projectMatch } from './filters.js';
 import { escapeRegex } from './helpers.js';
 import { partitionIds } from '../../util/shortid.js';
+import { noProjects } from '../project-scope.js';
 
 export async function insertObservations(
   collection: Collection<ObservationDoc>,
@@ -57,10 +59,11 @@ export async function remove(
   scanned: Collection<ScannedFileDoc>,
   filter: RemoveFilter,
 ): Promise<number> {
+  if (noProjects(filter.project)) return 0;
   if (filter.ids?.length === 0) return 0;
 
   const query: Record<string, unknown> = {};
-  if (filter.project) query['project'] = filter.project;
+  Object.assign(query, projectMatch(filter.project));
   if (filter.kind) query['kind'] = filter.kind;
   if (filter.before !== undefined) query['createdAt'] = { $lt: filter.before };
 
@@ -77,7 +80,7 @@ export async function remove(
   const count = await observations.countDocuments(query);
   await observations.deleteMany(query);
   if (isWholeScope(filter)) {
-    const scope = filter.project ? { project: filter.project } : {};
+    const scope = projectMatch(filter.project);
     await sessions.deleteMany(scope);
     await symbols.deleteMany(scope);
     await edges.deleteMany(scope);
@@ -94,8 +97,9 @@ export async function list(
   scanned: Collection<ScannedFileDoc>,
   filter: ListFilter,
 ): Promise<Observation[]> {
+  if (noProjects(filter.project)) return [];
   const query: Record<string, unknown> = {};
-  if (filter.project) query['project'] = filter.project;
+  Object.assign(query, projectMatch(filter.project));
   if (filter.sessionId) query['sessionId'] = filter.sessionId;
   if (filter.kind) query['kind'] = filter.kind;
   if (filter.status) query['status'] = filter.status;

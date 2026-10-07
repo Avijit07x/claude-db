@@ -82,6 +82,17 @@ export function factKey(obs: Observation): string | null {
   return obs.tags.find((tag) => tag.startsWith('key:'))?.slice(4) ?? null;
 }
 
+export function onePerKey(rows: Observation[]): Observation[] {
+  const seen = new Set<string>();
+  return rows.filter((obs) => {
+    const key = factKey(obs);
+    if (key === null) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function factLabel(obs: Observation): string | null {
   const type = factType(obs);
   if (type) return LABELS[type];

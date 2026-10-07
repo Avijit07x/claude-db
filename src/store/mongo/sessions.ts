@@ -1,8 +1,10 @@
 import type { Collection } from './driver.js';
-import type { Session } from '../../types.js';
+import type { ProjectFilter, Session } from '../../types.js';
+import { projectMatch } from './filters.js';
 import type { SessionDoc } from './docs.js';
 import { toSession } from './docs.js';
 import { summaryTime } from '../session-time.js';
+import { noProjects } from '../project-scope.js';
 
 export async function upsertSession(
   sessions: Collection<SessionDoc>,
@@ -42,11 +44,12 @@ export async function clearSummary(sessions: Collection<SessionDoc>, id: string)
 
 export async function recentSessions(
   sessions: Collection<SessionDoc>,
-  project: string,
+  project: ProjectFilter,
   limit: number,
 ): Promise<Session[]> {
+  if (noProjects(project)) return [];
   const docs = await sessions
-    .find({ project, summary: { $type: 'string' } })
+    .find({ ...projectMatch(project), summary: { $type: 'string' } })
     .sort({ startedAt: -1 })
     .limit(limit)
     .toArray();

@@ -71,8 +71,9 @@ export async function cmdProjects(): Promise<void> {
     }
 
     console.log(`database: ${redact(ctx.config.database)}\n`);
+    const names = await ctx.store.projectScope(here);
     for (const entry of projects) {
-      const marker = entry.project === here ? '*' : ' ';
+      const marker = names.includes(entry.project) ? '*' : ' ';
       const date = new Date(entry.lastActive).toISOString().slice(0, 10);
       console.log(`${marker} ${String(entry.observations).padStart(5)}  ${date}  ${entry.project}`);
     }

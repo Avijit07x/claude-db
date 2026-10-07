@@ -5,7 +5,15 @@ import type { HeadlessResult } from '../util/claude-cli.js';
 import { runHeadlessResult } from '../util/claude-cli.js';
 import { formatDay } from '../util/day.js';
 import { recordDistillFailure, recordDistillSuccess, takeDistillCalls } from './budget.js';
-import { FACT_SESSION, factId, factKey, factToObservation, factType, youScope } from './model.js';
+import {
+  FACT_SESSION,
+  factId,
+  factKey,
+  factToObservation,
+  factType,
+  onePerKey,
+  youScope,
+} from './model.js';
 import type { ExistingFact, SetOp } from './ops.js';
 import { buildDistillPrompt, parseOps } from './ops.js';
 
@@ -180,7 +188,7 @@ export async function existingFacts(ctx: RecallContext, project: string): Promis
       newest: true,
       limit: EXISTING_LIMIT,
     });
-    for (const obs of rows) {
+    for (const obs of onePerKey(rows.filter((row) => row.status !== 'replaced'))) {
       const key = factKey(obs);
       const type = factType(obs);
       if (obs.status === 'replaced' || !key || !type) continue;

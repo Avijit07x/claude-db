@@ -2,11 +2,13 @@ import type { Pool } from './driver.js';
 import type { ObservationIndexEntry, SearchQuery } from '../../types.js';
 import { appendScope } from './filters.js';
 import { toIndexEntry } from './rows.js';
+import { noProjects } from '../project-scope.js';
 
 export async function searchKeyword(
   pool: Pool,
   query: SearchQuery,
 ): Promise<ObservationIndexEntry[]> {
+  if (noProjects(query.project)) return [];
   const conditions = ['tsv @@ q.tsq'];
   const values: unknown[] = [query.text];
   appendScope(query, conditions, values);

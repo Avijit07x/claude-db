@@ -91,6 +91,9 @@ import manual from './smoke/manual.mjs';
 import vectors from './smoke/vectors.mjs';
 import lifecycle from './smoke/lifecycle.mjs';
 import graph from './smoke/graph.mjs';
+import projectLinks from './smoke/project-links.mjs';
+import projectLists from './smoke/project-lists.mjs';
+import scopedStore from './smoke/scoped-store.mjs';
 import sessions from './smoke/sessions.mjs';
 
 await retrieval(ctx, check);
@@ -100,6 +103,9 @@ await manual(ctx, check);
 await vectors(ctx, check);
 await lifecycle(ctx, check);
 await graph(ctx, check);
+await projectLinks(ctx, check);
+await projectLists(ctx, check);
+await scopedStore(ctx, check);
 
 await store.remove({ project });
 await store.close();
