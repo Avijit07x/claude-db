@@ -10,7 +10,10 @@
   stored. A folder with no remote is matched by its path, as before. A fork has its own remote, so it is
   its own project. The new setting `project.remote` picks another remote than `origin`. Memory saved before
   this, under a folder path, is still found and is not moved. A second machine needs this version to share
-  notes by remote. Postgres moves to schema version 5 on first use and adds one table, `project_links`.
+  notes by remote. A machine still on 0.10.x keeps working on the same database but does not see notes
+  saved by remote, so update every machine that shares a database. Each folder links itself to its remote
+  the first time you use 0.11.0 in it, and notes saved under that folder's path are found by other machines
+  from then on. Postgres moves to schema version 5 on first use and adds one table, `project_links`.
   MongoDB gets the same collection.
 - **`/catchup` and `/handoff` skills.** `/catchup` says where you stopped, in three groups: done, open and
   next, from the last chat, the recorded to-dos, the last handoff and git. `/handoff` writes the same three
