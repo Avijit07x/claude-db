@@ -10,15 +10,18 @@ const OPTIONAL_FLAGS: readonly (readonly string[])[] = [
 ];
 
 const UNKNOWN_OPTION = /unknown option '(--[\w-]+)'/i;
+const MODEL_UNAVAILABLE = /issue with the selected model/i;
 
 export interface HeadlessOptions {
   flags?: readonly (readonly string[])[];
   env?: Readonly<Record<string, string>>;
+  fallbackModel?: string;
 }
 
 export type HeadlessResult = { ok: true; stdout: string } | { ok: false; reason: string };
 
-type CallResult = { ok: true; stdout: string } | { ok: false; stderr: string; reason: string };
+type CallResult =
+  { ok: true; stdout: string } | { ok: false; stdout: string; stderr: string; reason: string };
 
 interface ProcessFailure {
   code?: unknown;
@@ -33,13 +36,20 @@ export async function runHeadlessResult(
   options: HeadlessOptions = {},
 ): Promise<HeadlessResult> {
   let optional = [...OPTIONAL_FLAGS, ...(options.flags ?? [])];
+  let current = model;
   for (;;) {
     const result = await call(
-      ['-p', prompt, '--model', model, ...optional.flat()],
+      ['-p', prompt, '--model', current, ...optional.flat()],
       timeoutMs,
       options.env ?? {},
     );
     if (result.ok) return { ok: true, stdout: result.stdout };
+
+    const { fallbackModel } = options;
+    if (fallbackModel && current !== fallbackModel && MODEL_UNAVAILABLE.test(result.stdout)) {
+      current = fallbackModel;
+      continue;
+    }
 
     const rejected = UNKNOWN_OPTION.exec(result.stderr)?.[1];
     const remaining = optional.filter((flags) => flags[0] !== rejected);
@@ -112,12 +122,17 @@ function call(
             return;
           }
           const text = String(stderr);
-          done({ ok: false, stderr: text, reason: describeFailure(error, text, timeoutMs) });
+          done({
+            ok: false,
+            stdout: String(stdout),
+            stderr: text,
+            reason: describeFailure(error, text, timeoutMs),
+          });
         },
       );
       child.stdin?.end();
     } catch (error) {
-      done({ ok: false, stderr: '', reason: describeFailure(error, '', timeoutMs) });
+      done({ ok: false, stdout: '', stderr: '', reason: describeFailure(error, '', timeoutMs) });
     }
   });
 }

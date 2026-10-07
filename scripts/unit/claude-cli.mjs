@@ -52,6 +52,22 @@ process.stderr.write('error: not logged in\\n');
 process.exit(1);
 `;
 
+const noModelClaude = (log) => `#!/usr/bin/env node
+const { appendFileSync } = require('node:fs');
+const argv = process.argv.slice(2);
+const model = argv[argv.indexOf('--model') + 1];
+appendFileSync(${JSON.stringify(log)}, model + '\\n');
+if (model === 'claude-haiku-5-5') {
+  process.stdout.write("There's an issue with the selected model (" + model + "). It may not exist or you may not have access to it.\\n");
+  process.exit(1);
+}
+if (model === 'down') {
+  process.stderr.write('error: not logged in\\n');
+  process.exit(1);
+}
+process.stdout.write(JSON.stringify({ argv }));
+`;
+
 const SLOW_CLAUDE = `#!/usr/bin/env node
 setTimeout(() => {}, 30000);
 `;
@@ -232,6 +248,34 @@ export default async function run() {
       'an older CLI that rejects optional flags is retried without them',
       old !== null && JSON.parse(old).argv.join(' ') === '-p summarize this --model haiku',
       old ?? 'null',
+    );
+
+    const modelLog = join(dir, 'models.log');
+    const models = () => readFileSync(modelLog, 'utf8').trim().split('\n');
+    process.env.CLAUDE_CODE_EXECPATH = script(dir, 'no-model-claude', noModelClaude(modelLog));
+    const fellBack = await runHeadlessResult('pick', 'claude-haiku-5-5', 5_000, {
+      fallbackModel: 'haiku',
+    });
+    check(
+      'a model the account cannot use is retried once with the fallback model',
+      fellBack.ok &&
+        JSON.parse(fellBack.stdout).argv.join(' ').includes('--model haiku') &&
+        models().join(' ') === 'claude-haiku-5-5 haiku',
+      models().join(' '),
+    );
+    rmSync(modelLog);
+    const noFallback = await runHeadlessResult('pick', 'claude-haiku-5-5', 5_000);
+    check(
+      'without a fallback model, that failure is returned as it is',
+      !noFallback.ok && models().join(' ') === 'claude-haiku-5-5',
+      models().join(' '),
+    );
+    rmSync(modelLog);
+    const down = await runHeadlessResult('pick', 'down', 5_000, { fallbackModel: 'haiku' });
+    check(
+      'a failure that is not about the model never switches to the fallback',
+      !down.ok && models().join(' ') === 'down',
+      models().join(' '),
     );
 
     process.env.CLAUDE_CODE_EXECPATH = script(dir, 'broken-claude', BROKEN_CLAUDE);

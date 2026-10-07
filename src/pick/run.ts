@@ -10,6 +10,7 @@ import { PICK_SYSTEM_PROMPT, buildPickPrompt, parsePicks } from './prompt.js';
 
 export const PICK_BUDGET = 'pick';
 const TIMEOUT_MS = 30_000;
+const LATEST_HAIKU = 'claude-haiku-5-5';
 
 export type PickRunner = (prompt: string) => Promise<HeadlessResult>;
 
@@ -36,11 +37,23 @@ export function recordPickSuccess(now = Date.now()): void {
   recordSuccess(PICK_BUDGET, now);
 }
 
+interface PickModel {
+  model: string;
+  fallback?: string;
+}
+
+export function pickModel(config: Config): PickModel {
+  const { model } = config.pick;
+  return model === 'haiku' ? { model: LATEST_HAIKU, fallback: model } : { model };
+}
+
 export function headlessPicker(config: Config): PickRunner {
+  const { model, fallback } = pickModel(config);
   return (prompt) =>
-    runHeadlessResult(prompt, config.pick.model, TIMEOUT_MS, {
+    runHeadlessResult(prompt, model, TIMEOUT_MS, {
       flags: [['--system-prompt', PICK_SYSTEM_PROMPT], ['--tools', ''], ['--strict-mcp-config']],
       env: { MAX_THINKING_TOKENS: '0' },
+      ...(fallback ? { fallbackModel: fallback } : {}),
     });
 }
 

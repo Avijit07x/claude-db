@@ -1,6 +1,6 @@
 import type { Config } from '../../config/index.js';
 import { loadConfig, setConfigValue } from '../../config/index.js';
-import { PICK_BUDGET } from '../../pick/run.js';
+import { PICK_BUDGET, pickModel } from '../../pick/run.js';
 import { budgetUsage, describePause } from '../../util/daily-budget.js';
 
 export function pickStatus(config: Config, now = Date.now()): string {
@@ -11,7 +11,9 @@ export function pickStatus(config: Config, now = Date.now()): string {
   const usage = budgetUsage(PICK_BUDGET, now);
   const pause = describePause(usage, now);
   const paused = pause ? `, paused ${pause}` : '';
-  return `pick     : on (${pick.model}), ${usage.used} of ${pick.dailyLimit} picks used today${paused}`;
+  const { model, fallback } = pickModel(config);
+  const models = fallback ? `${model}, else ${fallback}` : model;
+  return `pick     : on (${models}), ${usage.used} of ${pick.dailyLimit} picks used today${paused}`;
 }
 
 export function cmdPick(argv: (string | undefined)[]): void {
