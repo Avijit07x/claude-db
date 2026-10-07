@@ -1,36 +1,33 @@
-Every command is also available as `cdb`. Most of the time you will not run any of these: capture and
-recall are hooks, and Claude reaches the rest over MCP.
+Every command is also available as `cdb`. `claude-db --version` prints the version. Capture and recall are hooks, so you rarely need these.
 
 ## Setup
 
-| Command                            | What it does                                         |
-| ---------------------------------- | ---------------------------------------------------- |
-| `claude-db install [--project]`    | Register hooks and the MCP server                    |
-| `claude-db uninstall [--project]`  | Remove them, keeping your memory                     |
-| `claude-db status`                 | Is it wired up, and when did it last record anything |
-| `claude-db doctor [--deep]`        | Resolved config; `--deep` proves a full round trip   |
+| Command                           | What it does                                          |
+| --------------------------------- | ----------------------------------------------------- |
+| `claude-db install [--project]`   | Register hooks and the MCP server                     |
+| `claude-db uninstall [--project]` | Remove them, keeping your memory                      |
+| `claude-db status`                | Is it wired up, and when did it last record anything  |
+| `claude-db catchup`               | Where you stopped: last chat, to-dos, handoff and git |
+| `claude-db doctor [--deep]`       | Resolved config; `--deep` proves a full round trip    |
 
 ## Memory
 
-| Command                                           | What it does                                        |
-| ------------------------------------------------- | --------------------------------------------------- |
-| `claude-db search [--all] [--tag <name>] <query>` | Search this project's memory, or every project      |
-| `claude-db remember [--key <name>] <text>`        | Record a rule outright, e.g. "always use pnpm here" |
-| `claude-db forget <id>`                           | Delete specific observations by id                  |
+| Command                                           | What it does                                            |
+| ------------------------------------------------- | ------------------------------------------------------- |
+| `claude-db search [--all] [--tag <name>] <query>` | Search this project's memory, or every project          |
+| `claude-db remember [--key <name>] <text>`        | Record a rule outright, e.g. "always use pnpm here"     |
+| `claude-db forget <id>`                           | Delete specific observations by id                      |
 | `claude-db forget --session <id>`                 | Clear one session's summary, so it stops being injected |
-| `claude-db distill [on\|off]`                     | Turn chats into facts with Haiku; no argument, status |
-| `claude-db pick [on\|off]`                        | Let Haiku pick the memory shown with each prompt      |
-| `claude-db redact`                                | Re-apply secret redaction to memory already saved     |
-| `claude-db seed --from-git`                       | Fill a cold memory from this repo's history         |
-| `claude-db stats`                                 | What this project's memory is made of               |
-| `claude-db projects`                              | Every project with memory stored                    |
-| `claude-db view [--export <file>]`                | See this project's memory live in the browser       |
-| `claude-db adoption`                              | How often sessions grep vs use the memory tools     |
+| `claude-db distill [on\|off]`                     | Turn chats into facts with Haiku; no argument, status   |
+| `claude-db pick [on\|off]`                        | Let Haiku pick the memory shown with each prompt        |
+| `claude-db redact`                                | Re-apply secret redaction to memory already saved       |
+| `claude-db seed --from-git`                       | Fill a cold memory from this repo's history             |
+| `claude-db stats`                                 | What this project's memory is made of                   |
+| `claude-db projects`                              | Every project with memory stored                        |
+| `claude-db view [--export <file>]`                | See this project's memory live in the browser           |
+| `claude-db adoption`                              | How often sessions grep vs use the memory tools         |
 
-`view` starts a local server only while you are looking at it, opens the browser, and stops on
-Ctrl+C — no background process is left running. `--export` writes a standalone HTML snapshot
-instead. `adoption` reads this project's transcripts and reports Bash commands, greps, hook fires and
-memory-tool calls, so whether any of this is working is a number rather than a feeling.
+`view` runs a local server only while you look at it and stops on Ctrl+C. `--export` writes a standalone HTML snapshot instead.
 
 ## Code graph
 
@@ -44,44 +41,42 @@ one answers.
 
 ## Database
 
-| Command                    | What it does                                          |
-| -------------------------- | ----------------------------------------------------- |
-| `claude-db use <url>`      | Switch database and verify it                         |
-| `claude-db sync <url>`     | Two-way merge with another database                   |
-| `claude-db export [--all]` | Dump memory as JSONL, for backup or migration         |
-| `claude-db import <file>`  | Load a dump back in; safe to repeat                   |
-| `claude-db merge [<path>]` | Move memory from an old project path onto this one    |
+| Command                    | What it does                                       |
+| -------------------------- | -------------------------------------------------- |
+| `claude-db use <url>`      | Switch database and verify it                      |
+| `claude-db sync <url>`     | Two-way merge with another database                |
+| `claude-db export [--all]` | Dump memory as JSONL, for backup or migration      |
+| `claude-db import <file>`  | Load a dump back in; safe to repeat                |
+| `claude-db merge [<path>]` | Move memory from an old project path onto this one |
 
 ## Maintenance
 
-| Command                                | What it does                                  |
-| -------------------------------------- | --------------------------------------------- |
-| `claude-db flush`                      | Re-ingest every transcript for this project   |
-| `claude-db reembed`                    | Re-embed everything with the current model    |
-| `claude-db prune --older-than <days>`  | Delete old memory (dry run without `--yes`)   |
-| `claude-db reset [--project] --yes`    | Delete memory (dry run without `--yes`)       |
+| Command                               | What it does                                |
+| ------------------------------------- | ------------------------------------------- |
+| `claude-db flush`                     | Re-ingest every transcript for this project |
+| `claude-db reembed`                   | Re-embed everything with the current model  |
+| `claude-db prune --older-than <days>` | Delete old memory (dry run without `--yes`) |
+| `claude-db reset [--project] --yes`   | Delete memory (dry run without `--yes`)     |
 
-`reembed` is what you run after installing `@xenova/transformers`, so existing rows are searchable at
-the new dimension rather than only new ones. `flush` is what you run after upgrading claude-db, since
-it re-ingests transcripts through the current extractor and updates observations in place.
+Run `reembed` after installing `@xenova/transformers`, and `flush` after upgrading claude-db.
 
 ## Configuration
 
-`~/.claude-memory/config.json` holds the settings. Every key has a working default, so the file is
-optional.
+Settings live in `~/.claude-memory/config.json`. The file is optional, and every key has a default.
 
-| Key                     | Default | What it does                                                            |
-| ----------------------- | ------- | ----------------------------------------------------------------------- |
-| `embeddings.provider`   | `auto`  | `auto` uses the real model when installed, else the built-in embedder    |
-| `inject.perPrompt`      | `true`  | Show related memory with each prompt                                    |
-| `inject.minOverlap`     | `2`     | Content words a memory must share with the prompt to be considered; `0` off |
-| `inject.promptResults`  | `2`     | Most memories shown with one prompt                                     |
-| `pick.enabled`          | `true`  | Let Haiku pick which memories to show with a prompt                     |
-| `pick.dailyLimit`       | `150`   | Most picks a day; after that only strong word matches are shown         |
-| `capture.scripted`      | `false` | Capture headless `claude -p` / SDK sessions too                          |
-| `distill.enabled`       | `true`  | Turn each finished chat into short facts with one Haiku call             |
-| `distill.dailyLimit`    | `30`    | Most Haiku calls a day; older chats wait for the next day               |
-| `distill.backfillDays`  | `90`    | How far back older chats are turned into facts                          |
-| `capture.summarize`     | `off`   | `on` writes session summaries with your own Claude CLI; costs tokens     |
-| `capture.summarizeModel`| `opus`  | Model for those summaries: `opus`, `sonnet` or `haiku`, always low effort |
-| `updates`               | `notify`| Update checks: `auto`, `notify` or `off`                                |
+| Key                      | Default  | What it does                                                                |
+| ------------------------ | -------- | --------------------------------------------------------------------------- |
+| `embeddings.provider`    | `auto`   | `auto` uses the real model when installed, else the built-in embedder       |
+| `inject.perPrompt`       | `true`   | Show related memory with each prompt                                        |
+| `inject.minOverlap`      | `2`      | Content words a memory must share with the prompt to be considered; `0` off |
+| `inject.promptResults`   | `2`      | Most memories shown with one prompt                                         |
+| `pick.enabled`           | `true`   | Let Haiku pick which memories to show with a prompt                         |
+| `pick.dailyLimit`        | `150`    | Most picks a day; after that only strong word matches are shown             |
+| `capture.scripted`       | `false`  | Capture headless `claude -p` / SDK sessions too                             |
+| `distill.enabled`        | `true`   | Turn each finished chat into short facts with one Haiku call                |
+| `distill.dailyLimit`     | `30`     | Most Haiku calls a day; older chats wait for the next day                   |
+| `distill.backfillDays`   | `90`     | How far back older chats are turned into facts                              |
+| `capture.summarize`      | `off`    | `on` writes session summaries with your own Claude CLI; costs tokens        |
+| `capture.summarizeModel` | `opus`   | Model for those summaries: `opus`, `sonnet` or `haiku`, always low effort   |
+| `project.remote`         | `origin` | The git remote that names a project                                         |
+| `updates`                | `notify` | Update checks: `auto`, `notify` or `off`                                    |

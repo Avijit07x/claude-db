@@ -1,15 +1,10 @@
-claude-db gives Claude Code two things it does not have on its own: a memory of what you already
-explained, and a real graph of your code. Both run locally, against your own database.
+claude-db gives Claude Code a memory that lasts and a map of your code. It runs on your machine, against your own database.
 
-## The problem
+## Why
 
-You spent an hour yesterday explaining why the store uses three adapters, which approach you already
-tried and abandoned, and why one function must not be touched. Today Claude knows none of it, so you
-explain it again.
+Every Claude Code chat starts from zero. You explain the same decisions, dead ends and rules again, and Claude works out what calls what from scratch.
 
-The other half is the codebase itself. Without an index, Claude re-derives it every time: grep a
-name, open four files, work out which hits were definitions and which were calls. You pay for that
-in tokens on every question.
+claude-db keeps what you decided and a map of your code, and gives Claude the right part of it at the right time.
 
 ## What it does
 
@@ -17,48 +12,36 @@ in tokens on every question.
   items={[
     {
       icon: 'recall',
-      title: 'Captures every turn that changed something',
-      body: 'Claude Code already writes each session to disk as JSONL. claude-db reads that transcript, so it records why you did something, not just which files changed.',
+      title: 'Remembers across chats',
+      body: 'Decisions, dead ends and rules are saved when a chat ends. The next chat starts by seeing them.',
     },
     {
       icon: 'flow',
-      title: 'Injects the best match on every prompt',
-      body: 'Capture and recall are hooks, so neither depends on Claude deciding to look something up. You never run a search command.',
+      title: 'Recalls what fits',
+      body: 'Each prompt gets the one or two earlier memories that match it, and nothing when none fit. Capture and recall are hooks, so you never run a search.',
     },
     {
       icon: 'graph',
-      title: 'Answers questions about symbols from a graph',
-      body: 'One scan stores every symbol and every relationship: what calls what, what imports what, what extends what.',
+      title: 'Maps your code',
+      body: 'Who defines or calls a symbol is answered in one call from a local graph, instead of grep and reading files.',
     },
   ]}
 />
 
+## Get started
+
+You need Node 22.16 or newer and a git repository.
+
 ```bash
 npm install -g claude-db
-
 cd your-project
 claude-db install --project
 ```
 
-Restart Claude Code and it is running. The rest of these docs cover what that install writes, how to
-map your code, and every command and MCP tool you get.
+Restart Claude Code. There is nothing else to run. Continue with [Installation](/docs/installation) and the [Quick start](/docs/quick-start).
 
 ## What it is not
 
-It is not a cloud service and it is not an account. There is no telemetry and no sign-up. Memory lives
-in a database you choose; the only outside calls are small Claude Haiku calls through your own Claude
-Code login, one per finished chat and one to pick memory for a prompt that has some (`claude-db
-distill off` and `claude-db pick off` stop them), and a daily update check. It also does not replace
-`CLAUDE.md`: a stable overview of your project belongs there, while claude-db stores the things that
-actually happened.
+It is not a cloud service, and there is no account or telemetry. Memory lives in a database you choose. Two small features call Claude Haiku through your own Claude Code login, and each has an off switch. See [Privacy](/docs/privacy).
 
-## Requirements
-
-Node 22.16 or newer. That is the only hard requirement. SQLite comes from Node's builtin
-`node:sqlite`, and the parser ships as a prebuilt binary, so nothing compiles at install time.
-
-<Callout title="Better embeddings, optional">
-Embeddings run locally with a zero-dependency embedder at 256 dimensions. For real semantic search,
-`npm install @xenova/transformers` and it upgrades itself to 384. See [Databases](/docs/databases)
-for what that changes.
-</Callout>
+It does not replace `CLAUDE.md`. A stable overview of your project belongs there. claude-db stores what actually happened.

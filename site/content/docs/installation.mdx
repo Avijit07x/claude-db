@@ -1,5 +1,12 @@
-One global package, then one command inside the repo you want it to remember. Capture and recall are
-hooks, so there is nothing to run afterwards.
+Install the package once, then switch it on for a project.
+
+## Requirements
+
+- Node 22.16 or newer (`node -v`)
+- A git repository
+- Claude Code, logged in
+
+Nothing compiles at install time. SQLite comes from Node itself.
 
 ## Install
 
@@ -7,9 +14,9 @@ hooks, so there is nothing to run afterwards.
 npm install -g claude-db
 ```
 
-Every command is also available as `cdb`, which is the same binary under a shorter name.
+Every command also works as `cdb`.
 
-## Wire it to a repo
+## Switch it on
 
 <Steps>
 <Step n={1} title="Run install inside the project">
@@ -19,49 +26,47 @@ cd your-project
 claude-db install --project
 ```
 
-`--project` scopes everything to this one repo. Without it, the install is machine-wide and applies
-to every project you open.
+`--project` limits it to this repository. Run `claude-db install` without it to switch it on for every project on this machine. The folder you run it from does not matter in that case.
 
 </Step>
 <Step n={2} title="Restart Claude Code">
 
-Hooks are read at startup, so a running session will not pick them up.
-
-</Step>
-<Step n={3} title="Ignore the machine-specific file">
-
-```bash
-echo '.mcp.json' >> .gitignore
-```
-
-`.mcp.json` holds an absolute path to the installed package, so it should not be committed.
+Hooks and the MCP server load only when Claude Code starts. A session that is already open does not have them.
 
 </Step>
 </Steps>
 
-## What install writes
+Add `.mcp.json` and `CLAUDE.local.md` to your `.gitignore`. They hold paths and rules that are personal to your machine.
 
-| Path                          | What it is                                                        |
+## What install adds
+
+| Where                         | What it is                                                        |
 | ----------------------------- | ----------------------------------------------------------------- |
-| `.claude/settings.local.json` | Registers the SessionStart, UserPromptSubmit, SessionEnd and PreToolUse hooks |
-| `.mcp.json`                   | Registers the server exposing the six [MCP tools](/docs/mcp-tools) |
-| `CLAUDE.local.md`             | A standing instruction to search memory before re-explaining      |
-| `.claude/skills/cdb-scan`     | The skill that maps an existing codebase in one pass              |
+| `.claude/settings.local.json` | The hooks that capture and recall                                 |
+| `.mcp.json`                   | The server that gives Claude the six [MCP tools](/docs/mcp-tools) |
+| `CLAUDE.local.md`             | A standing instruction to search memory before asking you         |
+| `.claude/skills/`             | The [skills](/docs/skills): `/cdb-scan`, `/catchup`, `/handoff`   |
 
-A machine-wide install writes that instruction into `~/.claude/CLAUDE.md`, and the skill under `~/.claude/skills/`, instead.
+A machine-wide install writes the same things under `~/.claude/` and `~/.claude.json` instead. Memory is always one database for the whole machine, filed by project.
 
-<Callout title="Why a memory file as well as hooks">
-Hook output is context the agent may or may not act on. A memory file is a rule for the whole
-session, which is what makes recall the default rather than something you have to ask for.
-</Callout>
-
-## Verify
+## Check it works
 
 ```bash
-claude-db status        # wired up? when did it last record anything?
-claude-db doctor        # resolved config, database, embedder
-claude-db doctor --deep # proves a full write-read-search round trip
+claude-db doctor
+claude-db status
 ```
+
+`doctor` should show `wiring : ok` and list the three skills. `status` fills in after your first real session. Nothing is saved for a chat that only asked questions, and that is normal.
+
+For a full test, run `claude-db doctor --deep`. It writes one test memory, finds it, reads it back and deletes it.
+
+## Upgrade
+
+```bash
+npm install -g claude-db
+```
+
+Restart Claude Code. Your memory is kept.
 
 ## Uninstall
 
@@ -69,6 +74,4 @@ claude-db doctor --deep # proves a full write-read-search round trip
 claude-db uninstall --project
 ```
 
-This removes the hooks, the MCP entry and the instruction block. Your memory is left untouched on
-disk, so reinstalling picks up exactly where you left off. To delete the memory itself, see
-[Privacy](/docs/privacy).
+This removes the hooks, the MCP entry, the instructions and the skills. Your memory is left on disk, so reinstalling picks up where you stopped. To delete the memory itself, see [Privacy](/docs/privacy).

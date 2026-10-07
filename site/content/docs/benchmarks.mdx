@@ -1,45 +1,32 @@
-Recall is not free: it costs tokens whenever it fires. These are measured numbers, including the
-cases where it does not pay off. Lookups are measured on this repository; recall is priced by
-replaying 300 real prompts from a project with about 660 memories.
+Recall costs tokens whenever it fires, and a code lookup saves tokens when it replaces a grep. These are the measured numbers, including where it does not pay off.
 
-## The standing cost
+## Recall cost
 
-Recall costs about 20 tokens a prompt on average, and nothing at all on 69% of prompts, where no
-earlier chat fits well enough.
+Recall costs about 20 tokens a prompt on average, and nothing on 69% of prompts, where no earlier chat fits well enough. Measured by replaying 300 real prompts from a project with about 660 memories.
 
-## The refund
+## Code lookup
 
-Asking who defines and calls `closeObservations` by hand means a grep, then opening three store
-adapters to work out which hits are definitions. One `explain` call answers it already classified:
-**2.0x cheaper**, measured across eight real symbols in this repo.
+Asking who defines and calls `closeObservations` by hand means a grep, then opening three store adapters to tell definitions from calls. One `explain` call answers it already sorted.
 
 ```text
-  every prompt costs       20 tokens of recall
-  every lookup refunds    685 tokens   (1,338 by hand - 653 with)
-
-  so one lookup pays for 33.9 prompts of recall
+by hand       1,338 tokens
+with graph      653 tokens
+saved           685 tokens   (2.0x cheaper, eight real symbols)
 ```
+
+One lookup saves as many tokens as recall costs over about 34 prompts.
 
 ## Where it loses
 
-A symbol with two or three references is cheaper to grep than to look up, because the graph answer
-carries structure the question did not need. The full write-up lists every symbol measured, including
-those.
-
-<Callout title="Read the numbers, not the claim">
-[With and without](https://github.com/Avijit07x/claude-db/blob/main/docs/with-and-without.md) has the
-same questions answered both ways, per symbol, with the losses left in.
-</Callout>
+A symbol with two or three references is cheaper to grep, because the graph answer carries structure the question did not need. [With and without](https://github.com/Avijit07x/claude-db/blob/main/docs/with-and-without.md) lists every symbol measured, losses included.
 
 ## Run it yourself
 
 ```bash
 git clone https://github.com/Avijit07x/claude-db
 cd claude-db && npm install && npm run build
-
-npm run bench:ab      # with and without, per symbol
-npm run bench:tokens  # what recall costs per prompt
+npm run bench:ab
+npm run bench:tokens
 ```
 
-Both run against whatever repository you point them at, so the interesting number is the one from
-your own codebase rather than from this one.
+Both run against any repository you point them at, so the number that matters is the one from your own code.

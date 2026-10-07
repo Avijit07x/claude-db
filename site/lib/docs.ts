@@ -45,15 +45,17 @@ export const DOCS: DocMeta[] = [
     group: 'Guides',
   },
   {
-    slug: 'cdb-scan',
-    title: 'The cdb-scan skill',
-    description: 'Map an existing codebase into memory in one pass, from inside Claude Code.',
+    slug: 'skills',
+    title: 'Skills',
+    description:
+      'Pick up where you left off, hand work on, and map a codebase, from inside Claude Code.',
     group: 'Guides',
   },
   {
     slug: 'privacy',
     title: 'Privacy',
-    description: 'What stays on your machine, what is sent and why, and what is never written down.',
+    description:
+      'What stays on your machine, what is sent and why, and what is never written down.',
     group: 'Guides',
   },
   {

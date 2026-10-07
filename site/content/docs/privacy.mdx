@@ -2,43 +2,27 @@ Memory lives in a database you choose. There is no account and no telemetry.
 
 ## What uses the network
 
-Memory is a SQLite file in your home directory unless you point it elsewhere, embeddings are computed
-locally, and the parser runs on your machine. Four things can reach the network, and each can be
-turned off:
+Embeddings and parsing run on your machine. Four things can reach the network, and each has an off switch.
 
-- **Your database**, if you configured a remote one with `claude-db use`.
-- **Turning chats into facts.** After a chat ends, its saved, already redacted text is sent once to
-  Claude Haiku through your own Claude Code login, the same service the chat itself used. At most 30
-  calls a day. `claude-db distill off` stops it.
-- **Picking memory for a prompt.** When a prompt has related memory, the prompt, the end of Claude's
-  previous reply, and up to ten excerpts of saved memory are sent to Claude Haiku through the same
-  login, so it can pick what to show. At most 150 calls a day. `claude-db pick off` stops it.
-- **The update check.** Once a day the npm registry is asked for the latest version. Set
-  `"updates": "off"` to stop it.
+- **Your database**, only if you set a remote one with `claude-db use`.
+- **Turning chats into facts.** After a chat ends, its saved, redacted text is sent once to Claude Haiku through your own Claude Code login. At most 30 calls a day. `claude-db distill off` stops it.
+- **Picking memory for a prompt.** The prompt, the end of Claude's last reply and up to ten saved excerpts go to Haiku through the same login. At most 150 calls a day. `claude-db pick off` stops it.
+- **The update check.** Once a day, the npm registry is asked for the latest version. Set `"updates": "off"` to stop it.
 
 ## What is never stored
 
 - `.env` files and anything under `secrets/`
 - `node_modules` and `.git/`
-- Anything you wrap in `<private>...</private>`, which is stripped before the turn is written
+- Anything inside `<private>...</private>`, which is removed before the turn is saved
 
-## Redaction
-
-API keys and tokens are redacted before anything is written, so a key pasted into a prompt does not
-end up in the database, or in a fact, as a side effect of the turn being captured.
-
-<Callout title="Turns are summarised, not copied">
-One observation per turn holds a title, the reasoning, and the files touched. The raw transcript
-stays where Claude Code already put it.
-</Callout>
+API keys and tokens are redacted before anything is saved or sent. The raw transcript stays where Claude Code put it. claude-db keeps a short note per turn: a title, the reasoning and the files touched.
 
 ## Deleting memory
 
 ```bash
-claude-db forget <id>                  # one observation
-claude-db prune --older-than 90 --yes  # everything past a cutoff
-claude-db reset --project --yes        # this project's memory
+claude-db forget <id>
+claude-db prune --older-than 90 --yes
+claude-db reset --project --yes
 ```
 
-`prune` and `reset` are dry runs without `--yes`, so you can see the count before anything is
-deleted. Uninstalling does not delete memory; these commands are the only thing that does.
+`prune` and `reset` are dry runs without `--yes`. Uninstalling does not delete memory. These commands are the only thing that does.

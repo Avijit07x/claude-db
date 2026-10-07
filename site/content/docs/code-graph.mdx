@@ -1,74 +1,41 @@
-One command parses every supported source file and stores what it finds: each symbol, and each
-relationship between symbols. Parsing is local and deterministic, and costs no tokens.
+The graph stores every symbol in your code and how they connect. Parsing is local and costs no tokens.
 
 ## Build it
 
 ```bash
-claude-db scan          # build or refresh
-claude-db scan --force  # re-parse everything
+claude-db scan
+claude-db scan --force
 ```
 
-About a second on a mid-size repository. A rescan only re-parses files whose contents changed, so
-running it again is close to free.
+A scan takes about a second on a mid-size repository. Re-running only re-parses files that changed. `--force` re-parses everything.
 
 ## The four modes
 
-The same question can be answered four ways, over MCP as `find_usages` and on the command line as
-`claude-db usages`:
+Ask the same question four ways, over MCP as `find_usages` or in the terminal as `claude-db usages`:
 
-| Mode      | Answers                                                                 |
-| --------- | ----------------------------------------------------------------------- |
-| `text`    | Live `git grep`. Needs no scan at all and is never stale. The default.   |
-| `usages`  | What references this symbol, with the relation on each line.            |
-| `explain` | That, plus what the symbol itself reaches.                              |
-| `path`    | How two symbols connect.                                                |
+| Mode      | Answers                                                             |
+| --------- | ------------------------------------------------------------------- |
+| `text`    | Live `git grep`. Needs no scan, is never stale, and is the default. |
+| `usages`  | What references this symbol, with the relation on each line.        |
+| `explain` | That, plus what the symbol itself reaches.                          |
+| `path`    | How two symbols connect.                                            |
 
 ```bash
 claude-db usages --mode explain closeObservations
 claude-db usages --mode path cmdScan observationId
 ```
 
-<Path
-  hops={4}
-  nodes={['cmdScan', 'scanRepository', 'extractFile', 'symbolId', 'observationId']}
-/>
+<Path hops={4} nodes={['cmdScan', 'scanRepository', 'extractFile', 'symbolId', 'observationId']} />
 
 ## Confidence on every edge
 
-`EXTRACTED` means the relationship was read literally out of the syntax tree. An import names its own
-target, so nothing is guessed. `INFERRED` means the target was matched by name across files, which is
-wrong when two files export the same identifier, and it carries a score saying how sure the match
-was.
-
-<Callout title="One guess, labelled as one">
-Name matching is the only guess this makes, so it is labelled rather than presented as fact. You can
-see which half of an answer is certain.
-</Callout>
+`EXTRACTED` means the link was read straight from the syntax tree, so nothing is guessed. `INFERRED` means it was matched by name across files, and it carries a score. Name matching is the only guess the graph makes, and it is always labelled.
 
 ## Never stale
 
-Every graph query hashes the working tree first and re-parses whatever changed before answering, so
-it cannot report a line the source has already moved past. The SessionStart hook does the same
-refresh in the background for repositories that have been scanned, but correctness does not depend on
-it having run.
-
-Traversal is keyed on symbol id rather than name. Keying by name would merge every same-named symbol
-into one node, and a repository with a `run` in each test file would grow shortcuts between unrelated
-code, making the shortest path a route nothing can actually take.
+Every graph query checks the working tree first and re-parses what changed, so an answer never points at a line that has moved.
 
 ## Languages
 
-Two tiers, and the graph always says which one an answer came from.
-
-**Parsed** — TypeScript, TSX, JavaScript, Python, Go, Rust and Ruby. The parser is ast-grep, which
-ships with the package as a prebuilt binary per platform, so nothing compiles at install and nothing
-else has to be installed. These languages get real syntax: definitions read literally from the tree,
-and `calls`, `imports`, `extends` and `implements` told apart.
-
-**Read by pattern** — Java, C, C++, C#, Objective-C, Swift, Kotlin, Scala, PHP, Perl, Lua, R, Julia,
-Dart, Elixir, Erlang, Clojure, Haskell, OCaml, F#, Groovy, shell, PowerShell, SQL, Zig, Nim, Crystal,
-Solidity and Vala. A shared table of declaration patterns finds classes, modules, functions and
-methods, and references are matched by name, so every edge from this tier is tagged `INFERRED` with a
-score. A reference that matches no declaration anywhere in the repository produces no edge at all,
-rather than a guess. It is less precise than a real parse and is meant to be: the alternative for
-these languages is nothing.
+- **Parsed:** TypeScript, TSX, JavaScript, Python, Go, Rust and Ruby. The parser ships with the package, so nothing compiles at install. These get real syntax: definitions, `calls`, `imports`, `extends` and `implements`.
+- **Read by pattern:** about 30 more, including Java, C, C++, C#, Swift, Kotlin, PHP and SQL. Declarations are found by pattern and every edge is tagged `INFERRED`. A reference that matches no declaration produces no edge, not a guess.

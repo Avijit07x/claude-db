@@ -1,6 +1,5 @@
 import type { ComponentType } from 'react';
 import Benchmarks from './benchmarks.mdx';
-import CdbScan from './cdb-scan.mdx';
 import Cli from './cli.mdx';
 import CodeGraph from './code-graph.mdx';
 import Databases from './databases.mdx';
@@ -10,6 +9,7 @@ import Introduction from './introduction.mdx';
 import McpTools from './mcp-tools.mdx';
 import Privacy from './privacy.mdx';
 import QuickStart from './quick-start.mdx';
+import Skills from './skills.mdx';
 import Troubleshooting from './troubleshooting.mdx';
 
 export const BODIES: Record<string, ComponentType> = {
@@ -19,7 +19,7 @@ export const BODIES: Record<string, ComponentType> = {
   'how-it-works': HowItWorks,
   'code-graph': CodeGraph,
   databases: Databases,
-  'cdb-scan': CdbScan,
+  skills: Skills,
   privacy: Privacy,
   cli: Cli,
   'mcp-tools': McpTools,

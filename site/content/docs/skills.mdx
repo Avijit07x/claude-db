@@ -1,0 +1,61 @@
+Install adds three skills. Type the name in Claude Code to run one.
+
+| Skill       | Use it when                                          | What it does                                                  |
+| ----------- | ---------------------------------------------------- | ------------------------------------------------------------- |
+| `/catchup`  | You come back to a project or start a new chat       | Answers "where did I stop?" in three short groups             |
+| `/handoff`  | You finish for the day, switch tasks or hand work on | Writes a short note for the next chat or a teammate           |
+| `/cdb-scan` | Memory is new on an existing project                 | Maps the codebase into memory. See [cdb-scan](/docs/cdb-scan) |
+
+## /catchup
+
+It reads your last chat, the recorded to-dos, the last handoff note and git, then replies with:
+
+- **Done:** what is finished.
+- **Open:** what is started but not finished.
+- **Next:** what to do first.
+
+It only reads. It saves nothing and changes nothing. The same facts are available in the terminal:
+
+```bash
+claude-db catchup
+```
+
+## /handoff
+
+It writes one note with a Done, Open and Next line, saves it, and prints it so you can paste it into a message or a pull request.
+
+```text
+Handoff, Oct 6:
+- Done: timers, queue, mail family.
+- Open: PR #18 not merged.
+- Next: ask which retries to change on the worker queue.
+```
+
+The note is saved with a fixed key, so a new handoff replaces the old one. There is one current handoff per project. The next chat shows it at the start, under "Last handoff", for 14 days.
+
+A teammate sees the note when you both use the same [shared database](/docs/databases). With the default SQLite file, the printed note is the way to share it.
+
+## /cdb-scan
+
+A fresh install has nothing to recall. `/cdb-scan` fills it in one pass. Run it when memory is new on an existing project, or when the project has changed enough that the stored map is stale.
+
+<Flow
+  trigger="/cdb-scan"
+  branches={[
+    {
+      title: 'Build the code graph',
+      steps: ['runs claude-db scan', 'every symbol, and every relationship between symbols'],
+    },
+    {
+      title: 'Write the project profile',
+      steps: [
+        'five notes: stack, layout, conventions, workflows, architecture',
+        'stored under stable keys, so a re-run updates them in place',
+      ],
+    },
+  ]}
+/>
+
+It is safe to repeat. The graph re-parses only changed files, and the five notes are keyed, so a second run updates them instead of adding duplicates. The notes are tagged `inferred`, because they are Claude's reading of the code and not a record of something that happened.
+
+Run `/handoff` when you stop and `/catchup` when you come back. If you already have a skill with the same name, claude-db keeps yours and says so.

@@ -7,6 +7,9 @@ const config: NextConfig = {
   reactStrictMode: true,
   agentRules: false,
   pageExtensions: ['ts', 'tsx', 'mdx'],
+  redirects: async () => [
+    { source: '/docs/cdb-scan', destination: '/docs/skills', permanent: true },
+  ],
   turbopack: {
     root: dirname(fileURLToPath(import.meta.url)),
   },

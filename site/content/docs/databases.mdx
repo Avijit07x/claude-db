@@ -4,8 +4,7 @@ to Postgres or Mongo is one command.
 ## SQLite
 
 Stored at `~/.claude-memory/memory.db`. It comes from Node's builtin `node:sqlite`, so there is
-nothing to install and nothing compiles. Memory is partitioned by project path, so one database
-serves every repo you work in.
+nothing to install and nothing compiles. Memory is filed by project, so one database serves every repo you work in.
 
 ## Switch database
 
@@ -20,9 +19,9 @@ claude-db looks for them next to itself. `CLAUDE_DB_URL`
 overrides the config file when you need a one-off.
 
 <Callout title="Recall does not change with the backend">
-Search is hybrid, keyword plus vector, on all three. Ranking, fusion and token budgeting live above
-the adapters, so results behave identically no matter which database is plugged in. Only retrieval
-cost changes.
+  Search is hybrid, keyword plus vector, on all three. Ranking, fusion and token budgeting live
+  above the adapters, so results behave identically no matter which database is plugged in. Only
+  retrieval cost changes.
 </Callout>
 
 ## Sync two databases
@@ -33,6 +32,17 @@ claude-db sync "postgres://user:pass@host:5432/memory"
 
 A two-way merge, so a laptop and a desktop can each keep working offline and reconcile later.
 `export` and `import` cover the same ground as files when you would rather move a dump by hand.
+
+## Teams and several machines
+
+Point everyone at one Postgres or MongoDB database and they share memory.
+
+- **Projects are matched by git remote.** A repository with an `origin` remote is one project wherever it is cloned, so a laptop and a desktop share memory. The `ssh` and `https` addresses of one repository match, and no token in the address is ever stored. A folder with no remote is matched by its path. A fork has its own remote, so it is its own project. Set `project.remote` to use a remote other than `origin`.
+- **Update every machine to 0.11.0 or newer.** An older version does not see notes shared by git remote.
+- **Personal rules stay personal.** A rule about how you like to work is filed under your git email and never reaches a teammate. Set `git config user.email` so it is filed under the right name.
+- **Use a restricted account.** The account should reach only its own database.
+
+Memory saved before 0.11.0 under a folder path is still found and is not moved.
 
 ## MongoDB Atlas vector index
 

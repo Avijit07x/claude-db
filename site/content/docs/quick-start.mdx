@@ -1,37 +1,37 @@
-Memory fills itself as you work, so a fresh install has nothing to recall yet. These three steps give
-it something to find on day one.
+A fresh install has nothing to recall. These steps fill it, and these habits make recall better.
 
-## Map the code
+## Give it a head start
 
-The graph is the one part that needs a command. It parses every supported source file and stores each
-symbol and each relationship between symbols.
+Run these once in your project.
 
 ```bash
+claude-db flush
 claude-db scan
-```
-
-It takes about a second on a mid-size repository and costs no tokens, because parsing is local.
-Re-running is cheap: files are hashed and only what changed is re-parsed.
-
-## Seed from git history
-
-Your repository already contains a record of what happened. This reads it into memory so search has
-something to match before you have built up any sessions.
-
-```bash
 claude-db seed --from-git
 ```
 
-<Callout title="Or let Claude do both">
-Install also adds a `/cdb-scan` skill. Run it once inside Claude Code and it builds the graph, then
-writes five notes about your stack, layout, conventions, workflows and architecture into memory under
-stable keys.
-</Callout>
+| Command                     | What you get                                                             |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `claude-db flush`           | Your past chats for this project, loaded into memory                     |
+| `claude-db scan`            | A map of your code. It takes about a second and costs no tokens          |
+| `claude-db seed --from-git` | Your commit history, loaded into memory so search has something to match |
+
+Claude Code keeps chat files for about 30 days, so run `flush` early. After a session or two, older chats are also turned into short facts in the background, newest first, within a daily limit.
+
+You can build the map from inside Claude Code instead, with the [`/cdb-scan` skill](/docs/skills).
+
+## Work in ways that help
+
+- **Be specific.** "Make the order feed reconnect with backoff" finds memory. "ok" and "continue" do not.
+- **Say why.** "We chose a websocket because polling hammered the API" is kept as a decision with its reason.
+- **State a rule once.** Tell Claude to remember it, or run `claude-db remember "always use pnpm in this repo"`.
+- **Commit finished work.** Uncommitted work stays listed as open.
+- **Wrap private text in `<private>...</private>`.** It is removed before saving.
+- **Use `/catchup` when you return and `/handoff` when you stop.** See [Skills](/docs/skills).
 
 ## Ask something
 
-From here you do not run commands. Ask Claude the questions you would normally ask, and the answers
-come from the graph instead of from four file reads:
+From here you do not run commands. Ask Claude what you would normally ask:
 
 ```text
 what breaks if I change closeObservations?
@@ -39,17 +39,14 @@ why does capture read the transcript instead of the diff?
 what was I in the middle of yesterday?
 ```
 
-The first is answered by [the code graph](/docs/code-graph), the second by memory, and the third by
-the open-work list that `claude-db status` also prints.
+The first is answered by the [code graph](/docs/code-graph), the second by memory, and the third by `/catchup`.
 
-## Record a rule
-
-Most memory is captured automatically, but a standing preference is worth stating outright. Tell
-Claude to remember it, or write it yourself:
+## Look at what it holds
 
 ```bash
-claude-db remember "always use pnpm in this repo"
+claude-db search <words>
+claude-db stats
+claude-db view
 ```
 
-Rules recorded this way come back the same as anything else: injected above your prompt when they are
-relevant.
+`view` opens this project's memory in the browser, and stops when you press Ctrl+C.

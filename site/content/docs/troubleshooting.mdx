@@ -1,101 +1,59 @@
-Almost everything here is answered by two commands: `claude-db status` for whether it is wired up,
-and `claude-db doctor` for what it resolved.
-
-## Start with doctor
+Start with two commands: `claude-db status` shows whether it is wired up, and `claude-db doctor` shows what it resolved.
 
 ```bash
 claude-db doctor
-```
-
-It prints the version, the database URL, the adapter in use, whether that database is reachable, the
-embedder and its dimensions, and how many vectors are stored. Most problems are visible in those
-seven lines.
-
-```bash
 claude-db doctor --deep
 ```
 
-The deep check writes one observation, searches for it, expands it, then deletes it, proving the
-whole round trip rather than just the connection. Each step reports `ok` or `FAIL`, so a failure
-tells you which half is broken.
+`--deep` writes one test memory, searches for it, reads it back and deletes it. Each step reports `ok` or `FAIL`, so you can see which half is broken.
 
 ## Nothing is being captured
 
-| Check                            | Fix                                                             |
-| -------------------------------- | --------------------------------------------------------------- |
-| Did you restart Claude Code?      | Hooks are read at startup, so a running session never sees them |
-| Was `install` run in this repo?   | `claude-db install --project` from the repository root          |
-| Has any turn changed a file?      | Questions and read-only commands are skipped by design          |
+| Check                           | Fix                                                             |
+| ------------------------------- | --------------------------------------------------------------- |
+| Did you restart Claude Code?    | Hooks are read at startup, so a running session never sees them |
+| Was `install` run in this repo? | `claude-db install --project` from the repository root          |
+| Has any turn changed a file?    | Questions and read-only commands are skipped by design          |
 
-Run `claude-db status` to see when it last recorded anything. If the answer is never, it is one of
-the first two rows.
+## Memory rarely shows up
 
-## Search returns nothing
+- A fresh install has no history. Run the [head start steps](/docs/quick-start).
+- Prompts of one or two words, or filler like "ok", get nothing.
+- Run `claude-db pick`. It says if picking is off, paused after a failed call, or past today's limit.
+- A turn with no tool calls never shows a pick.
 
-On a fresh install this is expected: there is no history yet. Give it something to find with
-[`claude-db seed --from-git`](/docs/quick-start) or the [`/cdb-scan` skill](/docs/cdb-scan).
+## A moved repository looks empty
 
-If memory is not empty, check that you are in the same directory it was recorded under. Memory is
-partitioned by project path, so a moved repository looks empty:
+A repository with a git remote keeps its memory wherever it is cloned. With no remote, bring it across:
 
 ```bash
-claude-db merge /old/path/to/project
+claude-db merge /old/path/to/project --yes
 ```
 
 ## doctor says reachable: no
 
-The database URL resolved but could not be opened. For Postgres or Mongo, the driver does not ship
-by default:
+For Postgres or MongoDB, install the driver, and check `CLAUDE_DB_URL` is not set to something old.
 
 ```bash
 npm install -g pg
 npm install -g mongodb
 ```
 
-`CLAUDE_DB_URL` overrides the config file, so check it is not set to something stale.
-
 ## find_usages has no graph
 
-The graph is the one part that is not automatic. Build it once:
+Build the graph once with `claude-db scan`. Until then, `text` mode still works, because it is a live `git grep`.
 
-```bash
-claude-db scan
-```
+## Search got worse after adding the embedder
 
-Until then, `text` mode still answers: it is a live `git grep` and needs no scan at all.
-
-## Behaviour looks old after upgrading
-
-Hooks are registered by absolute path into the installed package, so they always run the current
-code. The skill and instruction copies are refreshed by SessionStart when they differ from what
-shipped, which means `npm i -g claude-db` is enough, but the refresh happens at session start, so
-restart Claude Code once after upgrading.
-
-## Search got worse after installing a better embedder
-
-Existing rows are still stored at the old dimension. Re-embed them:
+Re-embed the old rows at the new size:
 
 ```bash
 claude-db reembed
 ```
 
-## reembed runs out of memory
-
-Embedding is chunked, so peak memory is set by the chunk, not by the size of the database. Measured
-on `all-MiniLM-L6-v2` with worst-case 512-token observations, re-embedding 1,400 rows holds ~0.8 GB
-and takes the same time as re-embedding 128.
-
-Raising `embeddings.batchSize` costs memory and buys no speed — wall-clock is flat from 1 to 8 while
-peak memory triples, because CPU inference is compute-bound and the token count is the same either
-way. Lower it if you are tight on RAM:
-
-```json
-{ "embeddings": { "batchSize": 4 } }
-```
-
-The default is 8.
+If `reembed` runs low on memory, set `{ "embeddings": { "batchSize": 4 } }` in the config. The default is 8.
 
 <Callout title="Nothing here deletes memory">
-  `uninstall` removes the hooks and leaves your database alone. Only `forget`, `prune` and `reset`
-  delete anything, and the last two are dry runs without `--yes`.
+  `uninstall` leaves your database alone. Only `forget`, `prune` and `reset` delete anything, and
+  the last two are dry runs without `--yes`.
 </Callout>
