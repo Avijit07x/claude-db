@@ -18,6 +18,8 @@ with nothing in it is left out.
 - `Last chat` is the newest recorded chat, with a few lines of the work done in it.
 - `Still to do` are to-dos found in earlier chats.
 - `Not committed yet` is recorded work that no commit has covered.
+- `Decisions and dead ends` are what was chosen or ruled out, with the reason.
+- `Branch` says which branch you are on and how many files are uncommitted.
 - `Git status` and `Recent commits` are the live state of the repository.
 
 If the output is `Nothing recorded for this project yet.`, say exactly that and stop.

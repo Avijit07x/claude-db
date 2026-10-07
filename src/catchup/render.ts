@@ -21,6 +21,13 @@ function gitLines(data: CatchupData): { status: string[]; commits: string[] } {
   };
 }
 
+function branchLine(git: CatchupData['git']): string[] {
+  if (!git) return [];
+  const state =
+    git.changed === 0 ? 'clean' : `${git.changed} file${git.changed === 1 ? '' : 's'} uncommitted`;
+  return [`Branch: ${git.branch ?? 'detached HEAD'}, ${state}`, ''];
+}
+
 function chatBlock(chat: CatchupData['lastChat'], now: number): string[] {
   if (!chat) return [];
   const heading = `Last chat (${formatDay(chat.at, now)}): ${chat.summary || 'no summary'}`;
@@ -41,7 +48,9 @@ export function renderCatchup(data: CatchupData, now = Date.now()): string {
     ...handoffBlock(data.handoff, now),
     ...chatBlock(data.lastChat, now),
     ...section('Still to do (from facts):', bullets(data.todos)),
+    ...section('Decisions and dead ends (from facts):', bullets(data.decisions)),
     ...section('Not committed yet (recorded work):', bullets(data.uncommitted)),
+    ...branchLine(data.git),
     ...section('Git status:', status),
     ...section('Recent commits:', commits),
   ];

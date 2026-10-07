@@ -142,8 +142,8 @@ const removed = cli(['uninstall', '--project']);
 report(
   'uninstall removes the hooks, the server and the guidance',
   removed.code === 0 &&
-    !readJson(settingsPath).hooks &&
-    !readJson(join(project, '.mcp.json')).mcpServers &&
+    (!existsSync(settingsPath) || !readJson(settingsPath).hooks) &&
+    !existsSync(join(project, '.mcp.json')) &&
     !existsSync(join(project, 'CLAUDE.local.md')),
 );
 report('status then says nothing is installed', cli(['status']).out.includes('NOT INSTALLED'));

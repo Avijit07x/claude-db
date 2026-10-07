@@ -3,7 +3,7 @@ import { check } from '../lib/check.mjs';
 export default async function run() {
   {
     const { install, refreshHooks, uninstall } = await import('../../dist/cli/install.js');
-    const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } =
+    const { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } =
       await import('node:fs');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
@@ -89,10 +89,8 @@ export default async function run() {
       'and those hooks are still recognised as ours on uninstall',
       (() => {
         uninstall('C:\\Users\\Me\\node_modules\\claude-db\\dist', 'project', windows);
-        const after = JSON.parse(
-          readFileSync(join(windows, '.claude/settings.local.json'), 'utf8'),
-        );
-        return !after.hooks;
+        const file = join(windows, '.claude/settings.local.json');
+        return !existsSync(file) || !JSON.parse(readFileSync(file, 'utf8')).hooks;
       })(),
     );
     rmSync(windows, { recursive: true, force: true });
@@ -113,10 +111,21 @@ export default async function run() {
     uninstall(dist, 'project', repo);
     check(
       'uninstall removes the mcp server even when it was the only one',
-      !read('.mcp.json').mcpServers,
+      !read('.mcp.json')?.mcpServers,
       JSON.stringify(read('.mcp.json')),
     );
-    check('uninstall removes the hooks', !read('.claude/settings.local.json').hooks);
+    check('uninstall removes the hooks', !read('.claude/settings.local.json')?.hooks);
+    const bare = mkdtempSync(join(tmpdir(), 'bare-uninstall-'));
+    install(dist, 'project', bare);
+    uninstall(dist, 'project', bare);
+    check(
+      'uninstall leaves no empty files or folders behind in a project it set up',
+      !existsSync(join(bare, '.mcp.json')) &&
+        !existsSync(join(bare, '.claude')) &&
+        !existsSync(join(bare, 'CLAUDE.local.md')),
+      readdirSync(bare).join(' '),
+    );
+    rmSync(bare, { recursive: true, force: true });
     check('uninstall removes the scan skill', !existsSync(join(repo, '.claude/skills/cdb-scan')));
 
     const afterRemoval = readFileSync(join(repo, 'CLAUDE.local.md'), 'utf8');

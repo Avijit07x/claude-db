@@ -112,10 +112,13 @@ export default async function run() {
       refreshInstalled(dist, clean).length === 0 &&
         SKILLS.every(({ name }) => !existsSync(skillPathFor('project', clean, name))),
     );
+    const home = process.env.HOME;
+    process.env.HOME = clean;
+    const described = describeSkills(clean);
+    process.env.HOME = home;
     check(
       'doctor says what is missing and how to fix it',
-      describeSkills(clean).includes('/catchup MISSING') &&
-        describeSkills(clean).includes('claude-db install'),
+      described.includes('/catchup MISSING') && described.includes('claude-db install'),
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });

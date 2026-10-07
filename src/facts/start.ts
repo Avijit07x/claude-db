@@ -5,6 +5,7 @@ import { FACT_SESSION, factType, onePerKey, youScope } from './model.js';
 import { newestHandoff, handoffBodyLines } from './handoff.js';
 import { MANUAL_SESSION, factLine, seenByClaude } from './render.js';
 import { formatDay } from '../util/day.js';
+import { toShortId } from '../util/shortid.js';
 
 const ABOUT_YOU = 6;
 const THIS_PROJECT = 10;
@@ -82,5 +83,8 @@ export async function startFacts(
 }
 
 function handoffEntries(handoff: Observation): [string, string | null][] {
-  return handoffBodyLines(handoff).map((line, index) => [line, index === 0 ? handoff.id : null]);
+  return handoffBodyLines(handoff).map((line, index) => [
+    index === 0 ? `${line} (${toShortId(handoff.id)})` : line,
+    index === 0 ? handoff.id : null,
+  ]);
 }

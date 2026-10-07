@@ -102,6 +102,30 @@ try {
     },
     factToObservation(
       {
+        key: 'retries-stay-3',
+        type: 'decision',
+        scope: 'project',
+        text: 'Retries stay at 3 because the queue already backs off.',
+        files: [],
+        at,
+        source: 'test',
+      },
+      project,
+    ),
+    factToObservation(
+      {
+        key: 'second-pool',
+        type: 'deadend',
+        scope: 'project',
+        text: 'A second worker pool doubled the mail cost.',
+        files: [],
+        at,
+        source: 'test',
+      },
+      project,
+    ),
+    factToObservation(
+      {
         key: 'worker-retries',
         type: 'todo',
         scope: 'project',
@@ -128,6 +152,18 @@ try {
       before.stdout.includes('?? mail.txt') &&
       before.stdout.includes('fix: queue retries') &&
       before.stdout.includes('feat: add timers'),
+    before.stdout,
+  );
+  report(
+    'catchup shows the branch with how many files are uncommitted',
+    /Branch: \S+, 1 file uncommitted/.test(before.stdout),
+    before.stdout,
+  );
+  report(
+    'and the decisions and dead ends, with their reasons',
+    before.stdout.includes('Decisions and dead ends (from facts):') &&
+      before.stdout.includes('Decided: Retries stay at 3 because the queue already backs off.') &&
+      before.stdout.includes('Dead end: A second worker pool doubled the mail cost.'),
     before.stdout,
   );
   report(
@@ -166,6 +202,11 @@ try {
       context.includes('- Done: timers, queue, mail family.') &&
       context.includes('- Open: PR #18 not merged.') &&
       context.includes('- Next: ask which retries to change on the worker queue.'),
+    context,
+  );
+  report(
+    'and the first handoff line carries the note id, so the full text can be expanded',
+    /- Done: timers, queue, mail family\. \([0-9a-f]{8}-[0-9a-f]{4}\)/.test(context),
     context,
   );
   report(

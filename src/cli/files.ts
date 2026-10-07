@@ -1,5 +1,5 @@
 import { dirname } from 'node:path';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmSync, rmdirSync, writeFileSync } from 'node:fs';
 
 export function readText(path: string): string {
   try {
@@ -31,4 +31,17 @@ export function readJson(path: string): Record<string, unknown> {
 
 export function writeJson(path: string, value: unknown): void {
   writeAtomic(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+export function writeJsonOrRemove(path: string, value: Record<string, unknown>): void {
+  if (Object.keys(value).length === 0) rmSync(path, { force: true });
+  else writeJson(path, value);
+}
+
+export function removeIfEmpty(path: string): void {
+  try {
+    rmdirSync(path);
+  } catch {
+    return;
+  }
 }

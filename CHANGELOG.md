@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.11.1
+
+### Fixed
+
+- **Facts no longer repeat a rule you saved by hand.** When a chat ended, the fact-making call saw the
+  earlier facts but not the rules you saved with `remember`, so it saved the same rule again and the start
+  of a chat listed it twice. The call now sees those rules and is told not to repeat them. Rules already
+  duplicated stay until you remove one with `claude-db forget <id>`.
+- **`uninstall --project` leaves nothing empty behind.** It used to leave an empty `.mcp.json` and
+  `.claude/settings.local.json`, and an empty `.claude/skills` folder. It now removes them when nothing else
+  is in them. Your own settings, servers and skills are never touched, and a machine-wide uninstall is
+  unchanged.
+
+### Changed
+
+- **`/handoff` keeps more, in a fixed size.** The note can now hold Decided, Rejected, Watch out and State
+  lines, with the reason after "because", and carries still-true lines forward. It is capped at 8 lines of
+  about 200 characters. At the start of a chat only those 8 lines are shown, each cut at 220 characters, with
+  a line saying how many more there are. The first line ends with the note's id, so the full text can be
+  read with `get_observations`.
+- **`/catchup` shows the branch and how many files are uncommitted**, and the recent decisions and dead
+  ends, so a handoff can be written from facts and not only from the chat.
+
+### Docs
+
+- A shorter setup guide and README, and a cleaner docs site with a Skills page and a clearer code block.
+
 ## 0.11.0
 
 ### Added

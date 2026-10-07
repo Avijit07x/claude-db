@@ -7,6 +7,18 @@ import { refreshInstalled } from '../../dist/cli/refresh.js';
 import { instructionsPathFor, skillPathFor } from '../../dist/cli/paths.js';
 
 export default async function run() {
+  const realHome = process.env.HOME;
+  const home = mkdtempSync(join(tmpdir(), 'refresh-home-'));
+  process.env.HOME = home;
+  try {
+    await checks();
+  } finally {
+    process.env.HOME = realHome;
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
+async function checks() {
   const dist = new URL('../../dist', import.meta.url).pathname;
   const packaged = readFileSync(join(dist, '..', 'skills', 'cdb-scan', 'SKILL.md'), 'utf8');
 

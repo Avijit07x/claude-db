@@ -2,6 +2,7 @@ import { check } from '../lib/check.mjs';
 import { buildDistillPrompt, parseOps } from '../../dist/facts/ops.js';
 import { factId, factToObservation, youScope } from '../../dist/facts/model.js';
 import { memoryFact, parseMemoryFile } from '../../dist/facts/claude-memory.js';
+import { handoffBodyLines } from '../../dist/facts/handoff.js';
 
 export default async function run() {
   {
@@ -38,6 +39,13 @@ export default async function run() {
     check(
       'the model sees what is already known',
       prompt.includes('timers [decision, project] All timers fire after 1.1s.'),
+    );
+    check('no noted block when nothing was saved by hand', !prompt.includes('<noted-by-user>'));
+    const withNotes = buildDistillPrompt('Asked: fix the timer', [], ['Always use pnpm here']);
+    check(
+      'rules saved by hand are listed so they are not repeated',
+      withNotes.includes('<noted-by-user>\nAlways use pnpm here\n</noted-by-user>') &&
+        withNotes.includes('never write a fact that repeats'),
     );
     check(
       'and the chat, framed as data',
@@ -126,6 +134,30 @@ export default async function run() {
     check(
       'a memory about the user stays in its project, never in every project',
       about.scope === 'project' && about.type === 'fact',
+    );
+  }
+  {
+    const long = {
+      body: [
+        'Handoff, Oct 7:',
+        ...Array.from({ length: 12 }, (_, i) => `- Line ${i}: ${'x'.repeat(400)}`),
+      ].join('\n'),
+    };
+    const lines = handoffBodyLines(long);
+    check(
+      'a long handoff shows at most 8 lines, then says how many more there are',
+      lines.length === 9 && lines[8] === '- ...4 more line(s) in the full note',
+      String(lines.length),
+    );
+    check(
+      'and each line is cut to a short length',
+      lines.slice(0, 8).every((line) => line.length <= 220 && line.endsWith('…')),
+      String(Math.max(...lines.slice(0, 8).map((line) => line.length))),
+    );
+    const short = { body: 'Handoff, Oct 7:\n- Done: a.\n- Open: b.\n- Next: c.' };
+    check(
+      'a short handoff is shown whole',
+      JSON.stringify(handoffBodyLines(short)) === '["- Done: a.","- Open: b.","- Next: c."]',
     );
   }
 }

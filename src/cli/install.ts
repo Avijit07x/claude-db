@@ -3,7 +3,7 @@ import type { SkillInstallResult } from './skills.js';
 import { installSkills, removeSkills } from './skills.js';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { readJson, writeJson } from './files.js';
+import { readJson, writeJson, writeJsonOrRemove } from './files.js';
 import { removeInstructions, writeInstructions } from './instructions.js';
 import { toPosix } from '../util/paths.js';
 
@@ -132,6 +132,7 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
   const settings = readJson(path);
   if (Object.keys(settings).length === 0) return null;
 
+  const save = scope === 'project' ? writeJsonOrRemove : writeJson;
   const hooks = (settings['hooks'] ?? {}) as Record<string, HookMatcher[]>;
 
   for (const [event, entries] of Object.entries(hooks)) {
@@ -142,7 +143,7 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
   }
   if (Object.keys(hooks).length > 0) settings['hooks'] = hooks;
   else delete settings['hooks'];
-  writeJson(path, settings);
+  save(path, settings);
 
   removeInstructions(instructionsPathFor(scope, project));
   removeSkills(scope, project);
@@ -159,7 +160,7 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
   delete servers['memory'];
   if (Object.keys(servers).length > 0) mcpConfig['mcpServers'] = servers;
   else delete mcpConfig['mcpServers'];
-  if (existed) writeJson(mcpPath, mcpConfig);
+  if (existed) save(mcpPath, mcpConfig);
 
   return path;
 }
