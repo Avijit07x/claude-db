@@ -16,6 +16,7 @@ export function usage(): void {
   projects                    List every project with memory in this database
   merge [<old-path>] [--yes]  Move memory from an old project path onto this one
   stats                       What this project's memory is made of
+  catchup                     Where did I stop: last chat, to-dos, git state, last handoff
   adoption                    How often sessions grep vs use the memory tools
   view [--export <file>]      See this project's memory live in the browser
   distill [on|off]            Turn chats into facts with Haiku; no argument shows status
@@ -35,6 +36,7 @@ export function usage(): void {
   reembed [--project]         Re-embed with the current model
   prune --older-than <days>   Delete old memory (dry run without --yes)
   reset [--project] --yes     Delete stored memory (dry run without --yes)
+  --version, -v               Print the installed version
 
   --project  scope to the current repo via .claude/settings.local.json
              instead of every project on this machine

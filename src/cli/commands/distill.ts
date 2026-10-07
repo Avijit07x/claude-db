@@ -1,4 +1,5 @@
 import { setConfigValue } from '../../config/index.js';
+import { createBackfillPrinter } from '../backfill-output.js';
 import type { RecallContext } from '../../context.js';
 import { createContext } from '../../context.js';
 import { distillUsage } from '../../facts/budget.js';
@@ -10,6 +11,7 @@ import {
   factCounts,
   pendingSessions,
 } from '../../facts/distill.js';
+import { runHeadlessResult } from '../../util/claude-cli.js';
 import { describePause } from '../../util/daily-budget.js';
 import { finishJob, releaseJob } from '../../util/job-lock.js';
 import { resolveProject } from '../../util/project.js';
@@ -50,7 +52,16 @@ async function runBackfill(project: string): Promise<void> {
     const ctx = await createContext();
     try {
       await importClaudeMemory(ctx, project);
-      if (ctx.config.distill.enabled) await backfill(ctx, project);
+      if (ctx.config.distill.enabled) {
+        const printer = createBackfillPrinter({
+          write: (text) => process.stdout.write(text),
+          tty: process.stdout.isTTY === true,
+        });
+        const result = await backfill(ctx, project, runHeadlessResult, printer.step);
+        printer.finish(result, distillUsage(), ctx.config.distill.dailyLimit);
+      } else {
+        console.log('distill  : off, so no chats were turned into facts (claude-db distill on)');
+      }
     } finally {
       await ctx.close();
     }

@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readlinkSync, statSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import {
+  accessSync,
+  constants,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, delimiter, join } from 'node:path';
 import { CONFIG_DIR } from '../config/dir.js';
 
 const REMEMBERED_FILE = join(CONFIG_DIR, 'claude-binary');
@@ -24,7 +32,7 @@ function inspectOnLinux(pid: number): ProcessInfo | null {
   }
 }
 
-function inspectWithPs(pid: number): ProcessInfo | null {
+export function inspectWithPs(pid: number): ProcessInfo | null {
   try {
     const line = execFileSync('ps', ['-o', 'ppid=,comm=', '-p', String(pid)], {
       encoding: 'utf8',
@@ -38,7 +46,7 @@ function inspectWithPs(pid: number): ProcessInfo | null {
   }
 }
 
-function inspectProcess(pid: number): ProcessInfo | null {
+export function inspectProcess(pid: number): ProcessInfo | null {
   if (process.platform === 'win32') return null;
   return process.platform === 'linux' ? inspectOnLinux(pid) : inspectWithPs(pid);
 }
@@ -84,9 +92,57 @@ export function rememberClaudeBinary(
   } catch {}
 }
 
+export type ClaudeSource = 'CLAUDE_CODE_EXECPATH' | 'saved path' | 'parent process' | 'PATH';
+
+export interface ClaudeLocation {
+  path: string;
+  source: ClaudeSource;
+}
+
+export interface ClaudeLookup {
+  remembered: () => string | null;
+  ancestor: () => string | null;
+  onPath: (env: NodeJS.ProcessEnv) => string | null;
+}
+
+export function findOnPath(env: NodeJS.ProcessEnv = process.env): string | null {
+  const names = process.platform === 'win32' ? ['claude.exe', 'claude.cmd'] : ['claude'];
+  for (const dir of (env['PATH'] ?? '').split(delimiter)) {
+    if (dir === '') continue;
+    for (const name of names) {
+      const candidate = join(dir, name);
+      try {
+        if (!statSync(candidate).isFile()) continue;
+        accessSync(candidate, constants.X_OK);
+        return candidate;
+      } catch {}
+    }
+  }
+  return null;
+}
+
+export function resolveClaude(
+  env: NodeJS.ProcessEnv = process.env,
+  lookup: Partial<ClaudeLookup> = {},
+): ClaudeLocation | null {
+  const {
+    remembered = rememberedBinary,
+    ancestor = findClaudeAncestor,
+    onPath = findOnPath,
+  } = lookup;
+  const fromEnv = env['CLAUDE_CODE_EXECPATH'];
+  if (fromEnv) return { path: fromEnv, source: 'CLAUDE_CODE_EXECPATH' };
+  const saved = remembered();
+  if (saved) return { path: saved, source: 'saved path' };
+  const parent = ancestor();
+  if (parent) return { path: parent, source: 'parent process' };
+  const found = onPath(env);
+  return found ? { path: found, source: 'PATH' } : null;
+}
+
 export function claudeBinary(
   env: NodeJS.ProcessEnv = process.env,
-  remembered: () => string | null = rememberedBinary,
+  lookup: Partial<ClaudeLookup> = {},
 ): string {
-  return env['CLAUDE_CODE_EXECPATH'] || remembered() || 'claude';
+  return resolveClaude(env, lookup)?.path ?? 'claude';
 }

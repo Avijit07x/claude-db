@@ -2,7 +2,9 @@ import type { RecallContext } from '../context.js';
 import type { Observation } from '../types.js';
 import { openWork } from '../capture/progress.js';
 import { FACT_SESSION, factType, youScope } from './model.js';
+import { newestHandoff, handoffBodyLines } from './handoff.js';
 import { MANUAL_SESSION, factLine, seenByClaude } from './render.js';
+import { formatDay } from '../util/day.js';
 
 const ABOUT_YOU = 6;
 const THIS_PROJECT = 10;
@@ -28,8 +30,10 @@ export async function startFacts(
 
   const you = await list(youScope(), FACT_SESSION, 50);
   const facts = await list(project, FACT_SESSION, 300);
-  const manual = await list(project, MANUAL_SESSION, 20);
-  if (you.length + facts.length + manual.length === 0) return null;
+  const handoff = await newestHandoff(ctx, project);
+  const shownHandoff = handoff && visible(handoff) ? handoff : null;
+  const manual = (await list(project, MANUAL_SESSION, 20)).filter((obs) => obs.id !== handoff?.id);
+  if (you.length + facts.length + manual.length === 0 && !shownHandoff) return null;
 
   const rank = (obs: Observation) => {
     const index = ORDER.indexOf(factType(obs) ?? 'rule');
@@ -46,6 +50,10 @@ export async function startFacts(
   const sections: [string, [string, string | null][]][] = [
     ['About you:', you.slice(0, ABOUT_YOU).map((obs) => [factLine(obs), obs.id])],
     ['This project:', known.slice(0, THIS_PROJECT).map((obs) => [factLine(obs), obs.id])],
+    [
+      shownHandoff ? `Last handoff (${formatDay(shownHandoff.createdAt)}):` : '',
+      shownHandoff ? handoffEntries(shownHandoff) : [],
+    ],
     [
       'Where you stopped:',
       [
@@ -71,4 +79,8 @@ export async function startFacts(
   }
   lines.push('</memory>');
   return { block: lines.join('\n'), ids };
+}
+
+function handoffEntries(handoff: Observation): [string, string | null][] {
+  return handoffBodyLines(handoff).map((line, index) => [line, index === 0 ? handoff.id : null]);
 }

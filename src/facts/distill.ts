@@ -33,8 +33,14 @@ export interface DistillResult {
   retired: number;
 }
 
+export type BackfillStep =
+  | { kind: 'begin'; total: number }
+  | { kind: 'start'; index: number; total: number }
+  | { kind: 'done'; index: number; total: number; facts: number };
+
 export interface BackfillResult {
   distilled: number;
+  facts: number;
   remaining: number;
   stopped: 'done' | 'over-budget' | 'failed';
 }
@@ -109,32 +115,56 @@ async function distillWindow(
   return { ok: true, set: facts.length, retired, texts: sets.map((op) => op.text) };
 }
 
+async function pendingChats(
+  ctx: RecallContext,
+  project: string,
+  now: number,
+): Promise<{ id: string; startedAt: number }[]> {
+  const cutoff = now - ctx.config.distill.backfillDays * DAY_MS;
+  return (await ctx.store.recentSessions(project, 1000))
+    .filter((session) => session.distilledAt === undefined && session.startedAt >= cutoff)
+    .map((session) => ({ id: session.id, startedAt: session.startedAt }));
+}
+
 export async function pendingSessions(
   ctx: RecallContext,
   project: string,
   now = Date.now(),
 ): Promise<string[]> {
-  const cutoff = now - ctx.config.distill.backfillDays * DAY_MS;
-  return (await ctx.store.recentSessions(project, 1000))
-    .filter((session) => session.distilledAt === undefined && session.startedAt >= cutoff)
-    .map((session) => session.id);
+  return (await pendingChats(ctx, project, now)).map((chat) => chat.id);
+}
+
+export async function oldestPendingAt(
+  ctx: RecallContext,
+  project: string,
+  now = Date.now(),
+): Promise<number | null> {
+  const chats = await pendingChats(ctx, project, now);
+  return chats.length === 0 ? null : Math.min(...chats.map((chat) => chat.startedAt));
 }
 
 export async function backfill(
   ctx: RecallContext,
   project: string,
   run: Runner = runHeadlessResult,
+  onStep: (step: BackfillStep) => void = () => {},
 ): Promise<BackfillResult> {
   const pending = await pendingSessions(ctx, project);
+  const total = pending.length;
+  onStep({ kind: 'begin', total });
   let distilled = 0;
+  let facts = 0;
   for (const [index, sessionId] of pending.entries()) {
+    onStep({ kind: 'start', index: index + 1, total });
     const result = await distillSession(ctx, project, sessionId, run);
     if (result.outcome === 'over-budget' || result.outcome === 'failed') {
-      return { distilled, remaining: pending.length - index, stopped: result.outcome };
+      return { distilled, facts, remaining: total - index, stopped: result.outcome };
     }
     distilled += 1;
+    facts += result.set;
+    onStep({ kind: 'done', index: index + 1, total, facts });
   }
-  return { distilled, remaining: 0, stopped: 'done' };
+  return { distilled, facts, remaining: 0, stopped: 'done' };
 }
 
 export async function existingFacts(ctx: RecallContext, project: string): Promise<ExistingFact[]> {

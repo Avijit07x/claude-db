@@ -1,5 +1,6 @@
 import type { RecallContext } from '../../context.js';
 import { createContext } from '../../context.js';
+import type { Config } from '../../config/index.js';
 import { loadConfig } from '../../config/index.js';
 import { packageVersion } from '../../update.js';
 import { randomUUID } from 'node:crypto';
@@ -9,6 +10,14 @@ import { ourHookFile } from '../install.js';
 import { settingsPathFor } from '../paths.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { toShortId } from '../../util/shortid.js';
+import type { ClaudeLocation } from '../../util/claude-binary.js';
+import { resolveClaude } from '../../util/claude-binary.js';
+import { runHeadlessResult } from '../../util/claude-cli.js';
+import { describeSkills } from '../skills.js';
+
+const HAIKU_PROBE_PROMPT = 'Reply with the single word: ok';
+const HAIKU_PROBE_TIMEOUT_MS = 60_000;
+const REPLY_PREVIEW_CHARS = 40;
 
 export async function cmdDoctor(argv: (string | undefined)[]): Promise<void> {
   const base = loadConfig();
@@ -34,12 +43,53 @@ export async function cmdDoctor(argv: (string | undefined)[]): Promise<void> {
     console.log('hint     : builtin embeddings are keyword-grade. For semantic vectors:');
     console.log('           npm i -g @xenova/transformers && claude-db reembed');
   }
-  checkWiring(resolveProject(undefined));
+  const project = resolveProject(undefined);
+  checkWiring(project);
+  console.log(describeSkills(project));
 
-  const healthy = argv.includes('--deep') ? await deepCheck(ctx) : true;
+  const claude = resolveClaude();
+  console.log(describeClaude(claude));
+  const claudeOk = claude !== null || !claudeRequired(ctx.config);
+
+  const deepOk = argv.includes('--deep') ? await runDeepChecks(ctx, claude) : true;
 
   await ctx.close();
-  process.exit(reachable && healthy ? 0 : 1);
+  process.exit(reachable && deepOk && claudeOk ? 0 : 1);
+}
+
+function claudeRequired(config: Config): boolean {
+  return config.distill.enabled || config.pick.enabled;
+}
+
+async function runDeepChecks(ctx: RecallContext, claude: ClaudeLocation | null): Promise<boolean> {
+  const storeOk = await deepCheck(ctx);
+  const haikuOk = await haikuCheck(ctx, claude);
+  return storeOk && haikuOk;
+}
+
+export function describeClaude(location: ClaudeLocation | null): string {
+  if (location) return `claude   : ${location.path} (from ${location.source})`;
+  return [
+    'claude   : NOT FOUND, so facts and picks cannot run',
+    '           fix: put claude on PATH, or set CLAUDE_CODE_EXECPATH to its full path',
+  ].join('\n');
+}
+
+async function haikuCheck(ctx: RecallContext, claude: ClaudeLocation | null): Promise<boolean> {
+  const model = ctx.config.distill.model;
+  console.log(`\nhaiku check (one small ${model} call, not counted against the daily limits)`);
+  if (!claude) {
+    console.log('  FAIL call — claude was not found');
+    return false;
+  }
+  const result = await runHeadlessResult(HAIKU_PROBE_PROMPT, model, HAIKU_PROBE_TIMEOUT_MS);
+  if (!result.ok) {
+    console.log(`  FAIL call — ${result.reason}`);
+    return false;
+  }
+  const reply = result.stdout.trim().slice(0, REPLY_PREVIEW_CHARS);
+  console.log(`  ok   call — ${reply || 'empty reply'}`);
+  return true;
 }
 
 function checkWiring(project: string): void {

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
@@ -8,8 +8,11 @@ import { describeFailure, runHeadless, runHeadlessResult } from '../../dist/util
 import {
   claudeBinary,
   findClaudeAncestor,
+  inspectProcess,
+  inspectWithPs,
   rememberClaudeBinary,
   rememberedBinary,
+  resolveClaude,
 } from '../../dist/util/claude-binary.js';
 
 const FAKE_CLAUDE = `#!/usr/bin/env node
@@ -61,21 +64,48 @@ function script(dir, name, body) {
 }
 
 export default async function run() {
+  const nothing = () => null;
+  const none = { remembered: nothing, ancestor: nothing, onPath: nothing };
   check(
     'the running Claude Code binary is preferred',
-    claudeBinary({ CLAUDE_CODE_EXECPATH: '/opt/claude' }) === '/opt/claude',
+    claudeBinary({ CLAUDE_CODE_EXECPATH: '/opt/claude' }, none) === '/opt/claude',
   );
-  const nothing = () => null;
   check(
     'claude on PATH is the fallback',
-    claudeBinary({}, nothing) === 'claude' &&
-      claudeBinary({ CLAUDE_CODE_EXECPATH: '' }, nothing) === 'claude',
+    claudeBinary({}, none) === 'claude' &&
+      claudeBinary({ CLAUDE_CODE_EXECPATH: '' }, none) === 'claude',
   );
   check(
     'a remembered binary is used when the running one is unknown',
-    claudeBinary({}, () => '/opt/remembered') === '/opt/remembered' &&
-      claudeBinary({ CLAUDE_CODE_EXECPATH: '/opt/claude' }, () => '/opt/remembered') ===
-        '/opt/claude',
+    claudeBinary({}, { ...none, remembered: () => '/opt/remembered' }) === '/opt/remembered' &&
+      claudeBinary(
+        { CLAUDE_CODE_EXECPATH: '/opt/claude' },
+        { ...none, remembered: () => '/opt/remembered' },
+      ) === '/opt/claude',
+  );
+  const all = {
+    remembered: () => '/opt/saved',
+    ancestor: () => '/opt/parent',
+    onPath: () => '/opt/onpath',
+  };
+  const sourceOf = (env, lookup) => JSON.stringify(resolveClaude(env, lookup));
+  check(
+    'the lookup names each source, in order',
+    sourceOf({ CLAUDE_CODE_EXECPATH: '/opt/env' }, all) ===
+      '{"path":"/opt/env","source":"CLAUDE_CODE_EXECPATH"}' &&
+      sourceOf({}, all) === '{"path":"/opt/saved","source":"saved path"}' &&
+      sourceOf({}, { ...all, remembered: nothing }) ===
+        '{"path":"/opt/parent","source":"parent process"}' &&
+      sourceOf({}, { ...all, remembered: nothing, ancestor: nothing }) ===
+        '{"path":"/opt/onpath","source":"PATH"}',
+  );
+  check('the lookup gives nothing when claude is nowhere', resolveClaude({}, none) === null);
+  check(
+    'claudeBinary and resolveClaude agree for the same environment',
+    ['{}', '{"CLAUDE_CODE_EXECPATH":"/opt/env"}'].every((text) => {
+      const env = JSON.parse(text);
+      return claudeBinary(env, all) === resolveClaude(env, all)?.path;
+    }),
   );
 
   const dir = mkdtempSync(join(tmpdir(), 'claude-cli-'));
@@ -112,6 +142,23 @@ export default async function run() {
   );
   check('a chain with no Claude gives nothing', findClaudeAncestor(30, inspect) === null);
   check('an unknown process stops the search', findClaudeAncestor(99, inspect) === null);
+  const self = inspectProcess(process.pid);
+  check(
+    'the real inspection finds this process, its parent and an existing executable',
+    self !== null &&
+      Number.isInteger(self.parent) &&
+      self.parent > 0 &&
+      self.parent === process.ppid &&
+      existsSync(self.exe),
+    JSON.stringify(self),
+  );
+  const viaPs = process.platform === 'win32' ? null : inspectWithPs(process.pid);
+  check(
+    'the ps reading finds this process and its parent',
+    process.platform === 'win32' ||
+      (viaPs !== null && viaPs.parent === process.ppid && viaPs.exe.length > 0),
+    JSON.stringify(viaPs),
+  );
   const loop = () => ({ parent: 7, exe: '/usr/bin/sh' });
   check('a loop in the chain cannot hang the search', findClaudeAncestor(7, loop) === null);
   rmSync(target);

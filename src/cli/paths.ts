@@ -15,9 +15,9 @@ export function instructionsPathFor(scope: Scope, project: string): string {
     : join(homedir(), '.claude', 'CLAUDE.md');
 }
 
-export function skillPathFor(scope: Scope, project: string): string {
+export function skillPathFor(scope: Scope, project: string, name = 'cdb-scan'): string {
   const root = scope === 'project' ? join(project, '.claude') : join(homedir(), '.claude');
-  return join(root, 'skills', 'cdb-scan', 'SKILL.md');
+  return join(root, 'skills', name, 'SKILL.md');
 }
 
 export function mcpPathFor(scope: Scope, project: string): string {

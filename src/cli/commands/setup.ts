@@ -4,15 +4,27 @@ import type { Scope } from '../paths.js';
 import { CONFIG_PATH } from '../../config/index.js';
 import { DIST_DIR } from '../constants.js';
 import { assertStableLocation, install, uninstall } from '../install.js';
-import { instructionsPathFor, mcpPathFor, settingsPathFor, skillPathFor } from '../paths.js';
+import { instructionsPathFor, mcpPathFor, settingsPathFor } from '../paths.js';
+import type { SkillInstallResult } from '../skills.js';
 import { createContext } from '../../context.js';
 import { join, resolve } from 'node:path';
 import { readFileSync, statSync } from 'node:fs';
 import { resolveProject } from '../../util/project.js';
 import { mentionsPath } from '../../util/paths.js';
 import { transcriptsFor } from '../../capture/index.js';
-import { factCounts, pendingSessions } from '../../facts/distill.js';
+import { factCounts, oldestPendingAt, pendingSessions } from '../../facts/distill.js';
+import { distillUsage } from '../../facts/budget.js';
+import { waitingWarning } from '../../facts/health.js';
 import { pickStatus } from './pick.js';
+
+function printSkills(results: SkillInstallResult[]): void {
+  for (const { name, path, outcome } of results) {
+    if (outcome === 'written') console.log(`Skill    : ${path} (/${name})`);
+    if (outcome === 'kept-yours') {
+      console.log(`Skill    : /${name} not installed, you already have your own at ${path}`);
+    }
+  }
+}
 
 export async function cmdInstall(scope: Scope): Promise<void> {
   const project = resolveProject(undefined);
@@ -24,7 +36,7 @@ export async function cmdInstall(scope: Scope): Promise<void> {
     process.exit(1);
   }
 
-  const settingsPath = install(DIST_DIR, scope, project);
+  const { settingsPath, skills } = install(DIST_DIR, scope, project);
   const ctx = await createContext();
   const embedder = await ctx.embedder();
   await ctx.close();
@@ -34,7 +46,7 @@ export async function cmdInstall(scope: Scope): Promise<void> {
   );
   console.log(`Settings : ${settingsPath}`);
   console.log(`Guidance : ${instructionsPathFor(scope, project)}`);
-  console.log(`Skill    : ${skillPathFor(scope, project)} (/cdb-scan)`);
+  printSkills(skills);
   console.log(`Config   : ${CONFIG_PATH}`);
   console.log(`Database : ${redact(ctx.config.database)}`);
   if (embedder.id === 'builtin-hashing') {
@@ -120,11 +132,14 @@ export async function cmdStatus(): Promise<void> {
     console.log(`recorded : ${lastSaved > 0 ? ago(lastSaved) : 'never'}`);
     const facts = await factCounts(ctx, project);
     console.log(`facts    : ${facts.project} for this project, ${facts.you} about you`);
-    console.log(
-      ctx.config.distill.enabled
-        ? `waiting  : ${(await pendingSessions(ctx, project)).length} chat(s) not yet turned into facts`
-        : 'distill  : off, so chats are not turned into facts (claude-db distill on)',
-    );
+    if (ctx.config.distill.enabled) {
+      const waiting = (await pendingSessions(ctx, project)).length;
+      console.log(`waiting  : ${waiting} chat(s) not yet turned into facts`);
+      const warning = waitingWarning(waiting, await oldestPendingAt(ctx, project), distillUsage());
+      if (warning) console.log(warning);
+    } else {
+      console.log('distill  : off, so chats are not turned into facts (claude-db distill on)');
+    }
     console.log(pickStatus(ctx.config));
 
     await closeLandedWork(ctx.store, project);

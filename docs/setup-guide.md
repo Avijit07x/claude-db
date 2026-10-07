@@ -67,8 +67,9 @@ Five hooks, which is why nothing needs to be run by hand afterwards:
 | PreToolUse (Bash and Grep) | Points symbol searches at the code graph instead of grep                |
 | SessionEnd                 | Saves the last turn and starts turning the chat into facts              |
 
-It also writes a standing instruction ("search memory before asking the user to re-explain") and the
-`/cdb-scan` skill.
+It also writes a standing instruction ("search memory before asking the user to re-explain") and three
+skills: `/cdb-scan`, `/catchup` and `/handoff`. If you already have a skill with the same name, claude-db keeps
+yours and says so.
 
 ### Keep personal files out of git
 
@@ -124,13 +125,15 @@ test memory, searches for it, reads it back and deletes it, and tells you which 
 
 A fresh install has nothing to recall. These steps fill it from what already exists.
 
-| Step                                 | Command                                             | What it does                                                                                                                                            | Cost               |
-| ------------------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| Load your past chats                 | `claude-db flush`                                   | Reads the chats Claude Code already saved for this project and turns them into memory. Claude Code keeps chat files for about 30 days, so do this early | none               |
-| Map the code                         | `claude-db scan`                                    | Stores every symbol and how they connect. About a second on a mid-size repo. After the first scan it refreshes itself at each session start             | none               |
-| Read the git history                 | `claude-db seed --from-git`                         | Turns your commit history into memory so search has something to match                                                                                  | none               |
-| Or do the mapping from inside Claude | `/cdb-scan`                                         | A skill that builds the graph, then writes five notes about your stack, layout, conventions, workflows and architecture                                 | a normal chat turn |
-| State your standing rules            | `claude-db remember "always use pnpm in this repo"` | Stored as a rule for this project and recalled when relevant                                                                                            | none               |
+| Step                                 | Command                                             | What it does                                                                                                                                                | Cost               |
+| ------------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| Load your past chats                 | `claude-db flush`                                   | Reads the chats Claude Code already saved for this project and turns them into memory. Claude Code keeps chat files for about 30 days, so do this early     | none               |
+| Map the code                         | `claude-db scan`                                    | Stores every symbol and how they connect. About a second on a mid-size repo. After the first scan it refreshes itself at each session start                 | none               |
+| Read the git history                 | `claude-db seed --from-git`                         | Turns your commit history into memory so search has something to match                                                                                      | none               |
+| Or do the mapping from inside Claude | `/cdb-scan`                                         | A skill that builds the graph, then writes five notes about your stack, layout, conventions, workflows and architecture                                     | a normal chat turn |
+| Ask where you stopped                | `/catchup`                                          | Prints done, open and next from the last chat, the recorded to-dos, the last handoff and git. Writes nothing. The raw facts are also in `claude-db catchup` | a normal chat turn |
+| Hand work to the next chat           | `/handoff`                                          | Writes a short note (done, open, next), saves it as the project's one current handoff and prints it. The next chat sees it at the start for 14 days         | a normal chat turn |
+| State your standing rules            | `claude-db remember "always use pnpm in this repo"` | Stored as a rule for this project and recalled when relevant                                                                                                | none               |
 
 After you have used it for a session or two, a background job starts turning your older chats into
 **facts**: short rules, decisions with their reasons, dead ends and to-dos. It works newest chat first,
@@ -336,5 +339,6 @@ The [troubleshooting page](https://claude-db.vercel.app/docs/troubleshooting) co
 | `.mcp.json`                             | The MCP server, for a project install                                   |
 | `CLAUDE.local.md`                       | The standing instruction to search memory                               |
 | `.claude/skills/cdb-scan/`              | The `/cdb-scan` skill                                                   |
+| `.claude/skills/catchup/`, `handoff/`   | The `/catchup` and `/handoff` skills                                    |
 
 To delete everything claude-db has stored, remove `~/.claude-memory`.

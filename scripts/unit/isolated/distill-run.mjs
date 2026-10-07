@@ -6,6 +6,7 @@ import { ConfigSchema } from '../../../dist/config/index.js';
 import { createContext } from '../../../dist/context.js';
 import { distillUsage } from '../../../dist/facts/budget.js';
 import { backfill, distillSession, pendingSessions } from '../../../dist/facts/distill.js';
+import { createBackfillPrinter } from '../../../dist/cli/backfill-output.js';
 import { factId, youScope } from '../../../dist/facts/model.js';
 import { describePause } from '../../../dist/util/daily-budget.js';
 
@@ -300,4 +301,81 @@ try {
   );
 } finally {
   await recovering.close();
+}
+
+const printed = async (ctx, project, run, dailyLimit, tty = false) => {
+  let text = '';
+  const printer = createBackfillPrinter({
+    write: (chunk) => (text += chunk),
+    tty,
+    every: () => () => {},
+  });
+  const result = await backfill(ctx, project, run, printer.step);
+  printer.finish(result, distillUsage(), dailyLimit);
+  return text;
+};
+
+expirePause('distill');
+const shown = '/p/progress';
+const progress = await open(distillUsage().used + 6);
+try {
+  await chat(progress, shown, 'p-1', 'Asked: one\n\nOne.', now - 3 * DAY);
+  await chat(progress, shown, 'p-2', 'Asked: two\n\nTwo.', now - 2 * DAY);
+  const finished = await printed(
+    progress,
+    shown,
+    reply(['{"op":"set","key":"worker-retries","type":"todo","text":"Ask about the retries."}']),
+    distillUsage().used + 6,
+  );
+  report(
+    'a finished backfill says how many are waiting, then one line per chat, then a summary',
+    finished ===
+      '2 chat(s) waiting. This can take a few minutes, each chat needs one or more Haiku calls.\n' +
+        '1 of 2 chats, 1 fact made\n' +
+        '2 of 2 chats, 2 facts made\n' +
+        'done     : 2 chat(s) turned into 2 fact(s)\n',
+    JSON.stringify(finished),
+  );
+  const idle = await printed(progress, shown, reply(['{}']), 0);
+  report(
+    'a backfill with nothing waiting says so',
+    idle === 'nothing waiting: every recent chat is already turned into facts\n',
+    JSON.stringify(idle),
+  );
+} finally {
+  await progress.close();
+}
+
+const failShown = '/p/progress-fail';
+const progressFail = await open(distillUsage().used + 6);
+try {
+  await chat(progressFail, failShown, 'f-1', 'Asked: one\n\nOne.', now - 3 * DAY);
+  await chat(progressFail, failShown, 'f-2', 'Asked: two\n\nTwo.', now - 2 * DAY);
+  const failedRun = await printed(progressFail, failShown, reply(null), 6);
+  report(
+    'a failed backfill ends with the reason and how many chats are left',
+    failedRun.endsWith(`stopped  : a Haiku call failed (${FAILURE}), 2 chat(s) still waiting\n`) &&
+      !failedRun.includes('facts made'),
+    JSON.stringify(failedRun),
+  );
+} finally {
+  await progressFail.close();
+}
+
+const limitShown = '/p/progress-limit';
+const used = distillUsage().used;
+const limited = await open(used);
+try {
+  await chat(limited, limitShown, 'l-1', 'Asked: one\n\nOne.', now - 3 * DAY);
+  expirePause('distill');
+  const limitRun = await printed(limited, limitShown, reply(['{}']), used);
+  report(
+    'a backfill that hits the daily limit ends with that reason',
+    limitRun.endsWith(
+      `stopped  : the daily limit of ${used} calls is used up, 1 chat(s) still waiting\n`,
+    ),
+    JSON.stringify(limitRun),
+  );
+} finally {
+  await limited.close();
 }
