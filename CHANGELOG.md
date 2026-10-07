@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.11.0
+
+### Added
+
+- **Projects are matched by git remote.** A repository with an `origin` remote is now one project wherever
+  it is cloned, so a laptop and a Mac share memory when they use the same Postgres or MongoDB database.
+  The `ssh` and `https` addresses of one repository match. Any token in the address is dropped and never
+  stored. A folder with no remote is matched by its path, as before. A fork has its own remote, so it is
+  its own project. The new setting `project.remote` picks another remote than `origin`. Memory saved before
+  this, under a folder path, is still found and is not moved. A second machine needs this version to share
+  notes by remote. Postgres moves to schema version 5 on first use and adds one table, `project_links`.
+  MongoDB gets the same collection.
+- **`/catchup` and `/handoff` skills.** `/catchup` says where you stopped, in three groups: done, open and
+  next, from the last chat, the recorded to-dos, the last handoff and git. `/handoff` writes the same three
+  lines, saves them as the project's current handoff, and prints them. The next chat sees the handoff at the
+  start for 14 days. `claude-db catchup` prints the facts both skills use. If you already have a skill with
+  one of these names, claude-db keeps yours and says so.
+- **`claude-db --version` and `-v`.**
+- **`doctor` shows which `claude` it found and where from**, for example `from saved path`. With no
+  `claude` it says so and how to fix it. `doctor --deep` also makes one small real Haiku call. `doctor` lists
+  the installed skills.
+- **`status` warns when chats have waited over a day** and no fact-making call was tried.
+
+### Changed
+
+- **`distill --backfill` shows progress.** It says how many chats are waiting, shows a spinner on a terminal,
+  prints one line per finished chat, and ends with the reason if it stops. A pipe or a file gets plain lines.
+- **A session start shows the newest handoff** with its done, open and next lines.
+- **`status` and `projects` count notes saved by another clone** of the same repository as this project's.
+  A fact saved by two clones is shown once.
+
+### Fixed
+
+- On macOS, a `claude` found by name only could be saved as the useless path `claude`. A bare name is now
+  left to the `PATH` search.
+
 ## 0.10.3
 
 ### Fixed

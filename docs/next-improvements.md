@@ -156,10 +156,10 @@ because the plan asked for "one line per chat" there. The facts count in each li
 
 ## 3. Test the parent-process lookup on macOS
 
-**Status: fixed after the first CI run, waiting for the second.** CI on `macos-latest` showed that `ps` prints
+**Status: done, verified 2026-10-07.** CI passed on `macos-latest` and `ubuntu-latest`, on Node 22.16, 22.x and 24.x.
+History: fixed after the first CI run. CI on `macos-latest` showed that `ps` prints
 only the program name (`node`, `claude`), not a path. The lookup now returns nothing for a bare name and
-leaves it to the `PATH` search, and the check only requires an existing file when the path is absolute. It is
-done when the next CI run passes on `macos-latest`.
+leaves it to the `PATH` search, and the check only requires an existing file when the path is absolute.
 
 **Problem.** The 0.10.3 lookup reads `/proc` on Linux and runs `ps` on macOS. Only the Linux path was tried
 on a real machine. The macOS path is covered by logic tests with a fake process table, not by a real `ps`.
