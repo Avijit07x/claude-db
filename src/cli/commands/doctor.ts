@@ -1,6 +1,5 @@
 import type { RecallContext } from '../../context.js';
 import { createContext } from '../../context.js';
-import type { Config } from '../../config/index.js';
 import { loadConfig } from '../../config/index.js';
 import { packageVersion } from '../../update.js';
 import { randomUUID } from 'node:crypto';
@@ -49,16 +48,11 @@ export async function cmdDoctor(argv: (string | undefined)[]): Promise<void> {
 
   const claude = resolveClaude();
   console.log(describeClaude(claude));
-  const claudeOk = claude !== null || !claudeRequired(ctx.config);
 
   const deepOk = argv.includes('--deep') ? await runDeepChecks(ctx, claude) : true;
 
   await ctx.close();
-  process.exit(reachable && deepOk && claudeOk ? 0 : 1);
-}
-
-function claudeRequired(config: Config): boolean {
-  return config.distill.enabled || config.pick.enabled;
+  process.exit(reachable && deepOk ? 0 : 1);
 }
 
 async function runDeepChecks(ctx: RecallContext, claude: ClaudeLocation | null): Promise<boolean> {

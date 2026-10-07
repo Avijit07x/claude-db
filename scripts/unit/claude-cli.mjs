@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { aiSummary } from '../../dist/capture/index.js';
 import { describeFailure, runHeadless, runHeadlessResult } from '../../dist/util/claude-cli.js';
@@ -149,15 +149,19 @@ export default async function run() {
       Number.isInteger(self.parent) &&
       self.parent > 0 &&
       self.parent === process.ppid &&
-      existsSync(self.exe),
+      (!isAbsolute(self.exe) || existsSync(self.exe)),
     JSON.stringify(self),
   );
-  const viaPs = process.platform === 'win32' ? null : inspectWithPs(process.pid);
+  const hasPs = process.platform !== 'win32' && spawnSync('ps', ['-p', '1']).status === 0;
+  const viaPs = hasPs ? inspectWithPs(process.pid) : null;
   check(
     'the ps reading finds this process and its parent',
-    process.platform === 'win32' ||
-      (viaPs !== null && viaPs.parent === process.ppid && viaPs.exe.length > 0),
+    !hasPs || (viaPs !== null && viaPs.parent === process.ppid && viaPs.exe.length > 0),
     JSON.stringify(viaPs),
+  );
+  check(
+    'a Claude that ps shows by name only is left to the PATH lookup',
+    findClaudeAncestor(10, (pid) => ({ 10: { parent: 20, exe: 'claude' } })[pid] ?? null) === null,
   );
   const loop = () => ({ parent: 7, exe: '/usr/bin/sh' });
   check('a loop in the chain cannot hang the search', findClaudeAncestor(7, loop) === null);
