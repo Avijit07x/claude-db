@@ -51,7 +51,8 @@ machine.
 
 A fresh install has no history yet. `claude-db scan` builds the code graph, and
 the `/cdb-scan` skill maps an existing codebase into memory, so search has
-something to find on day one. The [setup guide](./docs/setup-guide.md) covers
+something to find on day one. `/catchup` answers "where did I stop?" and `/handoff` leaves a note for the
+next chat. The [setup guide](./docs/setup-guide.md) covers
 the settings and habits that give the best results.
 
 ## Commands

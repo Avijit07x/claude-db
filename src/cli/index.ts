@@ -9,6 +9,7 @@ import { cmdForget, cmdRemember, cmdSearch } from './commands/memory.js';
 import { cmdExport, cmdImport, cmdPrune, cmdReembed } from './commands/transfer.js';
 import { cmdMerge, cmdProjects, cmdStats } from './commands/insight.js';
 import { cmdFlush, cmdRedact, cmdReset, cmdUpdate } from './commands/maintain.js';
+import { cmdCatchup } from './commands/catchup.js';
 import { cmdDistill } from './commands/distill.js';
 import { cmdPick } from './commands/pick.js';
 import { cmdScan, cmdUsages } from './commands/graph.js';
@@ -16,6 +17,7 @@ import { cmdSeed } from './commands/seed.js';
 import { cmdAdoption } from './commands/adoption.js';
 import { cmdView } from './commands/view.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
+import { packageVersion } from '../update.js';
 
 silenceSqliteWarning();
 
@@ -78,6 +80,9 @@ async function run(): Promise<void> {
     case 'update':
       await cmdUpdate(args);
       break;
+    case 'catchup':
+      await cmdCatchup();
+      break;
     case 'distill':
       await cmdDistill(args);
       break;
@@ -110,6 +115,10 @@ async function run(): Promise<void> {
       break;
     case 'sync':
       await cmdSync(args);
+      break;
+    case '--version':
+    case '-v':
+      console.log(packageVersion());
       break;
     default:
       usage();

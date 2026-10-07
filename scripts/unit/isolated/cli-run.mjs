@@ -1,7 +1,14 @@
 import '../../lib/require-isolated.mjs';
 import { randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
@@ -15,7 +22,11 @@ mkdirSync(join(home, 'shop'), { recursive: true });
 const project = realpathSync(join(home, 'shop'));
 execFileSync('git', ['init', '-q'], { cwd: project });
 
-const baseEnv = { ...process.env };
+const fakeClaude = join(home, 'fake-claude');
+writeFileSync(fakeClaude, "#!/usr/bin/env node\nprocess.stdout.write('ok');\n");
+chmodSync(fakeClaude, 0o755);
+
+const baseEnv = { ...process.env, CLAUDE_CODE_EXECPATH: fakeClaude };
 delete baseEnv.CLAUDE_CODE_ENTRYPOINT;
 delete baseEnv.CLAUDE_DB_CAPTURE;
 
@@ -35,6 +46,19 @@ report(
   'with no command, the usage lists every command, pick included',
   help.out.includes('install [--project]') && help.out.includes('pick [on|off]'),
 );
+
+const version = readJson(new URL('../../../package.json', import.meta.url).pathname).version;
+const long = cli(['--version']);
+const short = cli(['-v']);
+report(
+  '--version and -v print the package version and exit 0',
+  long.code === 0 &&
+    short.code === 0 &&
+    long.out === `${version}\n` &&
+    short.out === `${version}\n`,
+  `${JSON.stringify(long.out)} ${JSON.stringify(short.out)} vs ${version}`,
+);
+report('the usage lists the version flag', help.out.includes('--version, -v'));
 
 const installed = cli(['install', '--project']);
 const settingsPath = join(project, '.claude', 'settings.local.json');
@@ -90,6 +114,7 @@ report(
     doctor.out.includes('wiring   : ok'),
   doctor.out,
 );
+report('doctor shows the same version', doctor.out.includes(`version  : ${version}`), version);
 const deep = cli(['doctor', '--deep']);
 report(
   'doctor --deep proves a write, search, read and delete',

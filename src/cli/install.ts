@@ -1,25 +1,15 @@
-import { Scope, instructionsPathFor, mcpPathFor, settingsPathFor, skillPathFor } from './paths.js';
-import { dirname, resolve } from 'node:path';
+import { Scope, instructionsPathFor, mcpPathFor, settingsPathFor } from './paths.js';
+import type { SkillInstallResult } from './skills.js';
+import { installSkills, removeSkills } from './skills.js';
+import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { readJson, readText, writeAtomic, writeJson } from './files.js';
+import { readJson, writeJson } from './files.js';
 import { removeInstructions, writeInstructions } from './instructions.js';
-import { rmSync } from 'node:fs';
 import { toPosix } from '../util/paths.js';
 
 interface HookMatcher {
   matcher?: string;
   hooks: { type: 'command'; command: string; timeout?: number }[];
-}
-
-function writeSkill(distDir: string, scope: Scope, project: string): void {
-  const source = resolve(distDir, '..', 'skills', 'cdb-scan', 'SKILL.md');
-  const body = readText(source);
-  if (body.length > 0) writeAtomic(skillPathFor(scope, project), body);
-}
-
-function removeSkill(scope: Scope, project: string): void {
-  const path = skillPathFor(scope, project);
-  rmSync(dirname(path), { recursive: true, force: true });
 }
 
 const HOOKS: [event: string, file: string, matcher?: string | undefined, timeout?: number][] = [
@@ -92,7 +82,12 @@ export function refreshHooks(distDir: string, path: string): boolean {
   return true;
 }
 
-export function install(distDir: string, scope: Scope, project: string): string {
+export interface InstallResult {
+  settingsPath: string;
+  skills: SkillInstallResult[];
+}
+
+export function install(distDir: string, scope: Scope, project: string): InstallResult {
   const path = settingsPathFor(scope, project);
   const settings = readJson(path);
   settings['hooks'] = withOurHooks(
@@ -104,9 +99,9 @@ export function install(distDir: string, scope: Scope, project: string): string 
 
   const server = resolve(distDir, 'mcp', 'server.js');
   writeInstructions(instructionsPathFor(scope, project));
-  writeSkill(distDir, scope, project);
+  const skills = installSkills(distDir, scope, project);
 
-  if (scope === 'global' && registerViaCli(server)) return path;
+  if (scope === 'global' && registerViaCli(server)) return { settingsPath: path, skills };
 
   const mcpPath = mcpPathFor(scope, project);
   const mcpConfig = readJson(mcpPath);
@@ -115,7 +110,7 @@ export function install(distDir: string, scope: Scope, project: string): string 
   mcpConfig['mcpServers'] = servers;
   writeJson(mcpPath, mcpConfig);
 
-  return path;
+  return { settingsPath: path, skills };
 }
 
 function claudeMcp(args: string[]): boolean {
@@ -150,7 +145,7 @@ export function uninstall(distDir: string, scope: Scope, project: string): strin
   writeJson(path, settings);
 
   removeInstructions(instructionsPathFor(scope, project));
-  removeSkill(scope, project);
+  removeSkills(scope, project);
 
   if (scope === 'global' && claudeMcp(['mcp', 'remove', 'memory', '-s', 'user'])) {
     return path;
