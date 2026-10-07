@@ -6,6 +6,8 @@ const STATUS_LINES = 15;
 const RECENT_COMMITS = 5;
 
 export interface GitState {
+  branch: string | null;
+  changed: number;
   status: string[];
   hiddenStatusLines: number;
   commits: string[];
@@ -32,8 +34,11 @@ function lines(text: string): string[] {
 export function readGitState(project: string, git: GitRunner = runGit(project)): GitState | null {
   try {
     const status = lines(git(['status', '--short']));
+    const branch = lines(git(['branch', '--show-current']))[0] ?? null;
     const commits = lines(git(['log', `-n${RECENT_COMMITS}`, '--pretty=format:%h %s'])).map(redact);
     return {
+      branch,
+      changed: status.length,
       status: status.slice(0, STATUS_LINES),
       hiddenStatusLines: Math.max(0, status.length - STATUS_LINES),
       commits,

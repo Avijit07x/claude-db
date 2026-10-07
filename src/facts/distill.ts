@@ -5,16 +5,9 @@ import type { HeadlessResult } from '../util/claude-cli.js';
 import { runHeadlessResult } from '../util/claude-cli.js';
 import { formatDay } from '../util/day.js';
 import { recordDistillFailure, recordDistillSuccess, takeDistillCalls } from './budget.js';
-import {
-  FACT_SESSION,
-  factId,
-  factKey,
-  factToObservation,
-  factType,
-  onePerKey,
-  youScope,
-} from './model.js';
-import type { ExistingFact, SetOp } from './ops.js';
+import { FACT_SESSION, factId, factToObservation, youScope } from './model.js';
+import { existingFacts, notedByUser } from './known.js';
+import type { SetOp } from './ops.js';
 import { buildDistillPrompt, parseOps } from './ops.js';
 
 export const FACTS_JOB = 'facts';
@@ -24,7 +17,6 @@ const WINDOW_CHARS = 40_000;
 const MAX_WINDOWS = 6;
 const ROW_CHARS = 900;
 const SEPARATOR = '\n\n---\n\n';
-const EXISTING_LIMIT = 80;
 const SESSION_ROWS = 1000;
 const TIMEOUT_MS = 120_000;
 
@@ -103,7 +95,12 @@ async function distillWindow(
   run: Runner,
 ): Promise<WindowResult> {
   const existing = await existingFacts(ctx, project);
-  const reply = await run(buildDistillPrompt(chat, existing), ctx.config.distill.model, TIMEOUT_MS);
+  const noted = await notedByUser(ctx, project);
+  const reply = await run(
+    buildDistillPrompt(chat, existing, noted),
+    ctx.config.distill.model,
+    TIMEOUT_MS,
+  );
   if (!reply.ok) return { ok: false, reason: reply.reason };
 
   const ops = parseOps(reply.stdout);
@@ -173,29 +170,6 @@ export async function backfill(
     onStep({ kind: 'done', index: index + 1, total, facts });
   }
   return { distilled, facts, remaining: 0, stopped: 'done' };
-}
-
-export async function existingFacts(ctx: RecallContext, project: string): Promise<ExistingFact[]> {
-  const owners: [string, ExistingFact['scope']][] = [
-    [project, 'project'],
-    [youScope(), 'you'],
-  ];
-  const facts: ExistingFact[] = [];
-  for (const [owner, scope] of owners) {
-    const rows = await ctx.store.list({
-      project: owner,
-      sessionId: FACT_SESSION,
-      newest: true,
-      limit: EXISTING_LIMIT,
-    });
-    for (const obs of onePerKey(rows.filter((row) => row.status !== 'replaced'))) {
-      const key = factKey(obs);
-      const type = factType(obs);
-      if (obs.status === 'replaced' || !key || !type) continue;
-      facts.push({ key, type, scope, text: obs.title });
-    }
-  }
-  return facts;
 }
 
 export function chatWindows(rows: Observation[], most = MAX_WINDOWS): string[] {

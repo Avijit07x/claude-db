@@ -1,6 +1,6 @@
 import { rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { readText, writeAtomic } from './files.js';
+import { readText, removeIfEmpty, writeAtomic } from './files.js';
 import type { Scope } from './paths.js';
 import { skillPathFor } from './paths.js';
 
@@ -77,6 +77,10 @@ export function removeSkills(scope: Scope, project: string): void {
     if (!isOurs(spec, readText(path))) continue;
     rmSync(dirname(path), { recursive: true, force: true });
   }
+  if (scope !== 'project') return;
+  const skillsDir = dirname(dirname(skillPathFor(scope, project)));
+  removeIfEmpty(skillsDir);
+  removeIfEmpty(dirname(skillsDir));
 }
 
 export function describeSkills(project: string): string {

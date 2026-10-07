@@ -31,11 +31,16 @@ const TEXT_MAX = 200;
 const WHY_MAX = 300;
 const FILES_MAX = 5;
 
-export function buildDistillPrompt(chat: string, existing: ExistingFact[]): string {
+export function buildDistillPrompt(
+  chat: string,
+  existing: ExistingFact[],
+  noted: string[] = [],
+): string {
   return [
     'You keep the long-term memory of a software project for a coding assistant. Read the',
     'CHAT LOG of one past session and decide what is worth remembering in future sessions.',
-    'EXISTING FACTS are what is already remembered.',
+    'EXISTING FACTS are what is already remembered. NOTED BY THE USER are rules the user saved',
+    'by hand. They are remembered too, so never write a fact that repeats one of them.',
     '',
     'Write one JSON object per line, and nothing else:',
     '{"op":"set","key":"short-kebab-key","type":"rule","scope":"project","text":"...","why":"...","files":["src/a.ts"]}',
@@ -60,6 +65,7 @@ export function buildDistillPrompt(chat: string, existing: ExistingFact[]): stri
     ...existing.map((fact) => `${fact.key} [${fact.type}, ${fact.scope}] ${fact.text}`),
     '</existing-facts>',
     '',
+    ...(noted.length > 0 ? ['<noted-by-user>', ...noted, '</noted-by-user>', ''] : []),
     '<chat-log>',
     chat,
     '</chat-log>',

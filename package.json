@@ -1,7 +1,7 @@
 {
   "name": "claude-db",
-  "version": "0.11.0",
-  "description": "Persistent memory for Claude Code. Captures why decisions were made, not just which files changed. Bring your own database: SQLite, MongoDB or Postgres. No cloud, no subscription.",
+  "version": "0.11.1",
+  "description": "Free, open-source memory for Claude Code. Remembers why decisions were made and maps your code. Your own database (SQLite, Postgres or MongoDB), no cloud, no subscription.",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
