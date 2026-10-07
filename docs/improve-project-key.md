@@ -68,7 +68,7 @@ That would turn every one of those folder uses into a broken path.
 
 ## Risks
 
-- It changes how every row is matched to a project. Ship it alone, with its own release note.
+- It changes how every row is matched to a project. It ships in 0.11.0 with the other items, decided on 2026-10-07, and the release note gives it its own section.
 - Reads become `IN (...)` lists. Search ranks and limits must still be right with a list.
 - Test a copy of the real database before any release. Never the real file.
 - The Postgres and MongoDB adapters only run in CI here, so steps 4, 5 and 6 depend on that run.

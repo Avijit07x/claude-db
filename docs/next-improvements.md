@@ -380,8 +380,8 @@ memory by hand when that happens.
 
 **Risks.**
 
-- It changes how every row is matched to a project, so it needs the most careful tests of this list. Ship
-  it alone, with its own release note.
+- It changes how every row is matched to a project, so it needs the most careful tests of this list. It
+  ships in 0.11.0 with the other items, decided on 2026-10-07, with its own section in the release note.
 - A fork and its upstream have different remotes and stay separate projects. Say so in the docs.
 - A monorepo with several packages stays one project, as today.
 
@@ -389,19 +389,18 @@ memory by hand when that happens.
 
 ## Order
 
-| #   | Item                                   | Size   | Why in this place                                 |
-| --- | -------------------------------------- | ------ | ------------------------------------------------- |
-| 1   | Say when the Haiku features cannot run | Medium | Done. The real failure that went unseen for days  |
-| 2   | Progress for `distill --backfill`      | Small  | Done. It looked stuck on a real run               |
-| 3   | macOS test of the lookup               | Small  | Built. Waits for CI on macOS. Closes a 0.10.3 gap |
-| 4   | `claude-db --version`                  | Small  | Done. Missing basic command                       |
-| 5   | Picks usefulness above 70%             | Large  | Needs more data first, and the ceiling is near    |
-| 6   | `/catchup` and `/handoff` skills       | Medium | Done. Used on every return to work                |
-| 7   | Match projects by git link             | Large  | Changes how every row is matched; ship it alone   |
+| #   | Item                                   | Size   | Why in this place                                  |
+| --- | -------------------------------------- | ------ | -------------------------------------------------- |
+| 1   | Say when the Haiku features cannot run | Medium | Done. The real failure that went unseen for days   |
+| 2   | Progress for `distill --backfill`      | Small  | Done. It looked stuck on a real run                |
+| 3   | macOS test of the lookup               | Small  | Built. Waits for CI on macOS. Closes a 0.10.3 gap  |
+| 4   | `claude-db --version`                  | Small  | Done. Missing basic command                        |
+| 5   | Picks usefulness above 70%             | Large  | Needs more data first, and the ceiling is near     |
+| 6   | `/catchup` and `/handoff` skills       | Medium | Done. Used on every return to work                 |
+| 7   | Match projects by git link             | Large  | Changes how every row is matched; own release note |
 
-Items 2 to 4 are small enough to ship together in one release. Item 1 is better on its own, so the release
-note can explain it. Item 6 can follow in its own release. Item 7 changes how rows are matched to projects,
-so it ships alone.
+All the items ship in 0.11.0, decided on 2026-10-07. No separate version is made for any of them. Item 7
+changes how rows are matched to projects, so the release note gives it its own section.
 
 The code graph work is planned in separate files, starting from
 [find-usages-accuracy.md](./find-usages-accuracy.md).
