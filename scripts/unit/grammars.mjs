@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -120,7 +121,7 @@ function linked(home) {
 }
 
 export default async function run() {
-  const home = mkdtempSync(join(tmpdir(), 'grammars-'));
+  const home = realpathSync(mkdtempSync(join(tmpdir(), 'grammars-')));
   try {
     builtPackage(join(home, 'built'));
     missingAndBroken(home);
