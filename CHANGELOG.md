@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.12.0
+
+### Added
+
+- **Imports are followed in seven languages.** TypeScript, JavaScript, Python, Go, Rust, Java and Kotlin bind
+  an import to the exact file and symbol it names, so two symbols with one name in different modules stay
+  apart. `usages` lists the importing files in an `Imported by` group, and a name exported under another
+  name is followed too.
+- **Java and Kotlin method calls reach the right method.** `x.method()` goes to the method of the declared
+  type of `x`, through parent classes and chained calls. A call on a value of unknown type stays `INFERRED`
+  and is listed once, under all the definitions it could be.
+- **Kotlin is read with real syntax after install.** Grammars now ship as one small package per platform,
+  so nothing is downloaded and the install is about 44 MB smaller. `claude-db languages` shows how each
+  language is read; `languages add` and `remove` have nothing left to do. Where no grammar package fits,
+  such as Alpine Linux, those languages are read by pattern.
+
+### Changed
+
+- **`find_usages` and `claude-db usages` answer from the graph by default.** References are grouped under
+  the definition they belong to, and lines that `git grep` finds but the graph cannot link come last, so
+  nothing a search would find is lost. Before the first `scan`, the answer comes from text and says so.
+- **Scans re-read only what changed.** A local cache keeps each file's parse, so a refresh after an edit
+  takes well under a second. The first scan after upgrading re-reads every file once.
+- **Hooks never wait for the graph.** The grep hook says when files changed since the last scan and
+  refreshes the graph in the background.
+
+### Development
+
+- `npm run bench:usages` measures `find_usages` against compilers and independent checkers on 28 pinned
+  public repositories, with a nightly check for regressions.
+- Code graph tests are fixture files run by one runner.
+
+### Docs
+
+- A shorter CONTRIBUTING, with separate pages for adding a language and for releasing.
+
 ## 0.11.1
 
 ### Fixed
