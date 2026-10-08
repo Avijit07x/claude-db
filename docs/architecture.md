@@ -1,48 +1,56 @@
-# claude-db: the whole picture
+# claude-db architecture
 
-What claude-db is, what each part does, why it exists, and when it runs. Every part has a diagram and a
-worked example. The examples use an invented shop project, never real data.
+What claude-db is, every feature one by one, and the reference tables. Each feature has the same four parts:
+what it does, when it runs, an example, and its settings. The examples use an invented shop project.
 
-This is the long version. [how-it-works.md](./how-it-works.md) is the short one, and
-[setup-guide.md](./setup-guide.md) covers settings.
+[how-it-works.md](./how-it-works.md) is the short version, [setup-guide.md](./setup-guide.md) covers settings,
+and [releasing.md](./releasing.md) covers a release.
 
 ## Contents
 
-1. [The problem and the idea](#1-the-problem-and-the-idea)
-2. [The big picture](#2-the-big-picture)
-3. [One chat from start to end](#3-one-chat-from-start-to-end)
-4. [Capture: saving what happened](#4-capture-saving-what-happened)
-5. [Search: finding it again](#5-search-finding-it-again)
-6. [Picks: the right memory with each prompt](#6-picks-the-right-memory-with-each-prompt)
-7. [Facts: turning chats into rules and decisions](#7-facts-turning-chats-into-rules-and-decisions)
-8. [What a new chat starts with](#8-what-a-new-chat-starts-with)
-9. [After `/compact`](#9-after-compact)
-10. [The code graph and `find_usages`](#10-the-code-graph-and-find_usages)
-11. [The MCP tools](#11-the-mcp-tools)
-12. [Commands](#12-commands)
-13. [Where the data lives](#13-where-the-data-lives)
-14. [Privacy and safety](#14-privacy-and-safety)
-15. [How the Haiku calls find `claude`](#15-how-the-haiku-calls-find-claude)
-16. [Limits, budgets and what happens when a call fails](#16-limits-budgets-and-what-happens-when-a-call-fails)
-17. [Install, update and uninstall](#17-install-update-and-uninstall)
-18. [The code, folder by folder](#18-the-code-folder-by-folder)
-19. [Testing and releasing](#19-testing-and-releasing)
-20. [Which part do I use when](#20-which-part-do-i-use-when)
-21. [Words used in this project](#21-words-used-in-this-project)
+| #   | Section                                                          | What it gives you                                                |
+| --- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+|     | **Overview**                                                     |                                                                  |
+| 1   | [What claude-db is](#1-what-claude-db-is)                        | The problem, the idea, and three design choices                  |
+| 2   | [How the parts fit](#2-how-the-parts-fit)                        | Hooks, the MCP server and the CLI, over one database             |
+| 3   | [One chat, start to end](#3-one-chat-start-to-end)               | When each hook runs in a real chat                               |
+|     | **Features**                                                     |                                                                  |
+| 4   | [Capture](#4-capture)                                            | Every turn that matters is saved, with the reason                |
+| 5   | [Search](#5-search)                                              | A note is found by its words and by its meaning                  |
+| 6   | [Memory with each prompt](#6-memory-with-each-prompt)            | Haiku shows the one or two earlier notes that fit your prompt    |
+| 7   | [Facts](#7-facts)                                                | Chats become short rules, decisions, dead ends and to-dos        |
+| 8   | [The start of a chat](#8-the-start-of-a-chat)                    | A new chat starts knowing you, the project and where you stopped |
+| 9   | [Other chats](#9-other-chats)                                    | A new chat knows what your other chats did, open or closed       |
+| 10  | [After `/compact`](#10-after-compact)                            | What this chat decided comes back after a compact                |
+| 11  | [Handoff and catchup](#11-handoff-and-catchup)                   | A note for the next chat, and "where did I stop?"                |
+| 12  | [Code graph and `find_usages`](#12-code-graph-and-find_usages)   | "Who uses this?" in one call                                     |
+| 13  | [One project, many folders](#13-one-project-many-folders)        | One repository is one project, in any folder and on any machine  |
+| 14  | [Databases and sync](#14-databases-and-sync)                     | SQLite by default, Postgres or MongoDB to share                  |
+|     | **Reference**                                                    |                                                                  |
+| 15  | [MCP tools](#15-mcp-tools)                                       | The six tools Claude can call                                    |
+| 16  | [Commands](#16-commands)                                         | Every `claude-db` command                                        |
+| 17  | [Settings and limits](#17-settings-and-limits)                   | Defaults, daily budgets, and what happens when a call fails      |
+| 18  | [Where the data lives](#18-where-the-data-lives)                 | The data folder and the database tables                          |
+| 19  | [Privacy and safety](#19-privacy-and-safety)                     | What is removed before saving, and what leaves your machine      |
+| 20  | [How Haiku calls find `claude`](#20-how-haiku-calls-find-claude) | How the background calls find the `claude` program               |
+| 21  | [Install, update, uninstall](#21-install-update-uninstall)       | What install writes, and how it stays current                    |
+| 22  | [The code, folder by folder](#22-the-code-folder-by-folder)      | Where each part lives in `src/`                                  |
+| 23  | [Testing and releasing](#23-testing-and-releasing)               | The checks every change passes                                   |
+| 24  | [Which part do I use when](#24-which-part-do-i-use-when)         | A task, and the tool for it                                      |
+| 25  | [Words used in this project](#25-words-used-in-this-project)     | The terms, in one line each                                      |
 
 ---
 
-## 1. The problem and the idea
+## 1. What claude-db is
 
-**The problem.** Every Claude Code chat starts from zero. You spend an hour explaining why the order feed
-uses a WebSocket and not polling, which approach you tried and dropped, and which function must not be
-touched. The next day Claude knows none of it, so you explain it again. It also works out "what calls what"
-from scratch each time, by grepping and reading files.
+**The problem.** Every Claude Code chat starts from zero. You explain why the order feed uses a WebSocket and not
+polling, which approach you tried and dropped, and which function must not be touched. The next day Claude knows
+none of it. It also works out "what calls what" from scratch, by grepping and reading files.
 
 **The idea.** Give Claude two things that last:
 
-1. **A memory.** What was done and why, saved from your real chats and handed back at the right moment.
-2. **A map of the code.** Every symbol and how they connect, so "who uses this" is one call.
+1. **A memory**: what was done and why, saved from your real chats and handed back at the right moment.
+2. **A map of the code**: every symbol and how they connect, so "who uses this" is one call.
 
 ```
  WITHOUT claude-db                         WITH claude-db
@@ -55,68 +63,70 @@ from scratch each time, by grepping and reading files.
             you: explain it all again                  polling hammered the API"
 ```
 
-**Why it works the way it does.** Three choices shape everything:
+**Three design choices.**
 
-- **It reads what Claude Code already writes.** Claude Code saves every chat to disk as a JSONL file.
-  claude-db reads that, so it needs no extra effort from you and captures the _reason_, not just the file
-  changes.
-- **Recall is a hook, not a request.** A hook always runs. Nothing depends on Claude deciding to look
-  something up.
-- **Your data stays yours.** It is a local database by default, with no cloud and no account. Postgres and
-  MongoDB are options for sharing across machines.
+- **It reads what Claude Code already writes.** Claude Code saves every chat to disk as a JSONL file. claude-db
+  reads that file, so it needs nothing from you and keeps the reason, not only the file changes.
+- **Recall is a hook, not a request.** A hook always runs. Nothing depends on Claude deciding to look.
+- **Your data stays yours.** A local database by default, with no cloud and no account. Postgres and MongoDB are
+  options for sharing.
 
 ---
 
-## 2. The big picture
+## 2. How the parts fit
 
 ```
-┌──────────────────────────── Claude Code (the chat you use) ───────────────────────────┐
-│                                                                                       │
-│   you type a prompt ──► Claude thinks ──► Claude uses tools ──► Claude replies        │
-│        │                                      │                       │               │
-└────────┼──────────────────────────────────────┼───────────────────────┼───────────────┘
-         │ hooks (small scripts Claude Code runs at fixed moments)       │
-         ▼                                      ▼                       ▼
- ┌───────────────┐   ┌───────────────┐  ┌───────────────┐      ┌───────────────┐
- │ SessionStart  │   │UserPromptSubm.│  │  PreToolUse   │      │  SessionEnd   │
- │ give facts    │   │ save last turn│  │ deliver pick  │      │ save, then    │
- │ refresh graph │   │ start a pick  │  │ answer grep   │      │ make facts    │
- └──────┬────────┘   └──────┬────────┘  └──────┬────────┘      └──────┬────────┘
-        │                   │                  │                      │
-        └───────────────────┴─────────┬────────┴──────────────────────┘
-                                      ▼
- ┌─────────────────────────── claude-db core (src/) ─────────────────────────────┐
- │  capture      search       facts        pick        graph        redact       │
- │  transcript   keyword +    Haiku makes  Haiku picks parse code   removes      │
- │  → memory     vector       rules,       1-2 memories → symbols   secrets      │
- │               + recency    decisions    per prompt   + edges     first        │
- └───────────────────────────────────┬───────────────────────────────────────────┘
-                                     │ one adapter interface
-                 ┌───────────────────┼────────────────────┐
-                 ▼                   ▼                    ▼
-           SQLite (default)       Postgres              MongoDB
-        ~/.claude-memory/        shared across         shared across
-            memory.db             machines              machines
+┌─────────────────────────────── Claude Code (the chat you use) ────────────────────────────────┐
+│  chat opens ──► you send a prompt ──► Claude uses tools ──► Claude replies ──► chat closes    │
+└──────┬──────────────────┬────────────────────┬────────────────────┬───────────────┬───────────┘
+       ▼                  ▼                    ▼                    ▼               ▼
+ SessionStart      UserPromptSubmit        PreToolUse              Stop          SessionEnd
+ start block,      save last turn,         deliver a pick,       save this      save, then
+ refresh graph     start a pick            answer a grep         turn           make facts
+       └──────────────────┴─────────────┬──────┴────────────────────┴───────────────┘
+                                        ▼
+ ┌──────────────────────────────── claude-db core (src/) ────────────────────────────────┐
+ │  capture · search · picks · facts · start block · code graph · redaction              │
+ └──────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            │ one adapter interface
+                      ┌─────────────────────┼─────────────────────┐
+                      ▼                     ▼                     ▼
+               SQLite (default)          Postgres              MongoDB
+              ~/.claude-memory/        shared across         shared across
+                  memory.db              machines              machines
 
- Claude can also ASK, any time, through the MCP server (a long-running helper):
+ Claude can ASK at any time, through the MCP server:
    search · get_observations · timeline · remember · forget · find_usages
 
- You can drive it from a terminal with the claude-db command (status, doctor, view, distill, ...).
+ You drive it from a terminal with the claude-db command (status, doctor, scan, search, ...).
 ```
 
-Two ways in, one store:
+Three ways in, one store:
 
-| Way in     | Who starts it                  | Used for                                          |
-| ---------- | ------------------------------ | ------------------------------------------------- |
-| Hooks      | Claude Code, at fixed moments  | Saving, giving facts, delivering picks, grep help |
-| MCP server | Claude, when it chooses to ask | Searching, opening a note, remembering, usages    |
-| CLI        | You, in a terminal             | Setup, health, backup, switching database         |
+| Way in     | Who starts it                  | Used for                                            |
+| ---------- | ------------------------------ | --------------------------------------------------- |
+| Hooks      | Claude Code, at fixed moments  | Saving, the start block, picks, the grep helper     |
+| MCP server | Claude, when it chooses to ask | Searching, opening a note, remembering, code usages |
+| CLI        | You, in a terminal             | Setup, health, scanning, backup, switching database |
+
+The six hooks:
+
+| Moment             | Hook file          | What it does                                                                    | Limit |
+| ------------------ | ------------------ | ------------------------------------------------------------------------------- | ----- |
+| Chat opens         | `session-start.js` | Gives the start block, refreshes the graph, hints to scan, shows update notices | -     |
+| You send a prompt  | `user-prompt.js`   | Marks the request not finished, saves the previous turn, starts a pick          | -     |
+| Claude uses a tool | `pick-deliver.js`  | Hands over a finished pick                                                      | 5 s   |
+| Claude greps       | `prefer-usages.js` | Answers a grep for a code symbol from the graph                                 | 10 s  |
+| Claude replies     | `turn-end.js`      | Saves this turn in the background                                               | -     |
+| Chat closes        | `session-end.js`   | Saves the last turn, ends the chat, starts the facts job                        | -     |
+
+Every hook catches its own errors and exits with success. A broken memory never stops your chat.
 
 ---
 
-## 3. One chat from start to end
+## 3. One chat, start to end
 
-When each part runs, using one short chat about the shop's order feed.
+One short chat about the shop's order feed:
 
 ```
 TIME ─────────────────────────────────────────────────────────────────────────────►
@@ -126,22 +136,22 @@ TIME ─────────────────────────
                    dropping"
     │                  │                      │                     │                │
     ▼                  ▼                      ▼                     │                ▼
- SessionStart     UserPromptSubmit        PreToolUse                │           SessionEnd
+ SessionStart     UserPromptSubmit        PreToolUse              Stop          SessionEnd
     │                  │                      │                     │                │
-    │ gives:           │ 1. saves the         │ pick-deliver:       │                │ 1. saves the last turn
-    │  about you       │    PREVIOUS turn     │  hands over the     │                │ 2. marks chat ended
-    │  this project    │ 2. looks up memory   │  pick, if ready     │                │ 3. starts the facts
-    │  where you       │ 3. starts a pick     │                     │                │    job in background
-    │  stopped         │    in background     │ (and if Claude      │                │
-    │ refreshes graph  │                      │  runs grep for a    │                ▼
-    │ shows scan hint  │                      │  symbol, prefer-    │         Haiku writes facts:
-    ▼                  ▼                      │  usages answers     │         "Decided: heartbeat
- Claude sees:      background:                │  from the graph)    │          every 20s, proxy
- ┌──────────────┐  Haiku reads 10            ▼                     │          closes idle at 60s"
- │<memory>      │  candidates, picks 1    Claude sees:              │
- │ Decided (Mon)│  and quotes it          ┌─────────────────────┐   │
- │ WebSocket... │        │                │<memory>             │   │
- └──────────────┘        └──────────────► │ - Oct 1: asked "why │   │
+    │ gives:           │ 1. saves the         │ pick-deliver:       │ saves this     │ 1. saves the last turn
+    │  about you       │    PREVIOUS turn     │  hands over the     │ turn, in the   │ 2. marks chat ended
+    │  this project    │ 2. looks up memory   │  pick, if ready     │ background     │ 3. starts the facts
+    │  other chats     │ 3. starts a pick     │                     │                │    job in background
+    │  where you       │    in background     │ (and if Claude      │                │
+    │  stopped         │                      │  greps a symbol,    │                ▼
+    ▼                  ▼                      │  prefer-usages      │         Haiku writes facts:
+ Claude sees:      background:                │  answers from the   │         "Decided: heartbeat
+ ┌──────────────┐  Haiku reads 10            │  graph)             │          every 20s, proxy
+ │<memory>      │  candidates, picks 1       ▼                     │          closes idle at 60s"
+ │ Decided (Mon)│  and quotes it          Claude sees:              │
+ │ WebSocket... │        │                ┌─────────────────────┐   │
+ └──────────────┘        └──────────────► │<memory>             │   │
+                                          │ - Oct 1: asked "why │   │
                                           │   does the feed     │   │
                                           │   drop?": the client│   │
                                           │   sends no heartbeat│   │
@@ -149,44 +159,29 @@ TIME ─────────────────────────
                                           └─────────────────────┘   │
 ```
 
-The same events in a table:
-
-| Moment             | Hook file          | What it does                                                                                       |
-| ------------------ | ------------------ | -------------------------------------------------------------------------------------------------- |
-| Chat opens         | `session-start.js` | Gives facts, refreshes the graph, hints to scan, shows update notice                               |
-| You send a prompt  | `user-prompt.js`   | Saves the previous turn, searches memory, starts a pick                                            |
-| Claude uses a tool | `pick-deliver.js`  | Hands over a finished pick (every tool, 5 s limit)                                                 |
-| Claude greps       | `prefer-usages.js` | If it greps a known code symbol, blocks the grep and returns the graph answer (Bash or Grep, 10 s) |
-| Chat closes        | `session-end.js`   | Saves the last turn, ends the session, starts the facts job                                        |
-
-Every hook catches its own errors and exits with success. A broken memory never stops your chat.
-
 ---
 
-## 4. Capture: saving what happened
+## 4. Capture
 
-**What.** After each turn, claude-db turns what happened into one **observation**: a short saved record with a
-kind, a title, a body, the files touched and the commands run.
+**What it does.** After each turn, claude-db turns what happened into one **observation**: a short record with a
+kind, a title, a body, the files touched and the commands run. Only turns that matter are kept, so a busy day
+gives 10 to 20 rows, not hundreds.
 
-**Why.** Claude Code's chat file is long and noisy. A good memory is short and says why. Capturing at the
-turn level, and only the turns that matter, keeps 10 to 20 rows a day, not hundreds.
-
-**When.** At each prompt (the previous turn), at chat end (the last turn), and on `claude-db flush`.
+**When it runs.** When Claude finishes a reply (that turn, in the background), at each prompt (the previous turn,
+as a backup for a reply you interrupted), when the chat closes (the last turn), and on `claude-db flush`.
 
 ```
- ~/.claude/projects/<project>/<session>.jsonl         (Claude Code writes this)
+ ~/.claude/projects/<project>/<chat>.jsonl            (Claude Code writes this)
         │  read only the NEW lines (a cursor remembers where it stopped)
         ▼
    turns:  prompt + Claude's reasoning + files edited + commands run
         │
         ├─ strip  <private>...</private>      →  "[private]"
         ├─ keep only turns that changed something or answered a real question
-        ├─ remove secrets (keys, tokens, passwords)           ← redact
+        ├─ remove secrets (keys, tokens, passwords)
         ▼
-   one observation per kept turn  ──► store (with an embedding for vector search)
+   one observation per kept turn  ──► store, with an embedding for search
 ```
-
-**What is kept and what is skipped:**
 
 | Turn                                       | Saved? | Why                               |
 | ------------------------------------------ | ------ | --------------------------------- |
@@ -196,7 +191,7 @@ turn level, and only the turns that matter, keeps 10 to 20 rows a day, not hundr
 | `ok`, `thanks`, a bare `grep`, a file read | No     | Nothing to remember               |
 | Text inside `<private>...</private>`       | Hidden | Replaced by `[private]`           |
 
-**One saved observation looks like this:**
+**Example.** One saved observation:
 
 ```
 [decision] Chose WebSocket over polling for live order updates
@@ -213,41 +208,34 @@ Ran: Test run: pnpm test
 
 The six kinds: `decision`, `pattern`, `bugfix`, `context`, `deadend`, `preference`.
 
-**Safe to repeat.** An observation's id is made from the session, the time and the prompt. Reading the same
-chat twice produces the same ids, so nothing is saved twice.
+**Safe to repeat.** An observation's id comes from the chat, the time the request was asked and the request. A
+turn read twice, for example at `Stop` and again at the next prompt, is one row.
 
 ---
 
-## 5. Search: finding it again
+## 5. Search
 
-**What.** One search that mixes three signals, so a note is found by its words _and_ by its meaning, and
-newer notes win a tie.
+**What it does.** One search that mixes three signals: the words, the meaning, and how recent a note is. Words
+alone miss a note that says "heartbeat" when you ask about "keepalive". Meaning alone misses an exact name like
+`useAuth`. Together they find both.
 
-**Why.** Words alone miss a note that says "heartbeat" when you ask about "keepalive". Meaning alone misses
-an exact name like `useAuth`. Together they cover both.
-
-**When.** On every prompt (to find candidates), whenever Claude calls `search`, and when you run
+**When it runs.** On every prompt (to find candidates for a pick), when Claude calls `search`, and on
 `claude-db search`.
 
 ```
    query: "why does the order feed drop"
         │
         ├──► keyword search (FTS5, BM25)  ──► ranked list A     exact words, rare words count more
-        │
         ├──► vector search (cosine)       ──► ranked list B     similar meaning
-        │
         ▼
-   fuse A and B  (reciprocal rank fusion: a note near the top of both wins)
-        │
+   fuse A and B   (reciprocal rank fusion: a note near the top of both wins)
         ▼
    recency boost  (a note loses a little weight as it ages; half-life 45 days)
-        │
         ▼
    top results:  id · kind · date · title · one matching line
 ```
 
-Search returns only a short line per result. The full text comes from `get_observations`, for the ids you
-choose. That keeps a search cheap.
+**Example.**
 
 ```
 $ claude-db search order feed drop
@@ -257,51 +245,49 @@ f6e5d4c3-b2a1  bugfix      2026-10-02  The websocket client sends no heartbeat
               …the proxy closes an idle connection after 60 seconds…
 ```
 
-**Embeddings.** The built-in embedder is a 256-number hashing scheme. It needs nothing installed and is
-keyword-grade. Installing `@xenova/transformers` switches to a 384-number model for real semantic matching,
-and `claude-db reembed` recomputes the old rows.
+A search returns one short line per hit. The full text comes from `get_observations`, for the ids worth reading.
 
-**The same on every database.** Ranking, fusion and the recency boost live in `src/search`, not in the
-database adapters. SQLite, Postgres and MongoDB give the same results; only the retrieval speed differs.
+**Settings.**
+
+| Setting               | Default | Meaning                                                                      |
+| --------------------- | ------- | ---------------------------------------------------------------------------- |
+| `embeddings.provider` | auto    | The built-in 256-number embedder, or a local 384-number model when installed |
+
+Installing `@xenova/transformers` switches to the local model, and `claude-db reembed` recomputes old rows.
+Ranking lives in `src/search`, not in the database adapters, so SQLite, Postgres and MongoDB give the same
+results.
 
 ---
 
-## 6. Picks: the right memory with each prompt
+## 6. Memory with each prompt
 
-**What.** Before Claude answers, claude-db shows one or two earlier notes that fit what you just asked. A
-small model, Claude Haiku, chooses them.
+**What it does.** Before Claude answers, it is shown the one or two earlier notes that fit what you just asked.
+Claude Haiku picks them, and may pick none. Most prompts get none.
 
-**Why.** Showing the top search hits is noisy. Measured on a real project, only about 1 in 4 shown memories
-was useful that way. A picker that reads the prompt and the candidates reached 61% to 70%. Most prompts need no
-memory at all, and the picker is allowed to choose none.
-
-**When.** On every prompt, in the background, so typing is never held up.
+**When it runs.** On every prompt, in the background, so typing is never held up. The pick reaches Claude with
+its first tool call.
 
 ```
  you send:  "the order feed keeps dropping and I do not know why"
       │
       ▼
  1. SEARCH   top 10 notes from OTHER chats in this project
-      │
       ▼
  2. GATE     does any candidate share at least 2 content words with the prompt?
-      │          no ──► stop. Haiku is not called. Nothing is shown.
-      │          yes
+      │          no  ──► stop. Haiku is not called. Nothing is shown.
       ▼
- 3. BUDGET   under 150 picks today, and not paused?
-      │          no ──► fallback: show the closest note only if it shares 4 words
-      │          yes
+ 3. BUDGET   under today's limit, and not paused?
+      │          no  ──► show the closest note only if it shares 4 words
       ▼
- 4. HAIKU    reads: end of Claude's previous reply + the prompt + the 10 candidates
-      │         returns up to 2 picks, each with ONE sentence copied from the note
+ 4. HAIKU    reads the end of Claude's previous reply, the prompt and the 10 candidates;
+      │      returns up to 2 picks, each with ONE sentence copied from the note
       ▼
  5. CHECK    is that sentence really inside the note?   no ──► the pick is dropped
-      │
       ▼
- 6. DELIVER  waits for Claude's first tool call, then adds it above the next step
+ 6. DELIVER  at Claude's first tool call
 ```
 
-**Example.** The ten candidates include these two. Haiku picks the first and quotes it:
+**Example.** Of the ten candidates, Haiku picks the first and quotes it:
 
 ```
  m1  "Order feed needs a heartbeat. Asked: why does the order feed drop after a minute?
@@ -314,50 +300,52 @@ memory at all, and the picker is allowed to choose none.
  - Oct 1: asked "why does the order feed drop after a minute?": The websocket client
    sends no heartbeat, so the proxy closes an idle connection after 60 seconds. (a1b2c3d4-e5f6)
  </memory>
- (context ≈ 62 tokens)
 ```
 
-**Rules that keep it honest:**
+**Rules.**
 
-- The quoted sentence is copied and then checked. A pick cannot carry a claim the note does not make.
-- Notes from the current chat are never offered. Nothing is repeated back to the chat that wrote it.
-- Facts are not offered here. A picked fact was useful 60% of the time against 69% for a chat's own rows.
-- A turn that uses no tool gets no pick, because delivery happens at the first tool call.
-- Subagent reports, task notifications and slash commands are not prompts, so they get nothing.
+- The quoted sentence is checked against the note, so a pick never carries a claim the note does not make.
+- Notes from the current chat are never offered back to it.
+- Facts are not offered here. They are shown at the start of a chat.
+- A turn that uses no tool gets no pick, since delivery happens at the first tool call.
+- Subagent reports, task notices and slash commands are not prompts, so they get nothing.
+- The model is `claude-haiku-5-5`. When the account cannot use it, the pick falls back to `haiku` on its own.
 
-**Cost.** About 20 tokens a prompt on average, and nothing on most prompts. The measurements are in
-[memory-improvements.md](./memory-improvements.md), section 7.
+**Settings.**
+
+| Setting                | Default | Meaning                                              |
+| ---------------------- | ------- | ---------------------------------------------------- |
+| `pick.enabled`         | on      | Haiku picks the memory shown with each prompt        |
+| `pick.dailyLimit`      | 150     | Picks per day                                        |
+| `inject.minOverlap`    | 2       | Content words a candidate must share with the prompt |
+| `inject.promptResults` | 2       | Most notes shown with a prompt                       |
+
+`claude-db pick` shows today's count, and `claude-db pick on|off` switches it.
 
 ---
 
-## 7. Facts: turning chats into rules and decisions
+## 7. Facts
 
-**What.** When a chat ends, one small Haiku call reads that chat's saved rows and writes short **facts**.
+**What it does.** One small Haiku call reads a finished chat and writes short **facts**: the lessons, not the
+record. Each fact has a type and a stable key, so a later chat updates it in place, and Haiku retires a fact a new
+chat proves wrong. The raw observations stay as the evidence.
 
-**Why.** A captured turn is a record of what happened, and its title is whatever sentence Claude wrote. That
-is a weak memory. A fact is the lesson: "rule", "decision and why", "dead end", "to do". The raw rows stay as
-the evidence.
-
-**When.** After a chat ends (`session-end.js` starts it in the background), or any time with
-`claude-db distill --backfill`.
+**When it runs.** When a chat closes, in the background. Chats that are still waiting are picked up at a later
+chat start, or at once with `claude-db distill --backfill`.
 
 ```
- chat ends
+ chat closes
     │
     ▼
- read the chat's saved rows  (split into windows of about 40,000 characters, at most 6)
+ read the chat's saved rows  (windows of about 40,000 characters, at most 6)
     +
- the facts already known for this project and for you   (up to 80)
+ the facts already known for this project and for you  (up to 80)
     │
     ▼
- Haiku writes / updates / retires facts          (one call per window, up to 120 s each)
-    │
-    ▼
- each fact has a stable KEY, so a later chat updates it in place
- and Haiku retires a fact the new chat proves is no longer true
+ Haiku writes, updates or retires facts      (one call per window, up to 120 s each)
 ```
 
-**The five fact types:** `rule`, `decision`, `deadend`, `todo`, `fact`.
+**The five types:** `rule`, `decision`, `deadend`, `todo`, `fact`.
 
 **Example.** After a chat about the order feed:
 
@@ -365,23 +353,35 @@ the evidence.
  type       key                          text
  ─────────  ───────────────────────────  ─────────────────────────────────────────────────────
  decision   order-feed-websocket         Use a WebSocket for the order feed, because polling
-                                        hammered the API.
+                                         hammered the API.
  deadend    order-feed-long-polling      Long polling was tried and dropped: it lagged behind.
  rule       prefer-pnpm                  User wants pnpm in this repo, not npm.   ← filed under YOU
  todo       order-feed-heartbeat         Add a 20 s heartbeat; the proxy closes idle sockets at 60 s.
 ```
 
-Only a **rule** about how you like to work is filed under you, and it follows you to every project. The
-rest belong to the project.
+Only a **rule** about how you like to work is filed under you, and it follows you to every project. The rest
+belong to the project. Facts show up at the start of every chat and in `search`.
 
-**Where facts show up:** at the start of every chat (section 8), in `search` results, and in the database
-that travels to other machines.
+**Settings.**
+
+| Setting                | Default | Meaning                                  |
+| ---------------------- | ------- | ---------------------------------------- |
+| `distill.enabled`      | on      | Chats become facts                       |
+| `distill.dailyLimit`   | 30      | Facts calls per day                      |
+| `distill.backfillDays` | 90      | How far back waiting chats are picked up |
+
+`claude-db distill` shows the state, `distill on|off` switches it, and `distill --backfill` builds facts now.
 
 ---
 
-## 8. What a new chat starts with
+## 8. The start of a chat
 
-At `SessionStart`, claude-db gives three short sections and a line of context cost:
+**What it does.** A new chat starts with one short block: what is known about you, about this project, what your
+other chats were doing, the last handoff note, and where you stopped.
+
+**When it runs.** At `SessionStart`: a new chat, a resumed chat, and after `/compact`.
+
+**Example.**
 
 ```
 <memory>
@@ -392,79 +392,157 @@ This project:
 - Decided (Oct 5): Use a WebSocket for the order feed, because polling hammered the API. (e7fc292e-0df9)
 - Dead end (Oct 5): Long polling was tried and dropped: it lagged behind. (e14ea0c9-ef45)
 
+Not finished yet in another chat (Oct 6, 10:40):
+- asked "move the feed URL to env"
+
+Last chat (Oct 6):
+- asked "add a heartbeat to the socket": Added a 30s heartbeat in src/ws/client.ts (a41c9e02-7d1b)
+
+Last handoff (Oct 5, older than the last chat):
+- Done: WebSocket feed, reconnect with backoff.
+- Next: add a heartbeat.
+
 Where you stopped:
 - Not committed: heartbeat in src/ws/client.ts
 </memory>
-Search this project's full history with the memory MCP tools before asking the user to re-explain prior decisions.
-(context ≈ 210 tokens)
 ```
 
-Also at this moment:
+| Part                               | Comes from                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------ |
+| `About you`                        | Rules filed under you, from any project                                  |
+| `This project`                     | The project's facts and the notes you saved with `remember`              |
+| `Not finished yet in another chat` | A request another chat is still working on ([section 9](#9-other-chats)) |
+| `Last chat`, `Chat before`         | The newest requests from your other chats ([section 9](#9-other-chats))  |
+| `Last handoff`                     | The newest `/handoff` note ([section 11](#11-handoff-and-catchup))       |
+| `Where you stopped`                | Open to-dos, and saved work no commit has covered yet                    |
 
-- A **hint to scan** if the repository has no code graph yet.
-- An **update notice** if a newer compatible version exists (`updates` setting: `notify` by default).
-- A **one-time notice** that explains the facts feature, shown once per notice version.
-- Facts a chat already knows from Claude Code's own memory files are not repeated.
-- If there are no facts yet (a fresh install), older session summaries are shown instead.
+Every line that carries an id can be opened in full with `get_observations`. Lines the chat already sees in
+Claude Code's own memory files are not repeated. A project with no facts yet, right after install, gets the
+older chat summaries and the other-chats part instead.
+
+Also at this moment: a **hint to scan** when the repository has no code graph, an **update notice** when a newer
+compatible version exists, and a **one-time notice** that explains the facts feature.
+
+**Settings.**
+
+| Setting           | Default | Meaning                          |
+| ----------------- | ------- | -------------------------------- |
+| `inject.maxChars` | 6000    | The most characters in the block |
 
 ---
 
-## 9. After `/compact`
+## 9. Other chats
 
-`/compact` shrinks Claude's chat history, so it forgets what _this chat_ decided. When the chat reopens after a
-compact, the start hook puts those back, under **Earlier in this chat**: what this chat decided, the dead
-ends it hit, and what it left uncommitted (up to 8 lines).
+**What it does.** You rarely close a chat. You leave it open and start a new one. The new chat still knows what
+the others did:
+
+- **The newest 5 requests from other chats**, from at most 5 chats, grouped by chat, newest chat first. A chat's
+  summary is added once it has closed. Empty chats and small talk save nothing, so they never move it.
+- **A request is saved the moment Claude finishes the reply**, not at your next message.
+- **A request another chat is still working on** is shown as not finished, so two chats do not change the same
+  files without knowing. It stays while that chat still has a background task running or a loop scheduled.
+
+**When it runs.** At the start of every chat, and in `/catchup`. The saving runs at every `Stop`.
+
+**Example.** Chat A did the real work and is still open, chat B asked one question, chat C opens:
 
 ```
- /compact ──► SessionStart (source: compact) ──► flush the chat, then show:
+Last chat (Oct 8):
+- asked "what does the mailer config do": It sets the SMTP host in src/mail.ts.
 
+Chat before (Oct 8):
+- asked "add retries to the worker queue": Added the retry in src/queue.ts.
+- asked "write tests for the retry backoff": Added 4 backoff tests.
+- asked "fix the failing test in the backoff suite": Fixed the timer in the backoff test.
+- asked "release the 0.12.2 patch": Tagged v0.12.2 and published it.
+```
+
+A request pushed out of these 5 lines stays in memory: search finds it, and each prompt can recall it.
+
+| Rule                                                             | Why                                                              |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| The chat that starts never shows itself                          | It already has its own history                                   |
+| A not-finished request shows for 2 hours at most                 | An interrupted reply fires no hook, so nothing else can clear it |
+| Files in `~/.claude-memory/active/` older than a day are deleted | A crashed chat leaves nothing behind                             |
+
+Every case, with examples, is in [improve-last-chat.md](./improve-last-chat.md).
+
+---
+
+## 10. After `/compact`
+
+**What it does.** `/compact` shrinks Claude's chat history, so it forgets what this chat decided. The start hook
+puts that back under **Earlier in this chat**: the chat's decisions, the dead ends it hit, and what it left
+uncommitted.
+
+**When it runs.** At `SessionStart` after a compact.
+
+**Example.**
+
+```
  Earlier in this chat:
  - Decided: heartbeat every 20 s
  - Dead end: long polling lagged
  - Not committed: src/ws/client.ts
 ```
 
+At most 8 lines.
+
 ---
 
-## 10. The code graph and `find_usages`
+## 11. Handoff and catchup
 
-**What.** `claude-db scan` parses your source files and stores every **symbol** (function, class, method,
-type, constant) and every **edge** between them (calls, imports, extends, implements, references, defines, aliases).
+**What it does.** Two skills for moving between chats on purpose.
 
-**Why.** "Who calls this?" is the question Claude asks before editing, renaming or deleting. Answering it with
-grep and reading files costs many tokens and cannot tell a call from an import. The graph answers in one call,
-measured 2.0 times cheaper than grep and reading on eight real symbols.
+- **`/handoff`** writes a short note with a Done, Open and Next line, saves it as the project's current handoff,
+  and prints it to paste into a message or a pull request. A new handoff replaces the old one.
+- **`/catchup`** answers "where did I stop?" in three groups, done, open and next, from the other chats, the
+  to-dos, the last handoff and git. It writes nothing. `claude-db catchup` prints what it reads.
 
-**When.** Scan once (or let `SessionStart` refresh it). Ask any time with `find_usages` or `claude-db usages`.
+**When it runs.** When you type the skill. Every new chat shows the newest handoff for 14 days.
+
+**Example.**
+
+```
+Handoff, Oct 6:
+- Done: timers, queue, mail family.
+- Open: PR #18 not merged.
+- Next: ask which retries to change on the worker queue.
+```
+
+A handoff is never hidden. Once a request in another chat comes after it, its heading says so:
+`Last handoff (Oct 6, older than the last chat):`. The new chat sees the note and the newer work, and knows
+which is newer.
+
+---
+
+## 12. Code graph and `find_usages`
+
+**What it does.** `claude-db scan` parses the source files and stores every **symbol** (function, class, method,
+type, constant) and every **edge** between them: calls, imports, extends, implements, references, defines and
+aliases. "Who calls this?" is then one call, with calls and imports told apart.
+
+**When it runs.** Scan once. After that, every graph query checks the working tree and refreshes only the files
+that changed, so the answer is never stale. Ask any time with `find_usages` or `claude-db usages`.
 
 ```
  source files ──► parser (ast-grep, local, no tokens) ──► symbols + edges ──► database
-                  TypeScript, TSX, JavaScript, Python, Go, Rust, Ruby,
-                  and more by pattern
-
- symbols:  id · name · kind · file · line · signature
- edges:    from symbol ──relation──► to symbol      with a confidence tag
 
  EXTRACTED  read literally from the syntax          "import { cart } from './cart'"
  INFERRED   matched by name across files, scored    wrong if two files export the same name
 ```
 
-**Four modes of `find_usages`:**
+| Mode               | Answers                                                           | Needs a scan |
+| ------------------ | ----------------------------------------------------------------- | ------------ |
+| `usages` (default) | What references each definition, then grep lines the graph missed | Yes          |
+| `explain`          | That, plus what the symbol itself reaches                         | Yes          |
+| `path`             | The shortest chain between two symbols                            | Yes          |
+| `text`             | Live `git grep` only                                              | No           |
 
-| Mode               | Answers                                                               | Needs a scan |
-| ------------------ | --------------------------------------------------------------------- | ------------ |
-| `usages` (default) | what references each definition, then the grep lines the graph missed | Yes          |
-| `explain`          | that, plus what the symbol itself reaches                             | Yes          |
-| `path`             | the shortest chain between two symbols                                | Yes          |
-| `text`             | live `git grep` only                                                  | No           |
-
-Each definition gets its own list of callers. Lines `git grep` finds that the graph could not link come last, so
-the answer never shows less than a plain search.
-
-**Example: `usages`.**
+**Example.**
 
 ```
-$ claude-db usages --mode usages recordFailure
+$ claude-db usages recordFailure
 
 recordFailure  [function]
   Source: src/util/daily-budget.ts:83
@@ -474,24 +552,23 @@ recordFailure  [function]
     <-- recordPickFailure     [calls] [INFERRED 0.95]  src/pick/run.ts:32
 ```
 
-**Example: `path`.**
+Lines `git grep` finds that the graph could not link come last, so the answer never shows less than a plain
+search.
 
-```
-Shortest path (4 hops):
-  cmdScan --> scanRepository --> extractFile --> symbolId --> observationId
-```
+**Languages.** TypeScript, TSX, JavaScript, Python, Go, Rust, Ruby, Java and Kotlin are read with real syntax, and
+27 more by pattern. `claude-db languages` lists them. Grammars ship in one package per platform; where none
+installs, a language is read by pattern.
 
-**Never stale.** Every graph query hashes the working tree first and refreshes when anything changed. A refresh
-parses only the changed files, reads the rest from a per-project cache in `~/.claude-memory/graph-cache/`, and
-links every reference again, so other files see a symbol that was added or removed. The scan yields after each
-file, because Node frees ast-grep's native trees only when the event loop turns.
+**Imports.** In TypeScript, JavaScript, Python, Go, Rust, Java and Kotlin, an imported name is bound to the symbol
+in the module it came from, so two symbols with one name in different modules stay apart, and `usages` lists the
+importing files under `Imported by`. In Java and Kotlin, `x.method()` goes to the method of the declared type of
+`x`. A name from outside the repository is never matched to a symbol inside it. The design is in
+[plan-code-graph.md](./plan-code-graph.md), and adding a language is in
+[adding-a-language.md](./adding-a-language.md).
 
-**The grep helper.** The `prefer-usages.js` hook watches for Claude running `grep`, `rg` or the Grep tool on
-a code symbol that the graph knows. By default it **blocks** that grep and puts the graph's answer in the
-reason, so Claude sees the callers and inherits at once and nothing needs re-running. It shows at most two
-symbols and 14 lines each, and ends with "more via find_usages", followed by up to six text matches the graph
-could not link. A grep for plain text, or for a name the graph does not know, runs as normal. When files
-changed since the last scan, the hook says so and refreshes in the background, so it never waits.
+**The grep helper.** When Claude runs `grep`, `rg` or the Grep tool for a code symbol the graph knows,
+`prefer-usages.js` answers from the graph instead: at most 2 symbols, 14 lines each, then up to 6 text matches the
+graph could not link. A grep for plain text, or for a name the graph does not know, runs as normal.
 
 | `CLAUDE_DB_USAGES_HOOK` | What happens                                               |
 | ----------------------- | ---------------------------------------------------------- |
@@ -499,116 +576,191 @@ changed since the last scan, the hook says so and refreshes in the background, s
 | `directive`             | The grep runs, and the graph answer is added as context    |
 | `off`                   | The hook does nothing                                      |
 
-**Imports.** A name that a file imports is bound to the symbol in the module it came from, so `usages` lists
-the importing files in an `Imported by` group and a call through an alias reaches the right symbol even when
-another module has one with the same name. This is built once, in `src/graph/modules/`, and each language adds
-a small adapter: how its imports are written, how a module name maps to a file (`tsconfig` and `package.json`
-for TypeScript and JavaScript, package folders for Python, `go.mod` for Go, the `mod` tree and `Cargo.toml`
-for Rust, the `package` line of each file for Java and Kotlin), and which identifiers count as a use. A name from outside the repository is never matched to a
-symbol of the same name inside it. Go imports whole packages, so its `usages` has no `Imported by` group.
-Grammars ship in one package per platform (`claude-db-grammars-<platform>`, built by `scripts/grammars.mjs`); where
-none installs, those languages are read by pattern. In Java and Kotlin, `x.method()` is bound through the declared
-type of `x`, its parent classes and the return type of a chained call (`scan/receivers.ts`); a call on a value of
-unknown type stays `INFERRED`.
-`export { a as b }` creates a symbol `b` with an `aliases` edge to `a`, and `usages a` follows those edges up
-to three levels, so it lists the users of `b` too. Measurements: `npm run bench:usages`, against compilers and
-independent checkers on pinned public repositories.
-
-**Known gaps** (measured, with the plan in [plan-code-graph.md](./plan-code-graph.md)): the graph
-merges symbols that share a name when no import says which one is meant, and it does not follow an imported
-name in the other languages it only reads by pattern.
-
-**The `/cdb-scan` skill** is the second pass. After `claude-db scan` builds the graph, the skill writes five
-notes: stack, layout, conventions, workflows and architecture. They are tagged `inferred`, because they are
-Claude's reading of the code, not a record of anything that happened. It exists so a fresh install has
-something to find on day one.
+**The `/cdb-scan` skill.** After a scan, it writes five notes about the project: stack, layout, conventions,
+workflows and architecture, tagged `inferred`. A fresh install then has something to find on day one.
 
 ---
 
-## 11. The MCP tools
+## 13. One project, many folders
 
-The MCP server is a small long-running helper that Claude Code starts. Claude calls these when it chooses to.
+**What it does.** A repository is one project wherever it is cloned. With a shared database, a laptop and a
+desktop see the same memory, and a second worktree sees the first one's notes.
+
+**When it runs.** Every time memory is read or written for a folder.
+
+```
+ /home/me/code/shop          ──┐
+ /Users/me/work/shop            ├──► github.com/acme/shop     (one project)
+ /home/me/code/shop-worktree  ──┘
+
+ /home/me/notes  (no remote)  ──►  /home/me/notes             (its own project)
+```
+
+- The key is the git remote, `origin` by default. The `ssh` and `https` addresses of one repository match.
+  A token in the address is dropped and never stored.
+- A folder with no remote is keyed by its path. A fork has its own remote, so it is its own project.
+- Each folder is linked to its key in the `project_links` table the first time it is used. Notes saved under an
+  older folder path are still found, and nothing is moved.
+
+**Settings.**
+
+| Setting          | Default | Meaning                             |
+| ---------------- | ------- | ----------------------------------- |
+| `project.remote` | origin  | The remote whose address is the key |
+
+`claude-db merge <old-path>` moves memory from a folder path that no longer exists onto this project.
+
+---
+
+## 14. Databases and sync
+
+**What it does.** Memory lives in one database: SQLite by default, or Postgres or MongoDB to share it across
+machines and teammates. All three give the same results.
+
+**When it runs.** Always. You choose the database once.
+
+```
+ claude-db use postgres://user:pass@host:5432/memory      checks it answers, then switches
+ claude-db use mongodb+srv://user:pass@cluster/memory
+ CLAUDE_DB_URL=...                                         overrides config.json for one shell
+```
+
+| Command                   | What it does                                        |
+| ------------------------- | --------------------------------------------------- |
+| `use <url>`               | Switch database, after checking it answers          |
+| `export`, `import <file>` | Back up to JSONL, or load a backup (safe to repeat) |
+| `sync <url>`              | Two-way merge with another database                 |
+
+---
+
+## 15. MCP tools
+
+The MCP server is a small helper that Claude Code starts. Claude calls these tools when it chooses to.
 
 | Tool               | What it does                                           | Use it for                             |
 | ------------------ | ------------------------------------------------------ | -------------------------------------- |
 | `search`           | Hybrid search, one short line per hit                  | "Why is it like this?", past decisions |
 | `get_observations` | Full text of notes, by id                              | Reading the ids worth reading          |
 | `timeline`         | Notes before and after one note                        | "What else happened around then?"      |
-| `remember`         | Saves a note now (kind, optional key)                  | A standing rule you just stated        |
-| `forget`           | Deletes notes by id, or clears one session's summary   | Removing a wrong or private note       |
-| `find_usages`      | Who uses a symbol: `text`, `usages`, `explain`, `path` | Before editing, renaming or deleting   |
+| `remember`         | Saves a note now, with a kind and an optional key      | A standing rule you just stated        |
+| `forget`           | Deletes notes by id, or clears one chat's summary      | Removing a wrong or private note       |
+| `find_usages`      | Who uses a symbol: `usages`, `explain`, `path`, `text` | Before editing, renaming or deleting   |
 
 A standing instruction block in `CLAUDE.local.md` tells Claude to search memory before asking you to explain a
-past decision, and to use `find_usages` for symbols. A hook's output is only context Claude may skip. A rule in
-the instruction file holds for the whole chat, so recall becomes the default.
+past decision, and to use `find_usages` for symbols. Hook output is context Claude may skip; a rule in the
+instruction file holds for the whole chat.
 
 ---
 
-## 12. Commands
+## 16. Commands
 
 `cdb` is a short alias for `claude-db`.
 
-| Group      | Command                              | What it does                                                      |
-| ---------- | ------------------------------------ | ----------------------------------------------------------------- |
-| Setup      | `install [--project]`                | Register hooks and the MCP server (`--project`: this repo only)   |
-|            | `uninstall [--project]`              | Remove them, keeping memory                                       |
-|            | `update`                             | Install a newer compatible release now                            |
-| Health     | `status`                             | Wired up? When did it last record? Pick and facts state           |
-|            | `doctor [--deep]`                    | Show the config; `--deep` proves write, search, read and delete   |
-|            | `adoption`                           | How often chats grep versus use the memory tools                  |
-| Memory     | `search [--all] <query>`             | Search this project or all projects                               |
-|            | `remember [--kind k] [--key name]`   | Save a note or house rule                                         |
-|            | `forget <id>...`                     | Delete notes                                                      |
-|            | `stats`, `projects`, `view`          | See what is stored, in a terminal or in the browser               |
-| Haiku      | `distill [on\|off] [--backfill]`     | Facts: status, switch, or build now for waiting chats             |
-|            | `pick [on\|off]`                     | Picks: status or switch                                           |
-| Code graph | `scan [--force]`                     | Build or refresh the graph                                        |
-|            | `languages [add\|remove <name>]`     | Show the languages read with real syntax; add or remove a grammar |
-|            | `usages [--mode m] <symbol>`         | Ask the graph or `git grep`                                       |
-| Data       | `export`, `import`, `sync <url>`     | Back up, restore, or two-way merge with another database          |
-|            | `use <url>`                          | Switch database, after checking it answers                        |
-|            | `merge [<old-path>]`                 | Move memory from an old project path onto this one                |
-|            | `reembed`, `redact`, `flush`, `seed` | Recompute vectors, re-clean secrets, re-read chats, fill from git |
-|            | `prune --older-than <days>`, `reset` | Delete old or all memory (a dry run without `--yes`)              |
+| Group      | Command                                   | What it does                                                       |
+| ---------- | ----------------------------------------- | ------------------------------------------------------------------ |
+| Setup      | `install [--project]`                     | Register hooks, the MCP server and skills (`--project`: this repo) |
+|            | `uninstall [--project]`                   | Remove them, keeping memory                                        |
+|            | `update`                                  | Install a newer compatible release now                             |
+| Health     | `status`                                  | Wired up? When did it last record? Pick and facts state            |
+|            | `doctor [--deep]`                         | Show the config; `--deep` proves write, search, read and delete    |
+|            | `adoption`                                | How often chats grep versus use the memory tools                   |
+|            | `--version`, `-v`                         | The installed version                                              |
+| Memory     | `search [--all] [--tag <name>] <query>`   | Search this project or every project                               |
+|            | `remember [--kind k] [--key name] <text>` | Save a note or a house rule                                        |
+|            | `forget <id>...`, `forget --session <id>` | Delete notes, or clear one chat's summary                          |
+|            | `catchup`                                 | Where you stopped: other chats, to-dos, git, last handoff          |
+|            | `stats`, `projects`, `view`               | See what is stored, in a terminal or in the browser                |
+| Haiku      | `distill [on\|off]`, `distill --backfill` | Facts: state, switch, or build now                                 |
+|            | `pick [on\|off]`                          | Picks: state or switch                                             |
+| Code graph | `scan [--force]`                          | Build or refresh the graph                                         |
+|            | `languages`                               | How each language is read                                          |
+|            | `usages [--mode m] <symbol>`              | Ask the graph or `git grep`                                        |
+| Data       | `use <url>`                               | Switch database, after checking it answers                         |
+|            | `export`, `import <file>`, `sync <url>`   | Back up, restore, or two-way merge                                 |
+|            | `merge [<old-path>]`                      | Move memory from an old folder path onto this project              |
+|            | `reembed`, `redact`, `flush`, `seed`      | Recompute vectors, re-clean secrets, re-read chats, fill from git  |
+|            | `prune --older-than <days>`, `reset`      | Delete old or all memory (a dry run without `--yes`)               |
 
 ---
 
-## 13. Where the data lives
+## 17. Settings and limits
+
+Settings live in `~/.claude-memory/config.json`. The full list is in [setup-guide.md](./setup-guide.md).
+
+| Setting                | Default | Meaning                                              |
+| ---------------------- | ------- | ---------------------------------------------------- |
+| `pick.enabled`         | on      | Haiku picks the memory shown with each prompt        |
+| `pick.dailyLimit`      | 150     | Picks per day                                        |
+| `distill.enabled`      | on      | Chats become facts                                   |
+| `distill.dailyLimit`   | 30      | Facts calls per day                                  |
+| `inject.maxChars`      | 6000    | The most characters in the start block               |
+| `inject.minOverlap`    | 2       | Content words a candidate must share with the prompt |
+| `inject.promptResults` | 2       | Most notes shown with a prompt                       |
+| `project.remote`       | origin  | The remote that names a project                      |
+| `capture.summarize`    | off     | An extra AI summary at chat end, when facts are off  |
+| `updates`              | notify  | `auto`, `notify` or `off`                            |
+
+**When a Haiku call fails, that feature pauses and says why.**
 
 ```
-~/.claude-memory/                    (CONFIG_DIR)
- ├── config.json                     your settings (database, limits, switches)
- ├── memory.db                       the SQLite database (default)
- ├── claude-binary                   path of the claude program, saved by hooks
- ├── update.json                     update-check state
- ├── cursors/<session>.offset        how far each chat file has been read
- ├── pick/
- │    ├── budget.json                picks used today, pause, failures
- │    └── pending/<session>.json     a pick waiting for the next tool call
- └── distill/
-      └── budget.json                facts calls used today, pause, failures
+ 1st failure     ──► pause 1 hour
+ 2nd in a row    ──► pause 6 hours
+ 3rd or more     ──► pause 1 day
+ a working call  ──► the count resets
+
+ $ claude-db status
+ pick     : on (claude-haiku-5-5, else haiku), 3 of 150 picks used today,
+            paused until 2026-10-06T15:14:58Z after a failed call: exited with code 1: error: not logged in
+```
+
+The reason is one of: `claude was not found`, `timed out after 30 s` (picks) or `120 s` (facts),
+`exited with code N: <first error line>`, `stopped by <signal>`, or `the reply was larger than the 1 MB buffer`.
+
+While paused or over budget, picking falls back to the strong word match only. Capture never calls a model, so it
+keeps working.
+
+**Two processes at once.** The SQLite connection waits up to 3 seconds for a lock, under the 5 second limit of
+the shortest hook, so a hook that starts during a background job does not fail.
+
+---
+
+## 18. Where the data lives
+
+```
+~/.claude-memory/
+ ├── config.json          your settings
+ ├── memory.db            the SQLite database (default)
+ ├── claude-binary        where the claude program is, saved by the hooks
+ ├── update.json          update-check state
+ ├── cursors/             how far each chat log has been read, and what each chat was shown
+ ├── active/              a request each chat has not finished yet
+ ├── turns/               a finished turn waiting for its background save
+ ├── pick/                today's pick budget, and picks waiting for the next tool call
+ ├── distill/             today's facts budget
+ ├── graph-cache/         parsed files per project, for fast graph refreshes
+ └── facts/, reingest/, graph-refresh/, notices/      locks for background jobs
 ```
 
 Inside the database (SQLite names; Postgres and MongoDB keep the same shapes):
 
-| Table              | Holds                                                         |
-| ------------------ | ------------------------------------------------------------- |
-| `sessions`         | One row per chat: project, start, end, summary                |
-| `observations`     | The notes and facts, with kind, body, files, tags, embedding  |
-| `observations_fts` | The keyword index over observations                           |
-| `symbols`          | The code graph's symbols                                      |
-| `symbol_edges`     | The graph's edges, with relation and confidence               |
-| `scanned_files`    | A hash per scanned file, so a rescan parses only what changed |
+| Table              | Holds                                                          |
+| ------------------ | -------------------------------------------------------------- |
+| `sessions`         | One row per chat: project, start, end, summary                 |
+| `observations`     | The notes and facts, with kind, body, files, tags, embedding   |
+| `observations_fts` | The keyword index over observations                            |
+| `symbols`          | The code graph's symbols                                       |
+| `symbol_edges`     | The graph's edges, with relation and confidence                |
+| `scanned_files`    | A hash per scanned file, so a refresh parses only what changed |
+| `project_links`    | Which folders belong to which project key                      |
 
-A **project** is the git repository root of the folder you work in, so one database serves every repo.
-Facts are kept in a reserved session named `facts`.
+Facts are kept in a reserved chat named `facts`, and notes from `remember` in one named `manual`.
 
 ---
 
-## 14. Privacy and safety
+## 19. Privacy and safety
 
 - **Local first.** The default database is one file on your disk. Nothing goes to a cloud service.
-- **Secrets are removed before saving.** The redaction step replaces these with a marker:
+- **Secrets are removed before saving:**
 
 | Pattern                                         | Becomes                  |
 | ----------------------------------------------- | ------------------------ |
@@ -617,85 +769,41 @@ Facts are kept in a reserved session named `facts`.
 | JWTs (`eyJ...`)                                 | `[redacted-jwt]`         |
 | `-----BEGIN ... PRIVATE KEY-----` blocks        | `[redacted-private-key]` |
 | `user:password@` in a URL                       | `//[redacted]@`          |
-| `password`, `secret`, `token`, `api_key` values | `"[redacted]"`           |
+| `password`, `secret`, `token`, `api_key` values | `[redacted]`             |
 
-- **`<private>...</private>`** in a prompt is replaced by `[private]` before anything is saved.
-- **`claude-db redact`** re-applies the cleaning to rows saved earlier.
-- **The Haiku calls** go through your own Claude login, with the `claude` program on your machine. The pick
-  prompt and the facts prompt hold your saved notes, so those notes are sent to the model, and the command line
-  is never part of a stored failure reason.
-- **A secret pasted into a chat** stays in Claude Code's own chat file, which claude-db does not edit. Rotate
-  it.
+- **`<private>...</private>`** in a prompt never reaches memory. A saved turn keeps `[private]` in its place.
+- **`claude-db redact`** cleans rows saved earlier again.
+- **The Haiku calls** go through your own Claude login and the `claude` program on your machine. The pick and
+  facts prompts hold your saved notes, so those notes reach the model.
+- **A secret pasted into a chat** stays in Claude Code's own chat file, which claude-db does not edit. Rotate it.
 - **`.mcp.json` holds an absolute path** that exists only on your machine. Add it to `.gitignore`.
-- **A reset is a dry run** until you pass `--yes`.
+- **`reset` and `prune` are dry runs** until you pass `--yes`.
 
 ---
 
-## 15. How the Haiku calls find `claude`
+## 20. How Haiku calls find `claude`
 
-Picks and facts run the `claude` program in headless mode. Claude Code does not give hooks its own path, and
-`claude` is often not on `PATH` (for example when it runs inside an editor). So the lookup is:
+Picks and facts run the `claude` program headless. Claude Code does not give hooks its own path, and `claude` is
+often not on `PATH`, for example inside an editor. The lookup:
 
 ```
  1. CLAUDE_CODE_EXECPATH, if set
  2. the path saved in ~/.claude-memory/claude-binary, if that file still exists
  3. "claude" on PATH
 
- Each hook, before it does anything else, walks UP its parent processes
- (hook shell ──► claude ──► editor) and saves the first one named "claude".
-```
+ Each hook first walks UP its parent processes and saves the first one named "claude":
 
-```
  hook process
-    └─ parent: dash                      exe=/usr/bin/dash
-        └─ parent: claude                exe=/home/you/.vscode/extensions/.../native-binary/claude   ◄── saved
+    └─ parent: dash      exe=/usr/bin/dash
+        └─ parent: claude   exe=/home/you/.vscode/extensions/.../native-binary/claude   ◄── saved
 ```
 
-A saved path that no longer exists, for example after an editor update, is ignored and replaced on the next
-hook run. The lookup works on Linux and macOS. Before 0.10.3 it failed silently where `claude` was not on
-`PATH`.
+A saved path that no longer exists, for example after an editor update, is ignored and replaced on the next hook
+run. `claude-db doctor` shows which `claude` was found and from where.
 
 ---
 
-## 16. Limits, budgets and what happens when a call fails
-
-| Setting                | Default | Meaning                                              |
-| ---------------------- | ------- | ---------------------------------------------------- |
-| `pick.enabled`         | on      | Haiku picks the memory shown with each prompt        |
-| `pick.dailyLimit`      | 150     | Picks per day                                        |
-| `distill.enabled`      | on      | Chats become facts                                   |
-| `distill.dailyLimit`   | 30      | Facts calls per day                                  |
-| `inject.minOverlap`    | 2       | Content words a candidate must share with the prompt |
-| `inject.promptResults` | 2       | Most memories shown with a prompt                    |
-| `capture.summarize`    | off     | An extra AI summary at chat end (when facts are off) |
-| `updates`              | notify  | `auto`, `notify` or `off`                            |
-
-**When a Haiku call fails, the feature pauses and says why:**
-
-```
- 1st failure  ──► pause 1 hour
- 2nd in a row ──► pause 6 hours
- 3rd or more  ──► pause 1 day
- a working call ──► the count resets
-
- $ claude-db status
- pick     : on (haiku), 3 of 150 picks used today, paused until 2026-10-06T15:14:58Z
-            after a failed call: exited with code 1: error: not logged in
-```
-
-The reason is one of: `claude was not found`, `timed out after 30 s` (picks) or `120 s` (facts), `exited
-with code N: <first error line>`, `stopped by <signal>`, or `the reply was larger than the 1 MB buffer`.
-
-**While paused or over budget**, picking falls back to the strong word match only (the closest note, if it
-shares four content words with the prompt). Nothing breaks, and capture keeps working, because capture never
-calls a model.
-
-**Two processes at once.** The SQLite connection waits up to 3 seconds for a lock, which is under the 5 second
-limit of the shortest hook, so a hook that starts during a background job does not fail.
-
----
-
-## 17. Install, update and uninstall
+## 21. Install, update, uninstall
 
 ```
  npm install -g claude-db
@@ -703,110 +811,109 @@ limit of the shortest hook, so a hook that starts during a background job does n
  claude-db install --project          then restart Claude Code
 ```
 
-`install` writes:
+| What install writes                               | With `--project`              | Without                   |
+| ------------------------------------------------- | ----------------------------- | ------------------------- |
+| The six hooks                                     | `.claude/settings.local.json` | `~/.claude/settings.json` |
+| The MCP server                                    | `.mcp.json`                   | `~/.claude.json`          |
+| The standing instruction block                    | `CLAUDE.local.md`             | `~/.claude/CLAUDE.md`     |
+| The `/cdb-scan`, `/catchup` and `/handoff` skills | `.claude/skills/`             | `~/.claude/skills/`       |
 
-| What                         | Where                                                        |
-| ---------------------------- | ------------------------------------------------------------ |
-| Five hook registrations      | `.claude/settings.local.json` (`--project`) or user settings |
-| The MCP server               | `.mcp.json` (project) or user level                          |
-| A standing instruction block | `CLAUDE.local.md`, or `~/.claude/CLAUDE.md` machine-wide     |
-| The `/cdb-scan` skill        | `~/.claude/skills/`                                          |
-
-**Staying current.** The hooks are registered by absolute path into the installed package, so they always run
-the newest code. At `SessionStart`, claude-db compares the copied skill and instruction block with what
-shipped and rewrites them if they differ. So `npm i -g claude-db` alone is enough. Only files that already
-exist are refreshed, and anything `uninstall` removed stays removed.
+**Staying current.** The hooks point at the installed package, so they always run the newest code. At each chat
+start, claude-db adds any hook a newer version brought, and rewrites the skills and the instruction block when
+they differ from what shipped. So `npm i -g claude-db` alone is enough. A `/catchup` or `/handoff` skill of your
+own with the same name is kept, and anything `uninstall` removed stays removed.
 
 **Uninstall.** `claude-db uninstall [--project]` removes the hooks, the server, the instruction block and the
-skill, and leaves your memory intact.
+skills, and leaves your memory as it is.
 
 **First days.** A fresh install has no history. Run `claude-db scan` and the `/cdb-scan` skill so search has
 something to find. Facts and picks become useful after a few chats.
 
 ---
 
-## 18. The code, folder by folder
+## 22. The code, folder by folder
 
 ```
 src/
- ├── hooks/        the five hooks and what they share (payload, shown-ids, recall rules, background jobs)
- ├── capture/      transcript reader, turn extractor, redaction, summary, flush
- ├── search/       keyword + vector fusion, recency, stopwords        (database-independent)
- ├── facts/        distill (Haiku), fact model, rendering, budget, import of Claude's own memory files
- ├── pick/         pick prompt, run, worker, pending files
- ├── graph/        parser, languages, scan, modules (imports per language), query (usages / explain / path), refresh
- ├── usages/       the live git-grep mode
- ├── store/        one adapter interface + sqlite/, postgres/, mongo/
- ├── embed/        builtin hashing embedder, optional transformers embedder
- ├── mcp/          the MCP server and its six tools
- ├── cli/          the claude-db command and its subcommands
- ├── config/       settings schema, loading, the data folder path
- └── util/         project resolution, the claude binary lookup, budgets, job locks, small helpers
+ ├── hooks/      the six hooks, the background save, and what they share
+ ├── capture/    chat log reader, turn extractor, redaction, not-finished requests, flush
+ ├── search/     keyword + vector fusion, recency, stopwords        (database-independent)
+ ├── facts/      facts (Haiku), the start block, other chats, handoff, Claude's own memory files
+ ├── catchup/    what /catchup and claude-db catchup read and print
+ ├── pick/       the pick prompt, run, worker and pending files
+ ├── graph/      parser, languages, scan, imports per language, queries, refresh
+ ├── usages/     the live git grep mode
+ ├── store/      one adapter interface + sqlite/, postgres/, mongo/
+ ├── embed/      the built-in embedder and the optional local model
+ ├── mcp/        the MCP server and its six tools
+ ├── cli/        the claude-db command and its subcommands
+ ├── config/     the settings schema, loading, the data folder path
+ └── util/       project keys, the claude lookup, budgets, job locks, small helpers
 ```
 
-Hooks are the entry points. They read the Claude Code payload, call the core folders, and print their result
-through one shared function, so the output format stays in one place.
+Hooks are the entry points. They read Claude Code's input, call the core folders, and print through one shared
+function, so the output format lives in one place.
 
 ---
 
-## 19. Testing and releasing
+## 23. Testing and releasing
 
-- **Checks:** `npm run typecheck`, `npm run lint`, and `npm test`. Lint runs a project script (no code
-  comments, no `any`, files under 250 lines, `.js` import endings, hooks print through `emitContext`), then
-  ESLint, then a scan of tests and docs for tokens, key prefixes and personal paths.
-- **Tests that touch real data** run in an isolated temporary home. A guard stops them if they ever point at
-  your real home folder.
+- **Checks:** `npm run typecheck`, `npm run lint` and `npm test`. Lint runs a project script first: no code
+  comments, no `any`, files under 250 lines, `.js` import endings, hooks print only through the shared function,
+  no leftover markers. Then ESLint, then a scan of tests and docs for tokens, key prefixes and personal paths.
+- **Tests that touch real data** run in an isolated temporary home. A guard stops them if they ever point at your
+  real home folder.
+- **The store tests** run against SQLite locally, and against Postgres and MongoDB in CI.
 - **CI** runs on Ubuntu and macOS, plus CodeQL.
-- **Release.** Update `CHANGELOG.md`, then a commit named just the version, then an annotated tag and a push.
-  The publish workflow checks the tag matches `package.json`, checks the version is not already on npm, runs
-  typecheck, build and tests, then publishes with provenance. npm versions can never be replaced.
-
-```
- docs: changelog for 0.10.3  ──►  0.10.3 (package.json + lock)  ──►  git tag -a v0.10.3 -m "0.10.3"
-                                                                      git push --follow-tags  ──► npm
-```
+- **Releasing** follows [releasing.md](./releasing.md): a branch and a pull request, green CI, then an annotated
+  tag that runs the publish workflow.
 
 ---
 
-## 20. Which part do I use when
+## 24. Which part do I use when
 
-| I want to...                             | Use                                              |
-| ---------------------------------------- | ------------------------------------------------ |
-| Know why the code is the way it is       | `search`, then `get_observations`                |
-| Find who calls or imports a function     | `find_usages` (`usages`)                         |
-| Check what a function reaches            | `find_usages` (`explain`)                        |
-| See how two functions connect            | `find_usages` (`path`)                           |
-| Find plain text, a log line or a comment | grep                                             |
-| Make Claude follow a rule from now on    | `remember`                                       |
-| Remove a wrong or private note           | `forget <id>`                                    |
-| Check it is installed and working        | `claude-db status`, `claude-db doctor`           |
-| See why picks or facts stopped           | `claude-db status` (the `paused` line shows why) |
-| Build facts from waiting chats now       | `claude-db distill --backfill`                   |
-| Share memory across machines             | `claude-db use <postgres or mongo url>`          |
-| Move memory after a repo moved folders   | `claude-db merge <old-path>`                     |
-| Back up, or move to a new machine        | `claude-db export`, then `import`                |
-| Map a project that already exists        | `claude-db scan`, then the `/cdb-scan` skill     |
+| I want to...                             | Use                                             |
+| ---------------------------------------- | ----------------------------------------------- |
+| Know why the code is the way it is       | `search`, then `get_observations`               |
+| Find who calls or imports a function     | `find_usages` (`usages`)                        |
+| Check what a function reaches            | `find_usages` (`explain`)                       |
+| See how two functions connect            | `find_usages` (`path`)                          |
+| Find plain text, a log line or a comment | grep                                            |
+| Make Claude follow a rule from now on    | `remember`                                      |
+| Remove a wrong or private note           | `forget <id>`                                   |
+| Leave a note for the next chat           | `/handoff`                                      |
+| Find out where I stopped                 | `/catchup`                                      |
+| Check it is installed and working        | `claude-db status`, `claude-db doctor`          |
+| See why picks or facts stopped           | `claude-db status` (the `paused` line says why) |
+| Build facts from waiting chats now       | `claude-db distill --backfill`                  |
+| Share memory across machines             | `claude-db use <postgres or mongo url>`         |
+| Move memory after a repo moved folders   | `claude-db merge <old-path>`                    |
+| Back up, or move to a new machine        | `claude-db export`, then `import`               |
+| Map a project that already exists        | `claude-db scan`, then the `/cdb-scan` skill    |
 
 ---
 
-## 21. Words used in this project
+## 25. Words used in this project
 
-| Word        | Meaning                                                                                       |
-| ----------- | --------------------------------------------------------------------------------------------- |
-| Observation | One saved record of a turn: kind, title, body, files, commands                                |
-| Fact        | A short lasting lesson (rule, decision, dead end, to do, fact) with a stable key              |
-| Project     | The git repository root of the folder you work in                                             |
-| Session     | One Claude Code chat                                                                          |
-| Hook        | A small script Claude Code runs at a fixed moment                                             |
-| MCP server  | A helper Claude Code starts, which Claude can call as tools                                   |
-| Pick        | The one or two notes Haiku chooses to show with a prompt                                      |
-| Candidate   | One of the ten notes the search offers to the picker                                          |
-| Distill     | Turn a finished chat into facts                                                               |
-| Backfill    | Distill every chat that is still waiting                                                      |
-| Symbol      | A named piece of code: function, class, method, type, constant                                |
-| Edge        | A link between two symbols: calls, imports, extends, implements, references, defines, aliases |
-| EXTRACTED   | An edge read literally from the syntax                                                        |
-| INFERRED    | An edge matched by name across files, with a score                                            |
-| Embedding   | A list of numbers that stands for the meaning of a text, used for vector search               |
-| Redaction   | Replacing secrets with a marker before saving                                                 |
-| Pause       | The wait after a failed Haiku call: 1 hour, then 6 hours, then a day                          |
+| Word           | Meaning                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| Observation    | One saved record of a turn: kind, title, body, files, commands                                |
+| Fact           | A short lasting lesson (rule, decision, dead end, to do, fact) with a stable key              |
+| Project        | One repository, keyed by its git remote, or a folder with no remote                           |
+| Chat (session) | One Claude Code chat                                                                          |
+| Turn           | One request and Claude's reply to it                                                          |
+| Hook           | A small script Claude Code runs at a fixed moment                                             |
+| MCP server     | A helper Claude Code starts, which Claude can call as tools                                   |
+| Pick           | The one or two notes Haiku chooses to show with a prompt                                      |
+| Candidate      | One of the ten notes the search offers to the picker                                          |
+| Distill        | Turn a finished chat into facts                                                               |
+| Backfill       | Distill every chat that is still waiting                                                      |
+| Handoff        | A note with Done, Open and Next lines, for the next chat                                      |
+| Not finished   | A request another chat is still working on                                                    |
+| Symbol         | A named piece of code: function, class, method, type, constant                                |
+| Edge           | A link between two symbols: calls, imports, extends, implements, references, defines, aliases |
+| EXTRACTED      | An edge read literally from the syntax                                                        |
+| INFERRED       | An edge matched by name across files, with a score                                            |
+| Embedding      | A list of numbers that stands for the meaning of a text, used for search                      |
+| Redaction      | Replacing secrets with a marker before saving                                                 |
+| Pause          | The wait after a failed Haiku call: 1 hour, then 6 hours, then a day                          |
