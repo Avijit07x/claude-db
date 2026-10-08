@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.2
+
+### Fixed
+
+- **A new chat knows what the other chats did, even while they are still open.** The start of each chat shows
+  the newest 5 requests from other chats, grouped by chat, with a chat's summary once it has ended. A request is
+  saved as soon as Claude finishes the reply, and one that another chat is still working on, also in a
+  background task, is shown as not finished yet. A handoff note stays, marked `older than the last chat` once a
+  later request has moved past it. `/catchup` shows the same and leaves out the chat it runs in.
+
 ## 0.12.1
 
 ### Changed
