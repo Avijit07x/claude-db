@@ -4,6 +4,7 @@ import { CONFIG_DIR } from '../config/index.js';
 import type { RecallContext } from '../context.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { readTranscript, sessionIdsOnDisk, transcriptPathFor } from './transcript.js';
+import type { Turn } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
 import { closeLandedWork } from './progress.js';
 
@@ -19,11 +20,14 @@ export async function flushSession(
   project: string,
   transcriptPath?: string,
   rebuild = false,
+  finalReply = '',
 ): Promise<FlushResult> {
   const path = transcriptPath ?? transcriptPathFor(project, sessionId);
   const cursor = readCursor(sessionId);
 
-  const { turns, nextOffset } = readTranscript(path, cursor);
+  const read = readTranscript(path, cursor);
+  const { nextOffset } = read;
+  const turns = withFinalReply(read.turns, finalReply);
   const lastReply = turns.at(-1)?.reasoning ?? '';
   if (turns.length === 0) {
     await closeLandedWork(ctx.store, project);
@@ -91,6 +95,14 @@ const KIND_RANK: Record<ObservationKind, number> = {
   pattern: 4,
   context: 5,
 };
+
+function withFinalReply(turns: Turn[], finalReply: string): Turn[] {
+  const reply = finalReply.trim();
+  const last = turns.at(-1);
+  if (!last || !reply || last.reasoning.includes(reply)) return turns;
+  const reasoning = last.reasoning ? `${last.reasoning}\n${reply}` : reply;
+  return [...turns.slice(0, -1), { ...last, reasoning }];
+}
 
 export function summarize(observations: Observation[], previous?: string): string {
   const kept = previous ? previous.split(' | ').filter(Boolean) : [];

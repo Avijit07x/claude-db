@@ -64,6 +64,7 @@ export interface RemoveFilter {
 export interface ListFilter {
   project?: ProjectFilter;
   sessionId?: string;
+  excludeSessions?: string[];
   kind?: ObservationKind;
   status?: ObservationStatus;
   after?: number;

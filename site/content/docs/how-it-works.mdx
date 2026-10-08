@@ -22,6 +22,8 @@ Claude Code writes every session to disk as JSONL. claude-db reads that transcri
 
 Both steps are hooks, so they always run. Nothing depends on Claude deciding to look something up.
 
+A turn is also saved as soon as Claude finishes the reply, in the background, so another chat sees it without waiting for your next prompt. The save at the next prompt stays as the backup, for a reply you interrupted.
+
 One observation is saved per turn, and only if the turn edited a file or ran a real command. Questions, `grep` and "ok" are skipped. A busy day produces 10 to 20 rows, not hundreds.
 
 ## The six kinds
@@ -39,7 +41,7 @@ Each observation is classified as it is captured, and `search` can filter on the
 
 ## What gets injected
 
-- Recent session summaries and facts at the start of a chat.
+- At the start of a chat: facts, the newest 5 requests from other chats, any request another chat has not finished, and the handoff note.
 - Above a prompt, at most two memories from earlier chats, picked by Claude Haiku.
 - After `/compact`, what this chat decided and left uncommitted.
 

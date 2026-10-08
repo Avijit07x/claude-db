@@ -12,6 +12,15 @@ export function projectClause(
   return `${column} = ANY($${values.length}::text[])`;
 }
 
+export function excludeSessionsClause(
+  sessions: string[] | undefined,
+  values: unknown[],
+): string | null {
+  if (!sessions || sessions.length === 0) return null;
+  values.push(sessions);
+  return `session_id <> ALL($${values.length}::text[])`;
+}
+
 export function appendScope(query: SearchQuery, conditions: string[], values: unknown[]): void {
   conditions.push("status <> 'replaced'");
   const project = projectClause(query.project, values);
@@ -32,8 +41,6 @@ export function appendScope(query: SearchQuery, conditions: string[], values: un
     values.push(query.until);
     conditions.push(`created_at <= $${values.length}`);
   }
-  if (query.excludeSessions && query.excludeSessions.length > 0) {
-    values.push(query.excludeSessions);
-    conditions.push(`session_id <> ALL($${values.length}::text[])`);
-  }
+  const excluded = excludeSessionsClause(query.excludeSessions, values);
+  if (excluded) conditions.push(excluded);
 }

@@ -1,6 +1,8 @@
 import { check } from '../lib/check.mjs';
 import { insertObservations } from '../../dist/store/postgres/insert.js';
 import { toDoc, toObservation } from '../../dist/store/mongo/docs.js';
+import { sessionMatch } from '../../dist/store/mongo/filters.js';
+import { excludeSessionsClause } from '../../dist/store/postgres/filters.js';
 
 function fakePool() {
   const seen = [];
@@ -76,4 +78,26 @@ export default async function run() {
   check('mongo persists status', doc.status === 'open', String(doc.status));
   check('mongo reads status back', toObservation({ ...doc, _id: 'o1' }).status === 'open');
   check('mongo defaults a statusless observation to done', toDoc(observation()).status === 'done');
+
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  check('mongo adds no chat filter when none is asked for', same(sessionMatch(undefined, []), {}));
+  check(
+    'mongo can ask for one chat and leave out others in one filter',
+    same(sessionMatch('a', ['b', 'c']), { sessionId: { $eq: 'a', $nin: ['b', 'c'] } }),
+  );
+  check(
+    'mongo can leave out chats alone',
+    same(sessionMatch(undefined, ['b']), { sessionId: { $nin: ['b'] } }),
+  );
+
+  const values = ['/p'];
+  check(
+    'postgres adds no chat filter for an empty list',
+    excludeSessionsClause([], values) === null && values.length === 1,
+  );
+  check(
+    'postgres leaves out chats with one array value',
+    excludeSessionsClause(['b', 'c'], values) === 'session_id <> ALL($2::text[])' &&
+      same(values[1], ['b', 'c']),
+  );
 }

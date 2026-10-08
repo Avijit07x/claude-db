@@ -38,6 +38,47 @@ export default async function run({ store, search, project, observations, sessio
     (await store.list({ project, sessionId: 'a-chat-that-wrote-nothing' })).length === 0,
   );
 
+  const otherChat = {
+    id: '5ca1ab1e-0000-4000-8000-0000000000c2',
+    sessionId: 'another-chat',
+    project,
+    kind: 'context',
+    title: 'Work from another chat',
+    body: 'Asked: something else\n\nDone.',
+    files: [],
+    tags: [],
+    createdAt: Date.now() - 60_000,
+  };
+  await store.insertObservations([otherChat]);
+  const everything = await store.list({ project, limit: 1000 });
+  const others = await store.list({ project, excludeSessions: [sessionId], limit: 1000 });
+  check(
+    'list can leave out one chat',
+    others.length === everything.length - seeded.size &&
+      others.every((obs) => obs.sessionId !== sessionId),
+    `${everything.length} -> ${others.length}`,
+  );
+  check(
+    'an empty list of chats to leave out changes nothing',
+    (await store.list({ project, excludeSessions: [], limit: 1000 })).length === everything.length,
+  );
+  check(
+    'a chat both asked for and left out lists nothing',
+    (await store.list({ project, sessionId, excludeSessions: [sessionId] })).length === 0,
+  );
+  const [newestOther] = await store.list({
+    project,
+    excludeSessions: [sessionId, 'a-chat-that-wrote-nothing'],
+    newest: true,
+    limit: 1,
+  });
+  check(
+    'the newest row outside the left-out chats is found',
+    newestOther?.id === otherChat.id,
+    newestOther?.sessionId,
+  );
+  await store.remove({ ids: [otherChat.id] });
+
   const stale = {
     id: '5ca1ab1e-0000-4000-8000-000000000001',
     sessionId: 'a-chat-saved-by-older-rules',

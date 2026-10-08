@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CLI = resolve(DIST, 'cli', 'index.js');
 export const PICK_WORKER = resolve(DIST, 'pick', 'worker.js');
+export const TURN_WORKER = resolve(DIST, 'hooks', 'turn-save.js');
 
 export function runDetached(
   script: string,

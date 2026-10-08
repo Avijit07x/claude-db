@@ -5,6 +5,8 @@ import { observationId } from './identity.js';
 import { redact } from './redact.js';
 import { classifyTurn, topLevelDirs } from './turn-extractor.js';
 
+export const GIT_SESSION = 'git';
+
 const RECORD = '';
 const FIELD = '';
 
@@ -54,8 +56,8 @@ function toObservation(record: string, project: string): Observation | null {
 
   const timestamp = createdAt;
   return {
-    id: observationId('git', 0, sha),
-    sessionId: 'git',
+    id: observationId(GIT_SESSION, 0, sha),
+    sessionId: GIT_SESSION,
     project,
     ...(author ? { author } : {}),
     kind: classifyTurn({

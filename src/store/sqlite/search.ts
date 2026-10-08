@@ -7,7 +7,7 @@ import type {
 } from '../../types.js';
 import type { Row } from './rows.js';
 import { toBuffer, toIndexEntry } from './rows.js';
-import { TAG_PREDICATE, appendScope, toMatchExpression } from './filters.js';
+import { TAG_PREDICATE, appendScope, excludeSessionsClause, toMatchExpression } from './filters.js';
 import { cosine, unpackVector } from '../../util/vector.js';
 import { noProjects } from '../project-scope.js';
 
@@ -37,10 +37,8 @@ export async function searchKeyword(
     conditions.push('o.created_at <= ?');
     params.push(query.until);
   }
-  if (query.excludeSessions && query.excludeSessions.length > 0) {
-    conditions.push(`o.session_id NOT IN (${query.excludeSessions.map(() => '?').join(',')})`);
-    params.push(...query.excludeSessions);
-  }
+  const excluded = excludeSessionsClause('o.session_id', query.excludeSessions, params);
+  if (excluded) conditions.push(excluded);
   params.push(query.limit);
 
   const rows = db

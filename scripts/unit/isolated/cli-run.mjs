@@ -78,7 +78,7 @@ report(
   'install --project registers every hook in this project only',
   installed.code === 0 &&
     hookFiles.join(',') ===
-      'pick-deliver.js,prefer-usages.js,session-end.js,session-start.js,user-prompt.js',
+      'pick-deliver.js,prefer-usages.js,session-end.js,session-start.js,turn-end.js,user-prompt.js',
   hookFiles.join(',') || installed.err,
 );
 report(

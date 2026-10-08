@@ -16,6 +16,7 @@ const HOOKS: [event: string, file: string, matcher?: string | undefined, timeout
   ['SessionStart', 'session-start.js'],
   ['UserPromptSubmit', 'user-prompt.js'],
   ['SessionEnd', 'session-end.js'],
+  ['Stop', 'turn-end.js'],
   ['PreToolUse', 'prefer-usages.js', 'Bash|Grep', 10],
   ['PreToolUse', 'pick-deliver.js', undefined, 5],
 ];

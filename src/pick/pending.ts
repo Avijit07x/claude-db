@@ -1,15 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import {
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONFIG_DIR } from '../config/dir.js';
+import { readJson, safeName, sweepOlderThan, writeJsonAtomic } from '../util/json-file.js';
 
 const STALE_MS = 10 * 60 * 1000;
 const ORPHAN_MS = 24 * 60 * 60 * 1000;
@@ -37,27 +30,8 @@ function folder(): string {
   return join(CONFIG_DIR, 'pick', 'pending');
 }
 
-function safe(sessionId: string): string {
-  return sessionId.replace(/[^\w-]/g, '_');
-}
-
 function path(sessionId: string, suffix: string): string {
-  return join(folder(), `${safe(sessionId)}${suffix}`);
-}
-
-function readJson<T>(file: string): T | null {
-  try {
-    return JSON.parse(readFileSync(file, 'utf8')) as T;
-  } catch {
-    return null;
-  }
-}
-
-function writeAtomic(file: string, value: unknown): void {
-  mkdirSync(folder(), { recursive: true });
-  const temp = `${file}.${randomUUID()}.tmp`;
-  writeFileSync(temp, JSON.stringify(value), 'utf8');
-  renameSync(temp, file);
+  return join(folder(), `${safeName(sessionId)}${suffix}`);
 }
 
 function isToken(value: unknown): value is string {
@@ -74,25 +48,14 @@ export function clearPick(sessionId: string): void {
 }
 
 export function sweepPicks(now = Date.now()): void {
-  let names: string[];
-  try {
-    names = readdirSync(folder());
-  } catch {
-    return;
-  }
-  for (const name of names) {
-    const file = join(folder(), name);
-    try {
-      if (now - statSync(file).mtimeMs > ORPHAN_MS) rmSync(file, { force: true });
-    } catch {}
-  }
+  sweepOlderThan(folder(), ORPHAN_MS, now);
 }
 
 export function startPick(sessionId: string, job: PickJob, now = Date.now()): string {
   clearPick(sessionId);
   const token = randomUUID();
-  writeAtomic(path(sessionId, `.${token}.job.json`), job);
-  writeAtomic(path(sessionId, '.json'), { token, startedAt: now } satisfies Current);
+  writeJsonAtomic(path(sessionId, `.${token}.job.json`), job);
+  writeJsonAtomic(path(sessionId, '.json'), { token, startedAt: now } satisfies Current);
   return token;
 }
 
@@ -123,7 +86,7 @@ export function finishPick(
   now = Date.now(),
 ): boolean {
   if (current(sessionId, now)?.token !== token) return false;
-  writeAtomic(path(sessionId, `.${token}.ready.json`), ready);
+  writeJsonAtomic(path(sessionId, `.${token}.ready.json`), ready);
   return true;
 }
 
