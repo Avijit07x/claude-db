@@ -14,8 +14,12 @@ claude-db catchup
 It prints what memory and git know about this project, in plain text. Some parts may be missing. A part
 with nothing in it is left out.
 
-- `Last handoff` is a note the user or a teammate saved on purpose. Trust it most.
-- `Last chat` is the newest recorded chat, with a few lines of the work done in it.
+- `Last handoff` is a note the user or a teammate saved on purpose. Trust it most, unless its heading says
+  `older than the last chat`. Then the last chat is newer, and wins where they differ.
+- `Not finished yet in another chat` is a request another chat is still working on, or that was stopped.
+  Say so under **Open**.
+- `Last chat` and `Chat before` are the other chats with the newest recorded requests, open or ended, newest
+  first: the 5 newest requests in all.
 - `Still to do` are to-dos found in earlier chats.
 - `Not committed yet` is recorded work that no commit has covered.
 - `Decisions and dead ends` are what was chosen or ruled out, with the reason.

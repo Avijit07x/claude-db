@@ -18,6 +18,16 @@ export function projectClause(
     : `${column} IN (${projects.map(() => '?').join(',')})`;
 }
 
+export function excludeSessionsClause(
+  column: string,
+  sessions: string[] | undefined,
+  params: unknown[],
+): string | null {
+  if (!sessions || sessions.length === 0) return null;
+  params.push(...sessions);
+  return `${column} NOT IN (${sessions.map(() => '?').join(',')})`;
+}
+
 export function removeWhere(filter: RemoveFilter): { where: string; params: unknown[] } {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -80,12 +90,8 @@ export function appendScope(
     conditions.push(`${prefix}created_at <= ?`);
     params.push(query.until);
   }
-  if (query.excludeSessions && query.excludeSessions.length > 0) {
-    conditions.push(
-      `${prefix}session_id NOT IN (${query.excludeSessions.map(() => '?').join(',')})`,
-    );
-    params.push(...query.excludeSessions);
-  }
+  const excluded = excludeSessionsClause(`${prefix}session_id`, query.excludeSessions, params);
+  if (excluded) conditions.push(excluded);
 }
 
 function scopeExpression(filter: ProjectFilter | undefined): string | null {

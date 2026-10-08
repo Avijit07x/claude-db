@@ -25,6 +25,10 @@ you send a prompt
 Both steps are hooks, so they always run. Nothing depends on Claude deciding to
 look something up.
 
+A turn is also saved as soon as Claude finishes the reply, in the background, so
+another chat sees it without waiting for your next prompt. The save at the next
+prompt stays as the backup, for a reply you interrupted.
+
 Install also writes a short standing instruction into `CLAUDE.local.md` (or
 `~/.claude/CLAUDE.md` for a machine-wide install), telling Claude to search
 memory before asking you to re-explain something. Hook output is context the
@@ -36,7 +40,8 @@ for. `claude-db uninstall` takes the block back out.
 file or ran a real command. Questions, `grep`, and "ok" are skipped. A busy day
 produces 10 to 20 rows, not hundreds.
 
-**What gets injected.** Recent session summaries at startup. Above a prompt, at
+**What gets injected.** At startup: facts, the newest 5 requests from other
+chats, any request another chat has not finished, and the handoff note. Above a prompt, at
 most two memories from earlier chats, picked by Claude Haiku:
 
 1. Search finds the ten closest memories from other chats. If none shares at

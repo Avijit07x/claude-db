@@ -9,7 +9,7 @@ import type {
 import type { ProjectSummary } from '../adapter.js';
 import { foreignNames, isWholeScope } from '../adapter.js';
 import { partitionIds } from '../../util/shortid.js';
-import { projectClause } from './filters.js';
+import { excludeSessionsClause, projectClause } from './filters.js';
 import { toIndexEntry, toObservation } from './rows.js';
 import { noProjects } from '../project-scope.js';
 
@@ -102,6 +102,8 @@ export async function list(pool: Pool, filter: ListFilter): Promise<Observation[
     values.push(filter.sessionId);
     conditions.push(`session_id = $${values.length}`);
   }
+  const excluded = excludeSessionsClause(filter.excludeSessions, values);
+  if (excluded) conditions.push(excluded);
   if (filter.kind) {
     values.push(filter.kind);
     conditions.push(`kind = $${values.length}`);

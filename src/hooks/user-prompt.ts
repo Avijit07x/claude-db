@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { recordActive } from '../capture/active.js';
 import { flushSession, redact } from '../capture/index.js';
 import { createContext } from '../context.js';
 import { capturingDisabled, emitContext, readPayload, runHook } from './payload.js';
@@ -24,6 +25,7 @@ await runHook(async () => {
 
   try {
     await ctx.store.upsertSession({ id: sessionId, project, startedAt: Date.now() });
+    recordActive(sessionId, project, payload.prompt ?? '');
 
     const { lastReply } = await flushSession(ctx, sessionId, project, payload.transcript_path);
 

@@ -1,19 +1,21 @@
 import type { RecallContext } from '../context.js';
 import { openWork } from '../capture/progress.js';
 import { FACT_SESSION, factLabel, factType, onePerKey } from '../facts/model.js';
-import { handoffBodyLines, newestHandoff } from '../facts/handoff.js';
+import { activeRequests } from '../capture/active.js';
+import { handoffBodyLines, newestHandoff, passedNote } from '../facts/handoff.js';
+import { latestRequestAt, recentChats, turnLine } from '../facts/last-chat.js';
 import type { GitState } from './git-state.js';
 import { readGitState } from './git-state.js';
 
-const CHAT_TITLES = 6;
 const TODOS = 5;
 const UNCOMMITTED = 5;
 const DECISIONS = 5;
 const FACTS_SCANNED = 100;
 
 export interface CatchupData {
-  handoff: { at: number; lines: string[] } | null;
-  lastChat: { at: number; summary: string; work: string[] } | null;
+  handoff: { at: number; lines: string[]; passed: boolean } | null;
+  unfinished: { at: number; request: string }[];
+  chats: { at: number; summary: string | null; work: string[] }[];
   todos: string[];
   decisions: string[];
   uncommitted: string[];
@@ -23,16 +25,13 @@ export interface CatchupData {
 export async function gatherCatchup(
   ctx: RecallContext,
   project: string,
+  current?: string,
   now = Date.now(),
 ): Promise<CatchupData> {
   const handoff = await newestHandoff(ctx, project, now);
-  const [latest] = await ctx.store.recentSessions(project, 1);
-
-  const chatWork = latest
-    ? (await ctx.store.list({ project, sessionId: latest.id, newest: true, limit: CHAT_TITLES }))
-        .filter((obs) => obs.status !== 'replaced')
-        .map((obs) => obs.title)
-    : [];
+  const unfinished = activeRequests(await ctx.store.projectScope(project), current, now);
+  const chats = await recentChats(ctx, project, current);
+  const latest = latestRequestAt(chats, unfinished);
 
   const facts = await ctx.store.list({
     project,
@@ -40,12 +39,12 @@ export async function gatherCatchup(
     newest: true,
     limit: FACTS_SCANNED,
   });
-  const current = onePerKey(facts.filter((obs) => obs.status !== 'replaced'));
-  const todos = current
+  const kept = onePerKey(facts.filter((obs) => obs.status !== 'replaced'));
+  const todos = kept
     .filter((obs) => factType(obs) === 'todo')
     .slice(0, TODOS)
     .map((obs) => obs.title);
-  const decisions = current
+  const decisions = kept
     .filter((obs) => ['decision', 'deadend'].includes(factType(obs) ?? ''))
     .slice(0, DECISIONS)
     .map((obs) => `${factLabel(obs)}: ${obs.title}`);
@@ -55,10 +54,19 @@ export async function gatherCatchup(
     .map((obs) => obs.title);
 
   return {
-    handoff: handoff ? { at: handoff.createdAt, lines: handoffBodyLines(handoff) } : null,
-    lastChat: latest
-      ? { at: latest.startedAt, summary: latest.summary ?? '', work: chatWork }
+    handoff: handoff
+      ? {
+          at: handoff.createdAt,
+          lines: handoffBodyLines(handoff),
+          passed: passedNote(handoff.createdAt, latest),
+        }
       : null,
+    unfinished: unfinished.map((entry) => ({ at: entry.askedAt, request: entry.request })),
+    chats: chats.map((chat) => ({
+      at: chat.at,
+      summary: chat.summary,
+      work: chat.turns.map(turnLine),
+    })),
     todos,
     decisions,
     uncommitted,

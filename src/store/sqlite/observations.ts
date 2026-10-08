@@ -4,7 +4,7 @@ import type { ProjectSummary } from '../adapter.js';
 import { foreignNames, isWholeScope } from '../adapter.js';
 import type { Row } from './rows.js';
 import { toObservation } from './rows.js';
-import { projectClause, removeWhere } from './filters.js';
+import { excludeSessionsClause, projectClause, removeWhere } from './filters.js';
 import { partitionIds } from '../../util/shortid.js';
 import { packVector } from '../../util/vector.js';
 import { scopeToken } from '../../util/scope.js';
@@ -117,6 +117,8 @@ export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observ
     conditions.push('session_id = ?');
     params.push(filter.sessionId);
   }
+  const excluded = excludeSessionsClause('session_id', filter.excludeSessions, params);
+  if (excluded) conditions.push(excluded);
   if (filter.kind) {
     conditions.push('kind = ?');
     params.push(filter.kind);

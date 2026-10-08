@@ -18,6 +18,8 @@ import { resolveProject } from '../util/project.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 import { distillInBackground } from './background.js';
 import { clearPick, sweepPicks } from '../pick/pending.js';
+import { clearActive, sweepActive } from '../capture/active.js';
+import { dropTurnSave, sweepTurnSaves } from './turn-job.js';
 
 silenceSqliteWarning();
 
@@ -56,6 +58,10 @@ await runHook(async () => {
     clearCursor(sessionId);
     clearPick(sessionId);
     sweepPicks();
+    dropTurnSave(sessionId);
+    sweepTurnSaves();
+    clearActive(sessionId);
+    sweepActive();
     if (ctx.config.distill.enabled) distillInBackground(project, sessionId);
 
     if (ctx.config.updates !== 'off' && isDue(readState())) {

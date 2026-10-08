@@ -10,6 +10,9 @@ export interface HookPayload {
   tool_input?: Record<string, unknown>;
   tool_response?: unknown;
   prompt?: string;
+  last_assistant_message?: string;
+  background_tasks?: { status?: string }[];
+  session_crons?: unknown[];
 }
 
 export function capturingDisabled(scripted: boolean): boolean {

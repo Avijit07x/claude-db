@@ -11,6 +11,7 @@ import { embedObservations } from '../../../dist/capture/index.js';
 import { claudeMemoryDir, importClaudeMemory } from '../../../dist/facts/claude-memory.js';
 import { factToObservation } from '../../../dist/facts/model.js';
 import { startFacts } from '../../../dist/facts/start.js';
+import { toShortId } from '../../../dist/util/shortid.js';
 import { promptCandidates } from '../../../dist/hooks/prompt-recall.js';
 
 const dist = new URL('../../../dist/', import.meta.url).pathname;
@@ -92,7 +93,11 @@ try {
     'unfinished work and todos are where you stopped',
     block.includes('To do (') && block.includes('- Not committed: Padding added'),
   );
-  report('the start block reports only facts it showed', start?.ids.size === 3);
+  report(
+    'the start block reports only rows it showed: 3 facts and the 3 last chat rows',
+    start?.ids.size === 6 && [...start.ids].every((id) => block.includes(`(${toShortId(id)})`)),
+    block,
+  );
 
   const memory = claudeMemoryDir(project);
   mkdirSync(memory, { recursive: true });

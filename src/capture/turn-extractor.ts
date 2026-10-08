@@ -6,6 +6,21 @@ import { currentAuthor, observationId } from './identity.js';
 import { redact } from './redact.js';
 import type { Turn } from './transcript.js';
 
+const ASKED_CHARS = 120;
+
+export function clipAsked(text: string): string {
+  const asked = text.replace(/\s+/g, ' ').trim();
+  return asked.length > ASKED_CHARS ? `${asked.slice(0, ASKED_CHARS)}…` : asked;
+}
+
+export function askedIn(body: string): string {
+  return clipAsked(/^Asked: (.*)$/m.exec(body)?.[1] ?? '');
+}
+
+export function stripPrivate(text: string): string {
+  return text.replace(/<private>[\s\S]*?(?:<\/private>|$)/gi, '[private]');
+}
+
 export function observationsFromTurns(
   turns: Turn[],
   sessionId: string,
@@ -23,8 +38,7 @@ export function observationsFromTurns(
 }
 
 function withoutPrivate(turn: Turn): Turn {
-  const strip = (text: string) => text.replace(/<private>[\s\S]*?(?:<\/private>|$)/gi, '[private]');
-  return { ...turn, prompt: strip(turn.prompt), reasoning: strip(turn.reasoning) };
+  return { ...turn, prompt: stripPrivate(turn.prompt), reasoning: stripPrivate(turn.reasoning) };
 }
 
 function isSubstantive(turn: Turn, config: Config): boolean {

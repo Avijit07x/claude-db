@@ -73,6 +73,7 @@ try {
     id: 'chat-1',
     project,
     startedAt: at,
+    endedAt: at + 2000,
     summary: 'Reworked the worker queue retries',
   });
   await ctx.store.insertObservations([

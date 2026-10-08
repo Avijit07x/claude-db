@@ -148,7 +148,7 @@ function extractToolCalls(content: unknown): { file?: string; command?: string }
   return calls;
 }
 
-function isSyntheticPrompt(text: string): boolean {
+export function isSyntheticPrompt(text: string): boolean {
   return (
     text.includes('<system-reminder>') ||
     text.includes('<project-memory>') ||
@@ -157,7 +157,8 @@ function isSyntheticPrompt(text: string): boolean {
     isRelayedMessage(text) ||
     text.startsWith('Caveat:') ||
     text.startsWith('[Request interrupted') ||
-    text.startsWith('<local-command')
+    text.startsWith('<local-command') ||
+    text.startsWith('<task-notification>')
   );
 }
 

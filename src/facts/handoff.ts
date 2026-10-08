@@ -1,5 +1,6 @@
 import type { RecallContext } from '../context.js';
 import type { Observation } from '../types.js';
+import { formatDay } from '../util/day.js';
 import { MANUAL_SESSION } from './render.js';
 
 export const HANDOFF_TAG = 'handoff';
@@ -10,6 +11,14 @@ const HANDOFF_MAX_AGE_MS = 14 * DAY_MS;
 const MANUAL_NOTES_SCANNED = 50;
 const HANDOFF_MAX_LINES = 8;
 const HANDOFF_LINE_CHARS = 220;
+
+export function passedNote(noteAt: number, latestRequest: number | null): boolean {
+  return latestRequest !== null && latestRequest > noteAt;
+}
+
+export function handoffHeading(at: number, passed: boolean, now = Date.now()): string {
+  return `Last handoff (${formatDay(at, now)}${passed ? ', older than the last chat' : ''}):`;
+}
 
 export async function newestHandoff(
   ctx: RecallContext,

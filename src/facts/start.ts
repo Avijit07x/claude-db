@@ -2,9 +2,13 @@ import type { RecallContext } from '../context.js';
 import type { Observation } from '../types.js';
 import { openWork } from '../capture/progress.js';
 import { FACT_SESSION, factType, onePerKey, youScope } from './model.js';
-import { newestHandoff, handoffBodyLines } from './handoff.js';
+import { activeRequests } from '../capture/active.js';
+import type { ActiveRequest } from '../capture/active.js';
+import { handoffBodyLines, handoffHeading, newestHandoff, passedNote } from './handoff.js';
+import { latestRequestAt, recentChats, turnLine } from './last-chat.js';
+import type { RecentChat } from './last-chat.js';
 import { MANUAL_SESSION, factLine, seenByClaude } from './render.js';
-import { formatDay } from '../util/day.js';
+import { formatDay, formatDayTime } from '../util/day.js';
 import { toShortId } from '../util/shortid.js';
 
 const ABOUT_YOU = 6;
@@ -23,6 +27,7 @@ export async function startFacts(
   ctx: RecallContext,
   project: string,
   hidden: ReadonlySet<string> = new Set(),
+  current?: string,
 ): Promise<StartFacts | null> {
   const visible = (obs: Observation) =>
     obs.status !== 'replaced' && !hidden.has(obs.id) && !seenByClaude(obs, project);
@@ -47,12 +52,16 @@ export async function startFacts(
   const uncommitted = (await openWork(ctx.store, project))
     .filter((obs) => !hidden.has(obs.id))
     .slice(0, UNCOMMITTED);
+  const recent = await recentWork(ctx, project, current);
 
-  const sections: [string, [string, string | null][]][] = [
+  const sections: Section[] = [
     ['About you:', you.slice(0, ABOUT_YOU).map((obs) => [factLine(obs), obs.id])],
     ['This project:', known.slice(0, THIS_PROJECT).map((obs) => [factLine(obs), obs.id])],
+    ...recentSections(recent, hidden),
     [
-      shownHandoff ? `Last handoff (${formatDay(shownHandoff.createdAt)}):` : '',
+      shownHandoff
+        ? handoffHeading(shownHandoff.createdAt, passedNote(shownHandoff.createdAt, recent.latest))
+        : '',
       shownHandoff ? handoffEntries(shownHandoff) : [],
     ],
     [
@@ -64,9 +73,50 @@ export async function startFacts(
     ],
   ];
 
+  return render(sections, ctx.config.inject.maxChars);
+}
+
+type Section = [string, [string, string | null][]];
+
+interface RecentWork {
+  unfinished: ActiveRequest[];
+  chats: RecentChat[];
+  latest: number | null;
+}
+
+async function recentWork(
+  ctx: RecallContext,
+  project: string,
+  current: string | undefined,
+): Promise<RecentWork> {
+  const unfinished = activeRequests(await ctx.store.projectScope(project), current);
+  const chats = await recentChats(ctx, project, current);
+  return { unfinished, chats, latest: latestRequestAt(chats, unfinished) };
+}
+
+function recentSections(recent: RecentWork, hidden: ReadonlySet<string>): Section[] {
+  return [
+    ...recent.unfinished.map(unfinishedSection),
+    ...recent.chats.map((chat, index) => chatSection(chat, index, hidden)),
+  ];
+}
+
+export async function recentWorkBlock(
+  ctx: RecallContext,
+  project: string,
+  current?: string,
+  hidden: ReadonlySet<string> = new Set(),
+): Promise<StartFacts | null> {
+  const sections = recentSections(await recentWork(ctx, project, current), hidden);
+  return sections.some(([, entries]) => entries.length > 0)
+    ? render(sections, ctx.config.inject.maxChars)
+    : null;
+}
+
+function render(sections: Section[], maxChars: number): StartFacts {
   const lines = ['<memory>'];
   const ids = new Set<string>();
-  let budget = ctx.config.inject.maxChars;
+  let budget = maxChars;
   for (const [heading, entries] of sections) {
     if (entries.length === 0) continue;
     if (lines.length > 1) lines.push('');
@@ -80,6 +130,21 @@ export async function startFacts(
   }
   lines.push('</memory>');
   return { block: lines.join('\n'), ids };
+}
+
+function unfinishedSection(entry: ActiveRequest): Section {
+  return [
+    `Not finished yet in another chat (${formatDayTime(entry.askedAt)}):`,
+    [[`- asked "${entry.request}"`, null]],
+  ];
+}
+
+function chatSection(chat: RecentChat, index: number, hidden: ReadonlySet<string>): Section {
+  const heading = `${index === 0 ? 'Last chat' : 'Chat before'} (${formatDay(chat.at)}):`;
+  const turns = chat.turns
+    .filter((turn) => !hidden.has(turn.id))
+    .map((turn): [string, string] => [`- ${turnLine(turn)} (${toShortId(turn.id)})`, turn.id]);
+  return [heading, chat.summary ? [[`- Summary: ${chat.summary}`, null], ...turns] : turns];
 }
 
 function handoffEntries(handoff: Observation): [string, string | null][] {

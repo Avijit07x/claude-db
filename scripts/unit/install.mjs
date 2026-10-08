@@ -43,6 +43,7 @@ export default async function run() {
       'prefer-usages.js',
       'session-end.js',
       'session-start.js',
+      'turn-end.js',
       'user-prompt.js',
     ];
     const hookFiles = (value) =>

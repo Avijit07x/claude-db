@@ -27,11 +27,16 @@ export function scopeFilter(query: SearchQuery): Doc {
   return filter;
 }
 
+export function sessionMatch(only: string | undefined, exclude: string[] | undefined): Doc {
+  const match: Record<string, unknown> = {};
+  if (only) match['$eq'] = only;
+  if (exclude && exclude.length > 0) match['$nin'] = exclude;
+  return Object.keys(match).length === 0 ? {} : { sessionId: match };
+}
+
 export function visibleFilter(query: SearchQuery): Doc {
   return {
     status: { $ne: 'replaced' },
-    ...(query.excludeSessions && query.excludeSessions.length > 0
-      ? { sessionId: { $nin: query.excludeSessions } }
-      : {}),
+    ...sessionMatch(undefined, query.excludeSessions),
   };
 }

@@ -1,4 +1,5 @@
 import { redact } from '../capture/redact.js';
+import { askedIn } from '../capture/turn-extractor.js';
 import type { Observation, ObservationIndexEntry } from '../types.js';
 import { meaningfulTokens } from '../search/stopwords.js';
 import { formatDay } from '../util/day.js';
@@ -61,13 +62,6 @@ export function renderPromptContext(
 export interface PickedLine {
   memory: Observation;
   quote: string;
-}
-
-const ASKED_CHARS = 120;
-
-function askedIn(body: string): string {
-  const asked = /^Asked: (.*)$/m.exec(body)?.[1]?.replace(/\s+/g, ' ').trim() ?? '';
-  return asked.length > ASKED_CHARS ? `${asked.slice(0, ASKED_CHARS)}…` : asked;
 }
 
 export function renderPicked(

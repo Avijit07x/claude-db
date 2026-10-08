@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createContext } from '../context.js';
 import { distillNotice } from '../facts/notice.js';
-import { startFacts } from '../facts/start.js';
+import { recentWorkBlock, startFacts } from '../facts/start.js';
 import { startBackgroundWork } from './background.js';
 import { refreshGraphInBackground } from './graph-refresh.js';
 import { recoverAfterCompact } from './compact.js';
@@ -70,14 +70,17 @@ await runHook(async () => {
         : null;
     const restored = earlier?.ids ?? new Set<string>();
 
-    const facts = await startFacts(ctx, project, restored);
+    const facts = await startFacts(ctx, project, restored, payload.session_id);
+    const recent = facts ? null : await recentWorkBlock(ctx, project, payload.session_id, restored);
     const legacy = facts ? null : await legacyBlock(ctx, project, restored);
-    if (facts && payload.session_id) markShown(payload.session_id, [...facts.ids]);
+    const shown = [...(facts?.ids ?? []), ...(recent?.ids ?? [])];
+    if (shown.length > 0 && payload.session_id) markShown(payload.session_id, shown);
 
-    const parts = [earlier?.block, facts?.block ?? legacy?.text].filter((part): part is string =>
-      Boolean(part),
+    const fallback = legacy?.hasMemory || !recent ? legacy?.text : undefined;
+    const parts = [earlier?.block, facts?.block ?? fallback, recent?.block].filter(
+      (part): part is string => Boolean(part),
     );
-    if ((facts || legacy?.hasMemory) && mcpRegistered(project)) {
+    if ((facts || recent || legacy?.hasMemory) && mcpRegistered(project)) {
       parts.push(
         "Search this project's full history with the memory MCP tools before " +
           'asking the user to re-explain prior decisions.',

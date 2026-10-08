@@ -4,7 +4,7 @@ import type { ProjectSummary } from '../adapter.js';
 import { isWholeScope } from '../adapter.js';
 import type { EdgeDoc, ObservationDoc, ScannedFileDoc, SessionDoc, SymbolDoc } from './docs.js';
 import { toDoc, toObservation } from './docs.js';
-import { projectMatch } from './filters.js';
+import { projectMatch, sessionMatch } from './filters.js';
 import { escapeRegex } from './helpers.js';
 import { partitionIds } from '../../util/shortid.js';
 import { noProjects } from '../project-scope.js';
@@ -100,7 +100,7 @@ export async function list(
   if (noProjects(filter.project)) return [];
   const query: Record<string, unknown> = {};
   Object.assign(query, projectMatch(filter.project));
-  if (filter.sessionId) query['sessionId'] = filter.sessionId;
+  Object.assign(query, sessionMatch(filter.sessionId, filter.excludeSessions));
   if (filter.kind) query['kind'] = filter.kind;
   if (filter.status) query['status'] = filter.status;
   if (filter.after !== undefined) {
