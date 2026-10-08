@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "src/hooks/{session-start,session-end,user-prompt,prefer-usages,pick-deliver}.ts",
+    "src/hooks/{session-start,session-end,user-prompt,prefer-usages,pick-deliver,turn-end,turn-save}.ts",
     "src/mcp/server.ts",
     "src/pick/worker.ts",
     "scripts/**/*.mjs"
