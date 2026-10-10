@@ -5,6 +5,9 @@ import { transcriptsFor } from '../../capture/transcript.js';
 import { resolveProject } from '../../util/project.js';
 import { DECLARED, isSymbol, symbolsGreppedIn } from '../../hooks/grep-symbols.js';
 
+const MAX_SYMBOLS = 2;
+const LOOKUPS_IN_FLIGHT = 8;
+
 interface TranscriptLine {
   message?: { content?: unknown };
 }
@@ -55,32 +58,13 @@ export async function cmdAdoption(): Promise<void> {
   const greps = bash.filter((command) => /\b(?:grep|rg)\b/.test(command));
   const candidates = greps.map((command) => symbolsGreppedIn(command)).filter((s) => s.length > 0);
 
-  const ctx = await createContext();
-  let fires = 0;
-  const cache = new Map<string, boolean>();
-  try {
-    for (const symbols of candidates) {
-      let hit = false;
-      for (const symbol of symbols.slice(0, 2)) {
-        let fired = cache.get(symbol);
-        if (fired === undefined) {
-          const answer = await queryGraph(ctx.store, project, {
-            mode: 'usages',
-            symbol,
-            limit: 20,
-          });
-          fired =
-            !answer.empty &&
-            (isSymbol(symbol) || answer.definitions.some((d) => DECLARED.has(d.kind)));
-          cache.set(symbol, fired);
-        }
-        if (fired) hit = true;
-      }
-      if (hit) fires++;
-    }
-  } finally {
-    await ctx.close();
-  }
+  const firing = await symbolsThatFire(
+    project,
+    candidates.flatMap((symbols) => symbols.slice(0, MAX_SYMBOLS)),
+  );
+  const fires = candidates.filter((symbols) =>
+    symbols.slice(0, MAX_SYMBOLS).some((symbol) => firing.has(symbol)),
+  ).length;
 
   const memoryTotal = [...memory.values()].reduce((a, b) => a + b, 0);
   const pct = (n: number, of: number) => (of === 0 ? '0.0%' : `${((n / of) * 100).toFixed(1)}%`);
@@ -100,4 +84,44 @@ export async function cmdAdoption(): Promise<void> {
         : `${(greps.length / memoryTotal).toFixed(1)} greps per memory call`;
     console.log(`\n  ${ratio}`);
   }
+}
+
+async function symbolsThatFire(project: string, symbols: string[]): Promise<Set<string>> {
+  const unique = [...new Set(symbols)];
+  const firing = new Set<string>();
+  if (unique.length === 0) return firing;
+
+  const ctx = await createContext();
+  const tty = process.stderr.isTTY === true;
+  let next = 0;
+  let done = 0;
+  const lookup = async (): Promise<void> => {
+    while (next < unique.length) {
+      const symbol = unique[next++] as string;
+      const answer = await queryGraph(ctx.store, project, {
+        mode: 'usages',
+        symbol,
+        limit: 20,
+        suggest: false,
+      });
+      if (
+        !answer.empty &&
+        (isSymbol(symbol) || answer.definitions.some((d) => DECLARED.has(d.kind)))
+      ) {
+        firing.add(symbol);
+      }
+      done += 1;
+      if (tty) process.stderr.write(`\rchecking symbols ${done}/${unique.length}`);
+    }
+  };
+
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(LOOKUPS_IN_FLIGHT, unique.length) }, () => lookup()),
+    );
+  } finally {
+    if (tty) process.stderr.write('\r\x1b[K');
+    await ctx.close();
+  }
+  return firing;
 }
