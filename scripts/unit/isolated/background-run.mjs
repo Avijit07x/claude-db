@@ -1,5 +1,10 @@
 import '../../lib/require-isolated.mjs';
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { createContext } from '../../../dist/context.js';
 import { report } from '../../lib/isolated.mjs';
 import { NoopEmbedder } from '../../../dist/embed/index.js';
 import {
@@ -68,3 +73,59 @@ report(
   log.slice(0, 80),
 );
 report('what a background job prints is kept, not thrown away', log.includes('Connection strings'));
+
+const shop = join(homedir(), 'reembed-shop');
+mkdirSync(shop, { recursive: true });
+const folder = realpathSync(shop);
+mkdirSync(join(homedir(), '.claude-memory'), { recursive: true });
+writeFileSync(
+  join(homedir(), '.claude-memory', 'config.json'),
+  JSON.stringify({ embeddings: { provider: 'builtin' }, updates: 'off' }),
+);
+const saved = (title, extra) => ({
+  id: randomUUID(),
+  sessionId: 'reembed-chat',
+  project: folder,
+  kind: 'pattern',
+  title,
+  body: title,
+  files: [],
+  tags: [],
+  createdAt: Date.now(),
+  status: 'done',
+  ...extra,
+});
+const other = saved('Embedded by another machine', {
+  embedding: [0.6, 0.8],
+  embedder: 'another-model',
+});
+const bare = saved('Saved before the model loaded', {});
+const before = await createContext();
+await before.store.insertObservations([other, bare]);
+await before.close();
+
+spawnSync(process.execPath, ['--no-warnings', CLI, 'reembed', '--project', '--background'], {
+  cwd: folder,
+  encoding: 'utf8',
+});
+const after = await createContext();
+const [kept, filled] = await after.store
+  .getObservations([other.id, bare.id])
+  .then((rows) => [
+    rows.find((obs) => obs.id === other.id),
+    rows.find((obs) => obs.id === bare.id),
+  ]);
+await after.close();
+report(
+  'a row with a vector from another embedder is unchanged after a background re-embed',
+  kept?.embedder === 'another-model' &&
+    kept?.embedding?.length === 2 &&
+    Math.abs(kept.embedding[0] - 0.6) < 1e-6 &&
+    Math.abs(kept.embedding[1] - 0.8) < 1e-6,
+  JSON.stringify({ embedder: kept?.embedder, embedding: kept?.embedding?.slice(0, 3) }),
+);
+report(
+  'and a row with no vector is filled',
+  (filled?.embedding?.length ?? 0) > 0,
+  String(filled?.embedder),
+);
