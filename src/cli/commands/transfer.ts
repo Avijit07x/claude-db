@@ -160,6 +160,12 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
       process.exit(1);
     }
 
+    const stored = ctx.store.storedVectorDims?.() ?? null;
+    if (background && stored !== null && stored !== embedder.dimensions) {
+      finished = true;
+      return;
+    }
+
     let migrated = false;
     if (!scoped && ctx.store.migrateVectorDims) {
       migrated = await ctx.store.migrateVectorDims(embedder.dimensions);
@@ -169,7 +175,9 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
     let skipped = 0;
     const filter = scoped ? { project } : {};
     const scanned = await eachObservation(ctx, filter, async (batch) => {
-      const stale = batch.filter((obs) => obs.embedder !== embedder.id || !obs.embedding?.length);
+      const stale = batch.filter(
+        (obs) => !obs.embedding?.length || (!background && obs.embedder !== embedder.id),
+      );
       skipped += batch.length - stale.length;
       if (stale.length === 0) return;
 
