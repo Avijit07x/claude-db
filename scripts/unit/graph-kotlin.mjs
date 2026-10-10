@@ -25,7 +25,8 @@ export default async function run() {
       'the languages command says how each grammar language is read',
       listed.status === 0 &&
         listed.stdout.includes('read with real syntax: typescript') &&
-        listed.stdout.includes('kotlin   read with real syntax'),
+        listed.stdout.includes('kotlin     read with real syntax') &&
+        listed.stdout.includes('typescript read with real syntax, built in'),
       listed.stdout + listed.stderr,
     );
     const added = spawnSync('node', [cli, 'languages', 'add', 'kotlin'], {

@@ -1,17 +1,19 @@
 import { GRAMMARS, PLATFORM, hasGrammar } from '../../graph/grammars.js';
-import { languageNames } from '../../graph/index.js';
+import { LANGUAGES, languageNames } from '../../graph/index.js';
 
 const SHIPPED =
   'Grammars ship with claude-db for each platform, so there is nothing to add or remove.';
 
-const stateOf = (name: string): string =>
-  hasGrammar(name)
+const stateOf = (name: string): string => {
+  if (!GRAMMARS.includes(name)) return 'read with real syntax, built in';
+  return hasGrammar(name)
     ? 'read with real syntax'
     : `read by pattern: no grammar for ${PLATFORM} in this install`;
+};
 
 function listLanguages(): void {
   console.log(`read with real syntax: ${languageNames()}`);
-  for (const name of GRAMMARS) console.log(`  ${name.padEnd(8)} ${stateOf(name)}`);
+  for (const { id, label } of LANGUAGES) console.log(`  ${label.padEnd(10)} ${stateOf(id)}`);
   if (GRAMMARS.some((name) => !hasGrammar(name))) {
     console.log('Reinstall claude-db to add the grammars for this platform.');
   }
