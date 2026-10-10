@@ -108,7 +108,10 @@ function memoryFiles(dir: string): MemoryFile[] {
   for (const name of names) {
     try {
       const path = join(dir, name);
-      const parsed = parseMemoryFile(readFileSync(path, 'utf8'), statSync(path).mtimeMs);
+      const parsed = parseMemoryFile(
+        readFileSync(path, 'utf8'),
+        Math.trunc(statSync(path).mtimeMs),
+      );
       if (parsed) files.push(parsed);
     } catch {}
   }
