@@ -1,4 +1,5 @@
 import '../../lib/require-isolated.mjs';
+import { existsSync, readFileSync } from 'node:fs';
 import { report } from '../../lib/isolated.mjs';
 import { NoopEmbedder } from '../../../dist/embed/index.js';
 import {
@@ -8,6 +9,7 @@ import {
   startReembed,
   vectorsMissing,
 } from '../../../dist/capture/index.js';
+import { CLI, backgroundLog, runDetached } from '../../../dist/hooks/detached.js';
 
 const HOUR = 60 * 60 * 1000;
 const project = '/work/shop';
@@ -36,3 +38,17 @@ finishReembed(project, now);
 await embedObservations(contextWith('auto'), [row(project)]);
 report('a new gap soon after a re-embed waits', !claimReembed(project, now + HOUR));
 report('the same gap is picked up later', claimReembed(project, now + 7 * HOUR));
+
+runDetached(CLI, ['no-such-command'], process.cwd(), () => {});
+const deadline = Date.now() + 10_000;
+const logged = () => existsSync(backgroundLog()) && readFileSync(backgroundLog(), 'utf8');
+while (!String(logged()).includes('Connection strings') && Date.now() < deadline) {
+  await new Promise((settle) => setTimeout(settle, 50));
+}
+const log = String(logged());
+report(
+  'a background job is named in the log',
+  log.includes('no-such-command started'),
+  log.slice(0, 80),
+);
+report('what a background job prints is kept, not thrown away', log.includes('Connection strings'));
