@@ -3,7 +3,12 @@ import { BATCH } from '../constants.js';
 
 const SESSION_LIMIT = 10000;
 import { createContext } from '../../context.js';
-import { embedObservations } from '../../capture/index.js';
+import {
+  embedObservations,
+  finishReembed,
+  releaseReembed,
+  startReembed,
+} from '../../capture/index.js';
 import { loadConfig } from '../../config/index.js';
 import { readFileSync } from 'node:fs';
 import { resolveProject } from '../../util/project.js';
@@ -141,8 +146,12 @@ export async function cmdPrune(argv: (string | undefined)[]): Promise<void> {
 
 export async function cmdReembed(argv: (string | undefined)[] = []): Promise<void> {
   const scoped = argv.includes('--project') || argv.includes('-p');
+  const background = argv.includes('--background');
+  const project = resolveProject(undefined);
   const base = loadConfig();
   const ctx = await createContext({ embeddings: { ...base.embeddings, timeoutMs: 0 } });
+  if (background) startReembed(project);
+  let finished = false;
 
   try {
     const embedder = await ctx.embedder();
@@ -158,7 +167,7 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
 
     let updated = 0;
     let skipped = 0;
-    const filter = scoped ? { project: resolveProject(undefined) } : {};
+    const filter = scoped ? { project } : {};
     const scanned = await eachObservation(ctx, filter, async (batch) => {
       const stale = batch.filter((obs) => obs.embedder !== embedder.id || !obs.embedding?.length);
       skipped += batch.length - stale.length;
@@ -167,10 +176,10 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
       await embedObservations(ctx, stale);
       await ctx.store.insertObservations(stale);
       updated += stale.length;
-      process.stderr.write(`\r${updated} re-embedded...`);
+      if (!background) process.stderr.write(`\r${updated} re-embedded...`);
     });
 
-    process.stderr.write('\r');
+    if (!background) process.stderr.write('\r');
     if (migrated) {
       console.log(`Rebuilt vector storage at ${embedder.dimensions}d.`);
     }
@@ -178,7 +187,12 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
       `Scanned ${scanned}, re-embedded ${updated} with ${embedder.id}` +
         `${skipped > 0 ? `, ${skipped} already current` : ''}.`,
     );
+    finished = true;
   } finally {
+    if (background) {
+      if (finished) finishReembed(project);
+      else releaseReembed(project);
+    }
     await ctx.close();
   }
 }
