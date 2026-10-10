@@ -27,6 +27,7 @@ export interface GraphQuery {
   symbol: string;
   target?: string;
   limit: number;
+  suggest?: boolean;
 }
 
 const aliasIds = (edges: CodeEdge[]): string[] =>
@@ -102,6 +103,8 @@ export async function queryGraph(
   answer.inbound = [...direct, ...(await throughAliases(store, project, direct, edgeLimit))];
   answer.outbound = edges.filter((edge) => idSet.has(edge.srcId) && !pointsAtSymbol(edge));
   answer.empty = answer.definitions.length === 0 && answer.inbound.length === 0;
-  if (answer.empty) answer.suggestions = await suggestFor(store, project, query.symbol);
+  if (answer.empty && query.suggest !== false) {
+    answer.suggestions = await suggestFor(store, project, query.symbol);
+  }
   return answer;
 }
