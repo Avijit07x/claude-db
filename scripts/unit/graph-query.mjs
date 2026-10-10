@@ -61,6 +61,20 @@ export default async function run() {
   check('an unknown symbol reports empty rather than inventing', missing.empty);
   check('the empty message names the symbol', formatGraph(missing, repo).includes('nowhere'));
 
+  const typo = await queryGraph(store, repo, { mode: 'usages', symbol: 'betaa', limit: 50 });
+  check('a near miss suggests the real name', typo.suggestions.includes('beta'), typo.suggestions);
+  const unsuggested = await queryGraph(store, repo, {
+    mode: 'usages',
+    symbol: 'betaa',
+    limit: 50,
+    suggest: false,
+  });
+  check(
+    'a caller that only needs found or not skips the suggestion scan',
+    unsuggested.empty && unsuggested.suggestions.length === 0,
+    unsuggested.suggestions,
+  );
+
   writeFileSync(
     join(repo, 'src', 'b.ts'),
     '\n\n\nexport function beta() {\n  return gamma();\n}\n',

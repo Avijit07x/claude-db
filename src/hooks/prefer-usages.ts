@@ -80,7 +80,7 @@ async function answerSymbols(
       store: ctx.store,
       root: project,
       project,
-      query: { mode: 'usages', symbol, limit: EDGE_LIMIT },
+      query: { mode: 'usages', symbol, limit: EDGE_LIMIT, suggest: false },
       refresh: false,
       text: false,
     });
