@@ -1,7 +1,11 @@
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { buildDistillPrompt, parseOps } from '../../dist/facts/ops.js';
 import { factId, factToObservation, youScope } from '../../dist/facts/model.js';
-import { memoryFact, parseMemoryFile } from '../../dist/facts/claude-memory.js';
+import { importClaudeMemory, memoryFact, parseMemoryFile } from '../../dist/facts/claude-memory.js';
+import { NoopEmbedder } from '../../dist/embed/index.js';
 import { handoffBodyLines } from '../../dist/facts/handoff.js';
 
 export default async function run() {
@@ -159,5 +163,32 @@ export default async function run() {
       'a short handoff is shown whole',
       JSON.stringify(handoffBodyLines(short)) === '["- Done: a.","- Open: b.","- Next: c."]',
     );
+  }
+
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'claude-memory-'));
+    const path = join(dir, 'no-modified.md');
+    writeFileSync(
+      path,
+      '---\nname: no-modified\ntype: project\n---\nA fact with no modified time.\n',
+    );
+    utimesSync(path, 1788415320.908391, 1788415320.908391);
+    const saved = [];
+    const ctx = {
+      config: { embeddings: { batchSize: 8 } },
+      embedder: async () => new NoopEmbedder(),
+      store: {
+        list: async () => [],
+        insertObservations: async (rows) => saved.push(...rows),
+        markReplaced: async () => 0,
+      },
+    };
+    await importClaudeMemory(ctx, '/p', dir);
+    check(
+      'a memory file timed by its mtime stores a whole-millisecond time',
+      saved.length === 1 && Number.isInteger(saved[0].createdAt),
+      saved.map((obs) => obs.createdAt).join(','),
+    );
+    rmSync(dir, { recursive: true, force: true });
   }
 }
