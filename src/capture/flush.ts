@@ -84,7 +84,8 @@ export async function embedObservations(
         }
       });
     }
-    noteMissingVectors(observations);
+    const stored = ctx.store.storedVectorDims?.() ?? null;
+    noteMissingVectors(observations, stored !== null && stored !== embedder.dimensions);
   } catch (error) {
     noteMissingVectors(observations);
     process.stderr.write(

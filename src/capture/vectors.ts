@@ -12,9 +12,9 @@ const REEMBED_EVERY_MS = 6 * 60 * 60 * 1000;
 const flagPath = (project: string): string =>
   join(CONFIG_DIR, FLAGS, `${scopeToken(project)}.flag`);
 
-export function noteMissingVectors(observations: Observation[]): void {
+export function noteMissingVectors(observations: Observation[], everyRow = false): void {
   const projects = new Set(
-    observations.filter((obs) => !obs.embedding?.length).map((obs) => obs.project),
+    observations.filter((obs) => everyRow || !obs.embedding?.length).map((obs) => obs.project),
   );
   for (const project of projects) {
     try {

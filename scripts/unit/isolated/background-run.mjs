@@ -24,6 +24,22 @@ const row = (owner) => ({ id: `${owner}-1`, project: owner, title: 't', body: 'b
 await embedObservations(contextWith('auto'), [row(project)]);
 report('a write that ran out of time to embed is noted', vectorsMissing(project));
 
+const wide = '/work/wide';
+await embedObservations(
+  {
+    config: { embeddings: { provider: 'auto', batchSize: 8 } },
+    embedder: async () => ({
+      id: 'small',
+      dimensions: 2,
+      minRelevance: 0,
+      embed: async (texts) => texts.map(() => [1, 0]),
+    }),
+    store: { storedVectorDims: () => 384 },
+  },
+  [row(wide)],
+);
+report('vectors the database is too wide to store are noted', vectorsMissing(wide));
+
 await embedObservations(contextWith('none'), [row(quiet)]);
 report('embeddings turned off note nothing', !vectorsMissing(quiet));
 

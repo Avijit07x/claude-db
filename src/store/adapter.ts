@@ -41,6 +41,7 @@ export interface MemoryStore {
   getObservations(ids: string[]): Promise<Observation[]>;
 
   migrateVectorDims?(dims: number): Promise<boolean>;
+  storedVectorDims?(): number | null;
 
   remove(filter: RemoveFilter): Promise<number>;
 
