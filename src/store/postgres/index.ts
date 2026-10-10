@@ -97,6 +97,10 @@ export class PostgresStore implements MemoryStore {
     return true;
   }
 
+  storedVectorDims(): number | null {
+    return this.vectorEnabled ? this.vectorDims : null;
+  }
+
   private async ensureVectorColumn(dims: number): Promise<boolean> {
     if (!this.vectorEnabled) return false;
     if (!Number.isInteger(dims) || dims < 1 || dims > 16000) return false;

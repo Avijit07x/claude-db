@@ -18,6 +18,9 @@
 - **The waiting-chats warning pointed at `doctor`, which does not work through them.** It now names
   `claude-db distill --backfill` as well.
 - **`claude-db languages` left TypeScript, TSX and JavaScript out of its list.** They are listed as built in.
+- **Vectors the database could not store were never filled in either.** When the embedder's width differs from
+  the Postgres column, for example the built-in 256d embedder against a 384d database, the store keeps text
+  only. Such a write now leaves the same note, so the background re-embed fills it once the model loads.
 
 ### Changed
 
