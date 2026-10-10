@@ -73,6 +73,11 @@ export default async function run() {
     'waiting chats past the limit with nothing tried give a warning',
     waitingWarning(3, old, idle, now)?.startsWith('warning') === true,
   );
+  check(
+    'the warning names the command that works through the waiting chats',
+    waitingWarning(3, old, idle, now)?.includes('claude-db distill --backfill') === true,
+    waitingWarning(3, old, idle, now),
+  );
   check('waiting chats under the limit give none', waitingWarning(3, young, idle, now) === null);
   check('no waiting chats give none', waitingWarning(0, null, idle, now) === null);
   check(

@@ -11,5 +11,8 @@ export function waitingWarning(
   if (waiting === 0 || oldestAt === null) return null;
   if (now - oldestAt < STALE_WAITING_MS) return null;
   if (usage.used > 0 || usage.pausedUntil > now) return null;
-  return `warning  : ${waiting} chat(s) have waited over a day and no facts were tried today. Run claude-db doctor`;
+  return (
+    `warning  : ${waiting} chat(s) have waited over a day and no facts were tried today. ` +
+    'Run claude-db distill --backfill to work through them now, or claude-db doctor to check Haiku'
+  );
 }
