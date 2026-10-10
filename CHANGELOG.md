@@ -11,7 +11,9 @@
 - **Rows saved while the embedding model was still loading never got a vector.** A hook gives the model
   `embeddings.timeoutMs` to load and stores text only when it runs out, and nothing went back to fill those rows
   in, so semantic search could not find them. Such a write now leaves a note, and the next chat start runs
-  `reembed --project` in the background, at most every 6 hours.
+  `reembed --project` in the background, at most every 6 hours. The background run only fills rows with no
+  vector, never replaces one from another embedder, and writes nothing when the embedder's width differs from
+  the database's.
 - **Background jobs kept no output.** Distill, redact, re-ingest, re-embed, graph refresh and the pick and turn
   workers wrote to nowhere, so a failure left no trace. Their output now goes to
   `~/.claude-memory/logs/background.log`, which rolls over at 1 MB.
@@ -24,12 +26,11 @@
 
 ### Changed
 
-- **A grep for a symbol that is not in the graph is about twice as fast.** The `PreToolUse` hook only needs to
-  know whether a symbol is there, but each miss also ran the "did you mean" scan, which reads up to 5,000
-  symbols. It no longer does: a miss went from about 1.6 s to 0.9 s against a remote Postgres.
-- **`claude-db adoption` finishes in seconds instead of minutes.** It looks each symbol up once, eight at a
-  time, without the suggestion scan, and shows a counter on a terminal. On 196 transcripts with 837 distinct
-  symbols against a remote Postgres it went from 7 min 14 s to 40 s, with the same report.
+- **A grep for a symbol that is not in the graph is faster.** The `PreToolUse` hook only needs to know whether
+  a symbol is there, but each miss also ran the "did you mean" scan, which reads up to 5,000 symbols. It no
+  longer does.
+- **`claude-db adoption` is faster.** It looks each symbol up once, eight at a time, without the suggestion
+  scan, and shows a counter on a terminal.
 
 ## 0.12.2
 
