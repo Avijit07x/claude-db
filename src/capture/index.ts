@@ -22,6 +22,13 @@ export {
   embedObservations,
 } from './flush.js';
 export type { FlushResult } from './flush.js';
+export {
+  claimReembed,
+  finishReembed,
+  releaseReembed,
+  startReembed,
+  vectorsMissing,
+} from './vectors.js';
 export { closeLandedWork, openWork } from './progress.js';
 export {
   REINGEST_VERSION,

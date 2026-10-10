@@ -7,6 +7,7 @@ import { readTranscript, sessionIdsOnDisk, transcriptPathFor } from './transcrip
 import type { Turn } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
 import { closeLandedWork } from './progress.js';
+import { noteMissingVectors } from './vectors.js';
 
 export interface FlushResult {
   observations: number;
@@ -63,9 +64,13 @@ export async function embedObservations(
   ctx: RecallContext,
   observations: Observation[],
 ): Promise<void> {
+  if (observations.length === 0) return;
   try {
     const embedder = await ctx.embedder();
-    if (embedder.dimensions === 0) return;
+    if (embedder.dimensions === 0) {
+      if (ctx.config.embeddings.provider !== 'none') noteMissingVectors(observations);
+      return;
+    }
 
     const size = ctx.config.embeddings.batchSize;
     for (let start = 0; start < observations.length; start += size) {
@@ -79,7 +84,9 @@ export async function embedObservations(
         }
       });
     }
+    noteMissingVectors(observations);
   } catch (error) {
+    noteMissingVectors(observations);
     process.stderr.write(
       `[claude-db] embedding skipped: ` +
         `${error instanceof Error ? error.message : String(error)}\n`,

@@ -1,7 +1,9 @@
 import {
+  claimReembed,
   claimReingest,
   claimScrub,
   reingestDone,
+  releaseReembed,
   releaseReingest,
   releaseScrub,
 } from '../capture/index.js';
@@ -21,6 +23,12 @@ export function startBackgroundWork(project: string, database: string, now = Dat
     return;
   }
   if (!reingestDone(project)) return;
+  if (claimReembed(project, now)) {
+    runDetached(CLI, ['reembed', '--project', '--background'], project, () =>
+      releaseReembed(project),
+    );
+    return;
+  }
   if (now - jobMark(FACTS_JOB, project) < FACTS_EVERY_MS) return;
   if (!claimJob(FACTS_JOB, project, now)) return;
   runDetached(CLI, ['distill', '--backfill'], project, () => releaseJob(FACTS_JOB, project));
