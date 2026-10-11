@@ -1,36 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.12.3
 
 ### Fixed
 
-- **Distill stopped on Postgres when a Claude memory file had no `modified` time.** The import timed such a
-  fact by the file's `mtimeMs`, which has a fraction, and Postgres refused it for the `bigint` column with
-  `invalid input syntax for type bigint`. The whole backfill stopped at that step, so chats waited for days. The
-  time is now whole milliseconds.
-- **Rows saved while the embedding model was still loading never got a vector.** A hook gives the model
-  `embeddings.timeoutMs` to load and stores text only when it runs out, and nothing went back to fill those rows
-  in, so semantic search could not find them. Such a write now leaves a note, and the next chat start runs
-  `reembed --project` in the background, at most every 6 hours. The background run only fills rows with no
-  vector, never replaces one from another embedder, and writes nothing when the embedder's width differs from
-  the database's.
-- **Background jobs kept no output.** Distill, redact, re-ingest, re-embed, graph refresh and the pick and turn
-  workers wrote to nowhere, so a failure left no trace. Their output now goes to
-  `~/.claude-memory/logs/background.log`, which rolls over at 1 MB.
-- **The waiting-chats warning pointed at `doctor`, which does not work through them.** It now names
-  `claude-db distill --backfill` as well.
-- **`claude-db languages` left TypeScript, TSX and JavaScript out of its list.** They are listed as built in.
-- **Vectors the database could not store were never filled in either.** When the embedder's width differs from
-  the Postgres column, for example the built-in 256d embedder against a 384d database, the store keeps text
-  only. Such a write now leaves the same note, so the background re-embed fills it once the model loads.
+- **`distill` no longer stops on Postgres.** A Claude memory file with no `modified` time made it fail with
+  `invalid input syntax for type bigint`, so chats waited for days. Times are now whole milliseconds.
+- **Rows saved without a vector get one later.** A row is saved as text only when the embedding model is still
+  loading, or when its width differs from the Postgres column. The next chat start fills such rows in the
+  background, at most every 6 hours, once an embedder of the right width loads. It never replaces a vector from
+  another embedder.
+- **Background jobs keep their output.** It goes to `~/.claude-memory/logs/background.log`, which rolls over at
+  1 MB.
+- **The waiting-chats warning names `claude-db distill --backfill`**, which works through them.
+- **`claude-db languages` lists TypeScript, TSX and JavaScript** as built in.
 
 ### Changed
 
-- **A grep for a symbol that is not in the graph is faster.** The `PreToolUse` hook only needs to know whether
-  a symbol is there, but each miss also ran the "did you mean" scan, which reads up to 5,000 symbols. It no
-  longer does.
-- **`claude-db adoption` is faster.** It looks each symbol up once, eight at a time, without the suggestion
-  scan, and shows a counter on a terminal.
+- **A grep for a symbol that is not in the graph is faster.** The hook no longer runs a "did you mean" scan it
+  never shows.
+- **`claude-db adoption` is faster.** It looks each symbol up once, several at a time, and shows a counter on a
+  terminal.
 
 ## 0.12.2
 
