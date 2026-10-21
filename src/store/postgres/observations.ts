@@ -125,7 +125,11 @@ function scopeConditions(filter: CountFilter, values: unknown[]): string[] {
   return conditions;
 }
 
-export async function list(pool: Pool, filter: ListFilter): Promise<Observation[]> {
+export async function list(
+  pool: Pool,
+  filter: ListFilter,
+  hasVectorColumn = false,
+): Promise<Observation[]> {
   if (noProjects(filter.project)) return [];
   const values: unknown[] = [];
   const conditions = scopeConditions(filter, values);
@@ -139,6 +143,16 @@ export async function list(pool: Pool, filter: ListFilter): Promise<Observation[
         `(created_at > $${values.length - 2} OR (created_at = $${values.length - 1} AND id > $${values.length}))`,
       );
     }
+  }
+  if (filter.vectorStale) {
+    const stale = hasVectorColumn
+      ? ['embedder IS NULL', 'embedding IS NULL']
+      : ['embedder IS NULL'];
+    if (filter.vectorStale.embedder !== undefined) {
+      values.push(filter.vectorStale.embedder);
+      stale.push(`embedder <> $${values.length}`);
+    }
+    conditions.push(`(${stale.join(' OR ')})`);
   }
   values.push(filter.limit ?? 1000);
 

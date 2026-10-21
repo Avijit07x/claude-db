@@ -175,7 +175,7 @@ export class PostgresStore implements MemoryStore {
   }
 
   async list(filter: ListFilter): Promise<Observation[]> {
-    return observationsOps.list(this.pool, filter);
+    return observationsOps.list(this.pool, filter, this.vectorDims !== null);
   }
 
   async count(filter: CountFilter): Promise<number> {

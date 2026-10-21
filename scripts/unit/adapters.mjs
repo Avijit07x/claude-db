@@ -152,6 +152,23 @@ async function leanReads(same) {
   check('postgres lists every column when vectors are asked for', /SELECT \*/.test(full), full);
   check('postgres fetches by id without the embedding', !/\*|embedding|tsv/.test(byId), byId);
 
+  const titles = fakePool();
+  await list(titles.pool, { project: '/p', vectorStale: {} }, true);
+  await list(titles.pool, { project: '/p', vectorStale: { embedder: 'm1' } }, false);
+  const [missing, other] = titles.seen;
+  check(
+    'postgres asks only for rows that lack a vector',
+    missing.sql.includes('(embedder IS NULL OR embedding IS NULL)'),
+    missing.sql,
+  );
+  check(
+    'postgres asks for rows from another embedder without touching a missing vector column',
+    other.sql.includes('(embedder IS NULL OR embedder <> $2)') &&
+      !other.sql.includes('embedding IS NULL') &&
+      other.values[1] === 'm1',
+    other.sql,
+  );
+
   const tagged = fakePool([{ n: 3 }]);
   const n = await count(tagged.pool, { project: '/p', tag: 'claude-memory', status: 'replaced' });
   const [counted] = tagged.seen;
@@ -204,6 +221,19 @@ async function sqliteScopes() {
         (await store.count({ project: '/p', status: 'replaced' })) === 2 &&
         (await store.count({ project: '/p', tag: 'other', status: 'replaced' })) === 2 &&
         (await store.count({ project: [] })) === 0,
+    );
+    await store.insertObservations([
+      observation({ id: 'v1', project: '/v', embedding: [0.1, 0.2], embedder: 'm1' }),
+      observation({ id: 'v2', project: '/v', embedding: [0.3, 0.4], embedder: 'm0' }),
+      observation({ id: 'v3', project: '/v' }),
+    ]);
+    check(
+      'sqlite lists only rows that lack a vector',
+      ids(await store.list({ project: '/v', vectorStale: {} })) === 'v3',
+    );
+    check(
+      'sqlite lists rows lacking a vector or made by another embedder',
+      ids(await store.list({ project: '/v', vectorStale: { embedder: 'm1' } })) === 'v2,v3',
     );
     await store.upsertGraph({
       symbols: [],
