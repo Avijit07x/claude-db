@@ -68,6 +68,7 @@ export interface MemoryStore {
   }): Promise<void>;
 
   findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]>;
+  symbolNames(project: string, limit: number): Promise<string[]>;
   findEdges(filter: EdgeFilter): Promise<CodeEdge[]>;
   scannedFiles(project: string, limit?: number): Promise<ScannedFile[]>;
 

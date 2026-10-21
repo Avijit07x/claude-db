@@ -79,6 +79,17 @@ export async function findSymbols(db: DatabaseSync, filter: SymbolFilter): Promi
   return rows.map(toSymbol);
 }
 
+export async function symbolNames(
+  db: DatabaseSync,
+  project: string,
+  limit: number,
+): Promise<string[]> {
+  const rows = db
+    .prepare('SELECT name FROM symbols WHERE project = ? ORDER BY file, line LIMIT ?')
+    .all(project, limit) as Row[];
+  return rows.map((row) => row['name'] as string);
+}
+
 export async function findEdges(db: DatabaseSync, filter: EdgeFilter): Promise<CodeEdge[]> {
   const params: unknown[] = [filter.project];
   const sides: string[] = [];
