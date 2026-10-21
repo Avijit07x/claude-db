@@ -217,6 +217,10 @@ export class MongoStore implements MemoryStore {
     return graphOps.findSymbols(this.symbols, this.edges, this.scanned, filter);
   }
 
+  async symbolNames(project: string, limit: number): Promise<string[]> {
+    return graphOps.symbolNames(this.symbols, project, limit);
+  }
+
   async findEdges(filter: EdgeFilter): Promise<CodeEdge[]> {
     return graphOps.findEdges(this.symbols, this.edges, this.scanned, filter);
   }

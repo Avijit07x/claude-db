@@ -131,6 +131,14 @@ export async function findSymbols(pool: Pool, filter: SymbolFilter): Promise<Cod
   return res.rows.map((row) => toSymbol({ ...row, project: filter.project }));
 }
 
+export async function symbolNames(pool: Pool, project: string, limit: number): Promise<string[]> {
+  const res = await pool.query(
+    'SELECT name FROM symbols WHERE project = $1 ORDER BY file, line LIMIT $2',
+    [project, limit],
+  );
+  return res.rows.map((row) => row['name'] as string);
+}
+
 export async function findEdges(pool: Pool, filter: EdgeFilter): Promise<CodeEdge[]> {
   const values: unknown[] = [filter.project];
   const sides: string[] = [];

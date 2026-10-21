@@ -50,9 +50,7 @@ export class PostgresStore implements MemoryStore {
     }
 
     this.vectorEnabled = await this.tryEnableVector();
-
     await this.pool.query(DDL);
-
     await this.ensureTagsIndexed();
     if (this.vectorEnabled) this.vectorDims = await this.readVectorDims();
     await this.writeMeta();
@@ -230,6 +228,10 @@ export class PostgresStore implements MemoryStore {
 
   async findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]> {
     return graphOps.findSymbols(this.pool, filter);
+  }
+
+  async symbolNames(project: string, limit: number): Promise<string[]> {
+    return graphOps.symbolNames(this.pool, project, limit);
   }
 
   async findEdges(filter: EdgeFilter): Promise<CodeEdge[]> {

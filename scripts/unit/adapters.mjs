@@ -4,7 +4,7 @@ import { toDoc, toObservation } from '../../dist/store/mongo/docs.js';
 import { sessionMatch } from '../../dist/store/mongo/filters.js';
 import { excludeSessionsClause } from '../../dist/store/postgres/filters.js';
 import { count, getObservations, list } from '../../dist/store/postgres/observations.js';
-import { findEdges, scannedFiles } from '../../dist/store/postgres/graph.js';
+import { findEdges, scannedFiles, symbolNames } from '../../dist/store/postgres/graph.js';
 import { createStore } from '../../dist/store/index.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -194,6 +194,16 @@ async function leanReads(same) {
     'postgres fills a graph row project from the filter, not the wire',
     edge.project === '/p' && !/SELECT \*|project,/.test(edges.seen[0].sql),
     edges.seen[0].sql,
+  );
+  const named = fakePool([{ name: 'alpha' }, { name: 'beta' }]);
+  const names = await symbolNames(named.pool, '/p', 5000);
+  check(
+    'postgres reads only symbol names for suggestions, in the same order',
+    same(names, ['alpha', 'beta']) &&
+      /^SELECT name FROM symbols WHERE project = \$1 ORDER BY file, line LIMIT \$2$/.test(
+        named.seen[0].sql,
+      ),
+    named.seen[0].sql,
   );
   const files = fakePool([{ path: 'a.ts', hash: 'h', scanned_at: 1 }]);
   const [file] = await scannedFiles(files.pool, '/p', 1);

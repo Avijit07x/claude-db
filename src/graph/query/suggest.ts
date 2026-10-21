@@ -56,11 +56,7 @@ export async function suggestFor(
 ): Promise<string[]> {
   if (!symbol) return [];
   try {
-    const symbols = await store.findSymbols({ project, limit: CANDIDATES });
-    return nearest(
-      symbols.map((entry) => entry.name),
-      symbol,
-    );
+    return nearest(await store.symbolNames(project, CANDIDATES), symbol);
   } catch {
     return [];
   }

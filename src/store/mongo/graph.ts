@@ -52,6 +52,19 @@ export async function findSymbols(
   return docs.map(toSymbol);
 }
 
+export async function symbolNames(
+  symbols: Collection<SymbolDoc>,
+  project: string,
+  limit: number,
+): Promise<string[]> {
+  const docs = await symbols
+    .find({ project }, { projection: { name: 1 } })
+    .sort({ file: 1, line: 1 })
+    .limit(limit)
+    .toArray();
+  return docs.map((doc) => doc.name);
+}
+
 export async function findEdges(
   symbols: Collection<SymbolDoc>,
   edges: Collection<EdgeDoc>,

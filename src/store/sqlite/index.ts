@@ -179,6 +179,10 @@ export class SqliteStore implements MemoryStore {
     return graphOps.findSymbols(this.db, filter);
   }
 
+  async symbolNames(project: string, limit: number): Promise<string[]> {
+    return graphOps.symbolNames(this.db, project, limit);
+  }
+
   async findEdges(filter: EdgeFilter): Promise<CodeEdge[]> {
     return graphOps.findEdges(this.db, filter);
   }
