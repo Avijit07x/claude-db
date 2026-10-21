@@ -86,7 +86,7 @@ await runHook(async () => {
           'asking the user to re-explain prior decisions.',
       );
     }
-    const scanned = (await ctx.store.scannedFiles(project)).length > 0;
+    const scanned = (await ctx.store.scannedFiles(project, 1)).length > 0;
     if (!scanned) parts.push(SCAN_HINT);
     const update = ctx.config.updates === 'off' ? null : updateNotice();
     if (update) parts.push(update);

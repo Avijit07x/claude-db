@@ -4,6 +4,7 @@ import { toDoc, toObservation } from '../../dist/store/mongo/docs.js';
 import { sessionMatch } from '../../dist/store/mongo/filters.js';
 import { excludeSessionsClause } from '../../dist/store/postgres/filters.js';
 import { count, getObservations, list } from '../../dist/store/postgres/observations.js';
+import { findEdges, scannedFiles } from '../../dist/store/postgres/graph.js';
 import { createStore } from '../../dist/store/index.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -106,7 +107,7 @@ export default async function run() {
       same(values[1], ['b', 'c']),
   );
 
-  await leanReads();
+  await leanReads(same);
   await sqliteScopes();
 }
 
@@ -117,7 +118,7 @@ const conflictOf = async (obs) => {
   return /ON CONFLICT \(id\) DO UPDATE SET (.+)$/s.exec(insert.sql)?.[1] ?? '';
 };
 
-async function leanReads() {
+async function leanReads(same) {
   const kept = await conflictOf(observation({ embedder: 'local-384' }));
   check(
     'postgres keeps the stored vector of a row read without one',
@@ -163,6 +164,23 @@ async function leanReads() {
       counted.values.includes('["claude-memory"]'),
     counted.sql,
   );
+
+  const edges = fakePool([{ id: 'e1', src_id: 'a', dst_id: 'b', line: 3, score: 1 }]);
+  const [edge] = await findEdges(edges.pool, { project: '/p' });
+  check(
+    'postgres fills a graph row project from the filter, not the wire',
+    edge.project === '/p' && !/SELECT \*|project,/.test(edges.seen[0].sql),
+    edges.seen[0].sql,
+  );
+  const files = fakePool([{ path: 'a.ts', hash: 'h', scanned_at: 1 }]);
+  const [file] = await scannedFiles(files.pool, '/p', 1);
+  check(
+    'postgres can ask whether a project was scanned with one row',
+    file.project === '/p' &&
+      /LIMIT \$2/.test(files.seen[0].sql) &&
+      same(files.seen[0].values, ['/p', 1]),
+    files.seen[0].sql,
+  );
 }
 
 async function sqliteScopes() {
@@ -186,6 +204,16 @@ async function sqliteScopes() {
         (await store.count({ project: '/p', status: 'replaced' })) === 2 &&
         (await store.count({ project: '/p', tag: 'other', status: 'replaced' })) === 2 &&
         (await store.count({ project: [] })) === 0,
+    );
+    await store.upsertGraph({
+      symbols: [],
+      edges: [],
+      files: ['x.ts', 'y.ts'].map((path) => ({ project: '/p', path, hash: 'h', scannedAt: 1 })),
+    });
+    check(
+      'sqlite caps scanned files when asked',
+      (await store.scannedFiles('/p', 1)).length === 1 &&
+        (await store.scannedFiles('/p')).length === 2,
     );
   } finally {
     await store.close();

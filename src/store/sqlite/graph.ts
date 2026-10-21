@@ -103,8 +103,16 @@ export async function findEdges(db: DatabaseSync, filter: EdgeFilter): Promise<C
   return rows.map(toEdge);
 }
 
-export async function scannedFiles(db: DatabaseSync, project: string): Promise<ScannedFile[]> {
-  const rows = db.prepare('SELECT * FROM scanned_files WHERE project = ?').all(project) as Row[];
+export async function scannedFiles(
+  db: DatabaseSync,
+  project: string,
+  limit?: number,
+): Promise<ScannedFile[]> {
+  const rows = (
+    limit === undefined
+      ? db.prepare('SELECT * FROM scanned_files WHERE project = ?').all(project)
+      : db.prepare('SELECT * FROM scanned_files WHERE project = ? LIMIT ?').all(project, limit)
+  ) as Row[];
   return rows.map((row) => ({
     project: row['project'] as string,
     path: row['path'] as string,

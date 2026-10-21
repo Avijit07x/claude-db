@@ -69,7 +69,7 @@ export interface MemoryStore {
 
   findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]>;
   findEdges(filter: EdgeFilter): Promise<CodeEdge[]>;
-  scannedFiles(project: string): Promise<ScannedFile[]>;
+  scannedFiles(project: string, limit?: number): Promise<ScannedFile[]>;
 
   removeGraph(project: string, files?: string[]): Promise<number>;
 }

@@ -27,7 +27,7 @@ export function addText(answer: GraphAnswer, root: string): void {
 }
 
 export const hasGraph = async (store: MemoryStore, project: string): Promise<boolean> =>
-  (await store.scannedFiles(project)).length > 0;
+  (await store.scannedFiles(project, 1)).length > 0;
 
 export async function answerQuery(request: AnswerRequest): Promise<GraphAnswer> {
   const { store, root, project, query } = request;
