@@ -172,13 +172,13 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
     }
 
     let updated = 0;
-    let skipped = 0;
     const filter = scoped ? { project } : {};
-    const scanned = await eachObservation(ctx, filter, async (batch) => {
+    const scanned = await ctx.store.count(filter);
+    const vectorStale = background ? {} : { embedder: embedder.id };
+    await eachObservation(ctx, { ...filter, vectorStale }, async (batch) => {
       const stale = batch.filter(
         (obs) => !obs.embedding?.length || (!background && obs.embedder !== embedder.id),
       );
-      skipped += batch.length - stale.length;
       if (stale.length === 0) return;
 
       await embedObservations(ctx, stale);
@@ -188,6 +188,7 @@ export async function cmdReembed(argv: (string | undefined)[] = []): Promise<voi
     });
 
     if (!background) process.stderr.write('\r');
+    const skipped = scanned - updated;
     if (migrated) {
       console.log(`Rebuilt vector storage at ${embedder.dimensions}d.`);
     }

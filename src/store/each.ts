@@ -1,11 +1,11 @@
 import type { RecallContext } from '../context.js';
-import type { Observation } from '../types.js';
+import type { ListFilter, Observation } from '../types.js';
 
 const PAGE = 500;
 
 export async function eachObservation(
   ctx: RecallContext,
-  filter: { project?: string },
+  filter: Pick<ListFilter, 'project' | 'vectorStale'>,
   visit: (batch: Observation[]) => Promise<void> | void,
 ): Promise<number> {
   let after: number | undefined;

@@ -145,6 +145,14 @@ export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observ
       params.push(filter.after, filter.after, filter.afterId);
     }
   }
+  if (filter.vectorStale) {
+    const stale = ['embedding IS NULL', 'embedder IS NULL'];
+    if (filter.vectorStale.embedder !== undefined) {
+      stale.push('embedder != ?');
+      params.push(filter.vectorStale.embedder);
+    }
+    conditions.push(`(${stale.join(' OR ')})`);
+  }
   params.push(filter.limit ?? 1000);
 
   const direction = filter.newest ? 'DESC' : 'ASC';

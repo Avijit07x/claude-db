@@ -73,6 +73,7 @@ export interface ListFilter {
   limit?: number;
   newest?: boolean;
   vectors?: boolean;
+  vectorStale?: { embedder?: string };
 }
 
 export type CountFilter = Pick<

@@ -125,6 +125,17 @@ export async function list(
         { createdAt: filter.after, _id: { $gt: filter.afterId } },
       ];
   }
+  if (filter.vectorStale) {
+    const { embedder } = filter.vectorStale;
+    query['$and'] = [
+      {
+        $or: [
+          { embedding: null },
+          embedder === undefined ? { embedder: null } : { embedder: { $ne: embedder } },
+        ],
+      },
+    ];
+  }
 
   const direction = filter.newest ? -1 : 1;
   const docs = await observations
