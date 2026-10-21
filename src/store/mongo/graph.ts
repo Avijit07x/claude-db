@@ -86,8 +86,10 @@ export async function scannedFiles(
   edges: Collection<EdgeDoc>,
   scanned: Collection<ScannedFileDoc>,
   project: string,
+  limit?: number,
 ): Promise<ScannedFile[]> {
-  const docs = await scanned.find({ project }).toArray();
+  const cursor = scanned.find({ project });
+  const docs = await (limit === undefined ? cursor : cursor.limit(limit)).toArray();
   return docs.map((doc) => ({
     project: doc.project,
     path: doc.path,

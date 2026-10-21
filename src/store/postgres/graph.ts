@@ -106,6 +106,10 @@ export async function upsertGraph(
   }
 }
 
+const SYMBOL_COLUMNS = 'id, name, kind, file, line, lang, signature';
+const EDGE_COLUMNS =
+  'id, src_id, src_name, dst_id, dst_name, relation, confidence, score, file, line';
+
 export async function findSymbols(pool: Pool, filter: SymbolFilter): Promise<CodeSymbol[]> {
   const values: unknown[] = [filter.project];
   const conditions = ['project = $1'];
@@ -120,11 +124,11 @@ export async function findSymbols(pool: Pool, filter: SymbolFilter): Promise<Cod
   values.push(filter.limit ?? 500);
 
   const res = await pool.query(
-    `SELECT * FROM symbols WHERE ${conditions.join(' AND ')}
+    `SELECT ${SYMBOL_COLUMNS} FROM symbols WHERE ${conditions.join(' AND ')}
        ORDER BY file, line LIMIT $${values.length}`,
     values,
   );
-  return res.rows.map(toSymbol);
+  return res.rows.map((row) => toSymbol({ ...row, project: filter.project }));
 }
 
 export async function findEdges(pool: Pool, filter: EdgeFilter): Promise<CodeEdge[]> {
@@ -146,17 +150,24 @@ export async function findEdges(pool: Pool, filter: EdgeFilter): Promise<CodeEdg
   values.push(filter.limit ?? 2000);
 
   const res = await pool.query(
-    `SELECT * FROM symbol_edges WHERE project = $1${where}
+    `SELECT ${EDGE_COLUMNS} FROM symbol_edges WHERE project = $1${where}
        ORDER BY file, line, id LIMIT $${values.length}`,
     values,
   );
-  return res.rows.map(toEdge);
+  return res.rows.map((row) => toEdge({ ...row, project: filter.project }));
 }
 
-export async function scannedFiles(pool: Pool, project: string): Promise<ScannedFile[]> {
-  const res = await pool.query('SELECT * FROM scanned_files WHERE project = $1', [project]);
+export async function scannedFiles(
+  pool: Pool,
+  project: string,
+  limit?: number,
+): Promise<ScannedFile[]> {
+  const res = await pool.query(
+    `SELECT path, hash, scanned_at FROM scanned_files WHERE project = $1${limit === undefined ? '' : ' LIMIT $2'}`,
+    limit === undefined ? [project] : [project, limit],
+  );
   return res.rows.map((row) => ({
-    project: row['project'] as string,
+    project,
     path: row['path'] as string,
     hash: row['hash'] as string,
     scannedAt: Number(row['scanned_at']),

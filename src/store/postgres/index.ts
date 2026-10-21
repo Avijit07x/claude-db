@@ -236,8 +236,8 @@ export class PostgresStore implements MemoryStore {
     return graphOps.findEdges(this.pool, filter);
   }
 
-  async scannedFiles(project: string): Promise<ScannedFile[]> {
-    return graphOps.scannedFiles(this.pool, project);
+  async scannedFiles(project: string, limit?: number): Promise<ScannedFile[]> {
+    return graphOps.scannedFiles(this.pool, project, limit);
   }
 
   async removeGraph(project: string, files?: string[]): Promise<number> {

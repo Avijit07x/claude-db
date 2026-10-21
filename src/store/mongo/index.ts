@@ -221,8 +221,8 @@ export class MongoStore implements MemoryStore {
     return graphOps.findEdges(this.symbols, this.edges, this.scanned, filter);
   }
 
-  async scannedFiles(project: string): Promise<ScannedFile[]> {
-    return graphOps.scannedFiles(this.symbols, this.edges, this.scanned, project);
+  async scannedFiles(project: string, limit?: number): Promise<ScannedFile[]> {
+    return graphOps.scannedFiles(this.symbols, this.edges, this.scanned, project, limit);
   }
 
   async removeGraph(project: string, files?: string[]): Promise<number> {
