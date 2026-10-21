@@ -37,7 +37,9 @@ export async function legacyBlock(
     for (const obs of open.slice(0, 3)) lines.push(`- ${obs.title}`);
   }
 
-  const rules = (await ctx.store.list({ project, kind: 'preference', limit: 100, newest: true }))
+  const rules = (
+    await ctx.store.list({ project, kind: 'preference', limit: 100, newest: true, bodies: false })
+  )
     .filter((obs) => obs.status !== 'replaced' && !restored.has(obs.id))
     .sort((a, b) => {
       const manual = Number(b.sessionId === 'manual') - Number(a.sessionId === 'manual');

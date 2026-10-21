@@ -46,6 +46,7 @@ export async function closeLandedWork(store: MemoryStore, project: string): Prom
       ...(after === undefined ? {} : { after }),
       ...(afterId === undefined ? {} : { afterId }),
       limit: OPEN_LIMIT,
+      bodies: false,
     });
     if (batch.length === 0) break;
 
@@ -64,6 +65,12 @@ export async function closeLandedWork(store: MemoryStore, project: string): Prom
 }
 
 export async function openWork(store: MemoryStore, project: string): Promise<Observation[]> {
-  const open = await store.list({ project, status: 'open', limit: OPEN_LIMIT, newest: true });
+  const open = await store.list({
+    project,
+    status: 'open',
+    limit: OPEN_LIMIT,
+    newest: true,
+    bodies: false,
+  });
   return open.sort((a, b) => b.createdAt - a.createdAt);
 }

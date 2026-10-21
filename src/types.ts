@@ -73,6 +73,7 @@ export interface ListFilter {
   limit?: number;
   newest?: boolean;
   vectors?: boolean;
+  bodies?: boolean;
   vectorStale?: { embedder?: string };
 }
 

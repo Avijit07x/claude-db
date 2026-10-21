@@ -32,7 +32,9 @@ export async function startFacts(
   const visible = (obs: Observation) =>
     obs.status !== 'replaced' && !hidden.has(obs.id) && !seenByClaude(obs, project);
   const list = async (owner: string, sessionId: string, limit: number) =>
-    (await ctx.store.list({ project: owner, sessionId, newest: true, limit })).filter(visible);
+    (
+      await ctx.store.list({ project: owner, sessionId, newest: true, limit, bodies: false })
+    ).filter(visible);
 
   const you = onePerKey(await list(youScope(), FACT_SESSION, 50));
   const facts = onePerKey(await list(project, FACT_SESSION, 300));

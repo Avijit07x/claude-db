@@ -29,7 +29,13 @@ export async function recoverAfterCompact(
   if (!capturingDisabled(ctx.config.capture.scripted)) {
     await flushSession(ctx, sessionId, project, transcriptPath);
   }
-  const observations = await ctx.store.list({ project, sessionId, newest: true, limit: SCANNED });
+  const observations = await ctx.store.list({
+    project,
+    sessionId,
+    newest: true,
+    limit: SCANNED,
+    bodies: false,
+  });
   return renderEarlierInChat(observations);
 }
 

@@ -16,7 +16,12 @@ import { noProjects } from '../project-scope.js';
 
 const COLUMNS =
   'id, session_id, project, kind, title, body, files, tags, created_at, embedder, author, status';
-const WITH_VECTORS = '*';
+const WITHOUT_BODY = COLUMNS.replace(' body,', '');
+
+function listColumns(filter: ListFilter): string {
+  if (filter.vectors) return '*';
+  return filter.bodies === false ? WITHOUT_BODY : COLUMNS;
+}
 
 export async function getObservations(pool: Pool, ids: string[]): Promise<Observation[]> {
   if (ids.length === 0) return [];
@@ -158,7 +163,7 @@ export async function list(
 
   const direction = filter.newest ? 'DESC' : 'ASC';
   const res = await pool.query(
-    `SELECT ${filter.vectors ? WITH_VECTORS : COLUMNS} FROM observations
+    `SELECT ${listColumns(filter)} FROM observations
        ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}
        ORDER BY created_at ${direction}, id ${direction} LIMIT $${values.length}`,
     values,

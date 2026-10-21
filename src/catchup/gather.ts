@@ -38,6 +38,7 @@ export async function gatherCatchup(
     sessionId: FACT_SESSION,
     newest: true,
     limit: FACTS_SCANNED,
+    bodies: false,
   });
   const kept = onePerKey(facts.filter((obs) => obs.status !== 'replaced'));
   const todos = kept

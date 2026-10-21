@@ -18,6 +18,7 @@ export async function existingFacts(ctx: RecallContext, project: string): Promis
       sessionId: FACT_SESSION,
       newest: true,
       limit: EXISTING_LIMIT,
+      bodies: false,
     });
     for (const obs of onePerKey(rows.filter((row) => row.status !== 'replaced'))) {
       const key = factKey(obs);
@@ -35,6 +36,7 @@ export async function notedByUser(ctx: RecallContext, project: string): Promise<
     sessionId: MANUAL_SESSION,
     newest: true,
     limit: EXISTING_LIMIT,
+    bodies: false,
   });
   return rows
     .filter((row) => row.status !== 'replaced' && !row.tags.includes(HANDOFF_TAG))
