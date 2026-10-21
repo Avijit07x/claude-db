@@ -1,10 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { ListFilter, Observation, RemoveFilter } from '../../types.js';
+import type { CountFilter, ListFilter, Observation, RemoveFilter } from '../../types.js';
 import type { ProjectSummary } from '../adapter.js';
 import { foreignNames, isWholeScope } from '../adapter.js';
 import type { Row } from './rows.js';
 import { toObservation } from './rows.js';
-import { excludeSessionsClause, projectClause, removeWhere } from './filters.js';
+import { TAG_PREDICATE, excludeSessionsClause, projectClause, removeWhere } from './filters.js';
 import { partitionIds } from '../../util/shortid.js';
 import { packVector } from '../../util/vector.js';
 import { scopeToken } from '../../util/scope.js';
@@ -106,10 +106,8 @@ export async function remove(db: DatabaseSync, filter: RemoveFilter): Promise<nu
   return count?.n ?? 0;
 }
 
-export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observation[]> {
-  if (noProjects(filter.project)) return [];
+function scopeConditions(filter: CountFilter, params: unknown[]): string[] {
   const conditions: string[] = [];
-  const params: unknown[] = [];
 
   const project = projectClause('project', filter.project, params);
   if (project) conditions.push(project);
@@ -127,6 +125,17 @@ export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observ
     conditions.push('status = ?');
     params.push(filter.status);
   }
+  if (filter.tag) {
+    conditions.push(TAG_PREDICATE(''));
+    params.push(filter.tag);
+  }
+  return conditions;
+}
+
+export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observation[]> {
+  if (noProjects(filter.project)) return [];
+  const params: unknown[] = [];
+  const conditions = scopeConditions(filter, params);
   if (filter.after !== undefined) {
     if (filter.afterId === undefined) {
       conditions.push('created_at > ?');
@@ -147,6 +156,19 @@ export async function list(db: DatabaseSync, filter: ListFilter): Promise<Observ
     )
     .all(...(params as never[])) as Row[];
   return rows.map(toObservation);
+}
+
+export async function count(db: DatabaseSync, filter: CountFilter): Promise<number> {
+  if (noProjects(filter.project)) return 0;
+  const params: unknown[] = [];
+  const conditions = scopeConditions(filter, params);
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM observations
+         ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}`,
+    )
+    .get(...(params as never[])) as { n: number } | undefined;
+  return Number(row?.n ?? 0);
 }
 
 export async function listProjects(db: DatabaseSync): Promise<ProjectSummary[]> {

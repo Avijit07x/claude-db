@@ -8,6 +8,7 @@ import * as projectLinksOps from './project-links.js';
 import type {
   CodeEdge,
   CodeSymbol,
+  CountFilter,
   EdgeFilter,
   ListFilter,
   Observation,
@@ -164,6 +165,10 @@ export class MongoStore implements MemoryStore {
       this.scanned,
       filter,
     );
+  }
+
+  async count(filter: CountFilter): Promise<number> {
+    return observationsOps.count(this.observations, filter);
   }
 
   async listProjects(): Promise<ProjectSummary[]> {

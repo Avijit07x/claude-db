@@ -3,7 +3,11 @@ import { insertObservations } from '../../dist/store/postgres/insert.js';
 import { toDoc, toObservation } from '../../dist/store/mongo/docs.js';
 import { sessionMatch } from '../../dist/store/mongo/filters.js';
 import { excludeSessionsClause } from '../../dist/store/postgres/filters.js';
-import { getObservations, list } from '../../dist/store/postgres/observations.js';
+import { count, getObservations, list } from '../../dist/store/postgres/observations.js';
+import { createStore } from '../../dist/store/index.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 function fakePool(rows = []) {
   const seen = [];
@@ -103,6 +107,7 @@ export default async function run() {
   );
 
   await leanReads();
+  await sqliteScopes();
 }
 
 const conflictOf = async (obs) => {
@@ -145,4 +150,45 @@ async function leanReads() {
   );
   check('postgres lists every column when vectors are asked for', /SELECT \*/.test(full), full);
   check('postgres fetches by id without the embedding', !/\*|embedding|tsv/.test(byId), byId);
+
+  const tagged = fakePool([{ n: 3 }]);
+  const n = await count(tagged.pool, { project: '/p', tag: 'claude-memory', status: 'replaced' });
+  const [counted] = tagged.seen;
+  check(
+    'postgres counts in the database with the same filters as a list',
+    n === 3 &&
+      /SELECT COUNT\(\*\)/.test(counted.sql) &&
+      /status = \$\d/.test(counted.sql) &&
+      /tags @> \$\d::jsonb/.test(counted.sql) &&
+      counted.values.includes('["claude-memory"]'),
+    counted.sql,
+  );
+}
+
+async function sqliteScopes() {
+  const dir = mkdtempSync(join(tmpdir(), 'cdb-scopes-'));
+  const store = await createStore(join(dir, 'memory.db'));
+  try {
+    await store.init();
+    await store.insertObservations([
+      observation({ id: 'a', tags: ['claude-memory'] }),
+      observation({ id: 'b', tags: ['other'], status: 'replaced' }),
+      observation({ id: 'c', tags: ['claude-memory', 'other'], status: 'replaced' }),
+    ]);
+    const ids = (rows) => rows.map((obs) => obs.id).join(',');
+    check(
+      'sqlite lists only rows carrying a tag',
+      ids(await store.list({ project: '/p', tag: 'claude-memory' })) === 'a,c',
+    );
+    check(
+      'sqlite counts rows with the list filters',
+      (await store.count({ project: '/p' })) === 3 &&
+        (await store.count({ project: '/p', status: 'replaced' })) === 2 &&
+        (await store.count({ project: '/p', tag: 'other', status: 'replaced' })) === 2 &&
+        (await store.count({ project: [] })) === 0,
+    );
+  } finally {
+    await store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 }

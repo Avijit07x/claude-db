@@ -1,5 +1,6 @@
 import type { Pool } from './driver.js';
 import type {
+  CountFilter,
   ListFilter,
   Observation,
   ObservationIndexEntry,
@@ -98,10 +99,8 @@ export async function remove(pool: Pool, filter: RemoveFilter): Promise<number> 
   }
 }
 
-export async function list(pool: Pool, filter: ListFilter): Promise<Observation[]> {
-  if (noProjects(filter.project)) return [];
+function scopeConditions(filter: CountFilter, values: unknown[]): string[] {
   const conditions: string[] = [];
-  const values: unknown[] = [];
 
   const project = projectClause(filter.project, values);
   if (project) conditions.push(project);
@@ -119,6 +118,17 @@ export async function list(pool: Pool, filter: ListFilter): Promise<Observation[
     values.push(filter.status);
     conditions.push(`status = $${values.length}`);
   }
+  if (filter.tag) {
+    values.push(JSON.stringify([filter.tag]));
+    conditions.push(`tags @> $${values.length}::jsonb`);
+  }
+  return conditions;
+}
+
+export async function list(pool: Pool, filter: ListFilter): Promise<Observation[]> {
+  if (noProjects(filter.project)) return [];
+  const values: unknown[] = [];
+  const conditions = scopeConditions(filter, values);
   if (filter.after !== undefined) {
     if (filter.afterId === undefined) {
       values.push(filter.after);
@@ -140,6 +150,18 @@ export async function list(pool: Pool, filter: ListFilter): Promise<Observation[
     values,
   );
   return res.rows.map(toObservation);
+}
+
+export async function count(pool: Pool, filter: CountFilter): Promise<number> {
+  if (noProjects(filter.project)) return 0;
+  const values: unknown[] = [];
+  const conditions = scopeConditions(filter, values);
+  const res = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM observations
+       ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}`,
+    values,
+  );
+  return Number(res.rows[0]?.['n'] ?? 0);
 }
 
 export async function listProjects(pool: Pool): Promise<ProjectSummary[]> {

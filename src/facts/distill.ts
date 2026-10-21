@@ -214,9 +214,11 @@ export async function factCounts(
   ctx: RecallContext,
   project: string,
 ): Promise<{ project: number; you: number }> {
-  const count = async (owner: string) =>
-    (await ctx.store.list({ project: owner, sessionId: FACT_SESSION, limit: 100_000 })).filter(
-      (obs) => obs.status !== 'replaced',
-    ).length;
+  const count = async (owner: string) => {
+    const scope = { project: owner, sessionId: FACT_SESSION };
+    return (
+      (await ctx.store.count(scope)) - (await ctx.store.count({ ...scope, status: 'replaced' }))
+    );
+  };
   return { project: await count(project), you: await count(youScope()) };
 }

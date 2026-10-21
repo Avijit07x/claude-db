@@ -1,6 +1,7 @@
 import type {
   CodeEdge,
   CodeSymbol,
+  CountFilter,
   EdgeFilter,
   ListFilter,
   Observation,
@@ -46,6 +47,7 @@ export interface MemoryStore {
   remove(filter: RemoveFilter): Promise<number>;
 
   list(filter: ListFilter): Promise<Observation[]>;
+  count(filter: CountFilter): Promise<number>;
 
   listProjects(): Promise<ProjectSummary[]>;
 
