@@ -129,6 +129,8 @@ export interface EdgeFilter {
   project: string;
   srcIds?: string[];
   dstIds?: string[];
+  unresolvedSrcNames?: string[];
+  unresolvedDstNames?: string[];
   dstName?: string;
   limit?: number;
 }

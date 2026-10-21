@@ -66,6 +66,12 @@ export async function findEdges(
   if (filter.dstIds && filter.dstIds.length > 0) {
     alternatives.push({ dstId: { $in: filter.dstIds } });
   }
+  if (filter.unresolvedSrcNames && filter.unresolvedSrcNames.length > 0) {
+    alternatives.push({ srcId: { $in: ['', null] }, srcName: { $in: filter.unresolvedSrcNames } });
+  }
+  if (filter.unresolvedDstNames && filter.unresolvedDstNames.length > 0) {
+    alternatives.push({ dstId: { $in: ['', null] }, dstName: { $in: filter.unresolvedDstNames } });
+  }
   if (alternatives.length > 0) query['$or'] = alternatives;
   if (filter.dstName !== undefined) {
     query['dstName'] = {

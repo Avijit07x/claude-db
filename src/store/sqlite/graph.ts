@@ -90,6 +90,14 @@ export async function findEdges(db: DatabaseSync, filter: EdgeFilter): Promise<C
     sides.push(`${column} IN (${ids.map(() => '?').join(',')})`);
     params.push(...ids);
   }
+  for (const [side, names] of [
+    ['src', filter.unresolvedSrcNames],
+    ['dst', filter.unresolvedDstNames],
+  ] as const) {
+    if (!names || names.length === 0) continue;
+    sides.push(`(${side}_id = '' AND ${side}_name IN (${names.map(() => '?').join(',')}))`);
+    params.push(...names);
+  }
   let where = sides.length > 0 ? ` AND (${sides.join(' OR ')})` : '';
   if (filter.dstName !== undefined) {
     where += ' AND (dst_name = ? OR dst_name LIKE ?)';
