@@ -139,7 +139,7 @@ const writtenPath = (sessionId: string): string =>
   cursorPath(sessionId).replace(/\.offset$/, '.written');
 
 const printOf = (obs: Observation): string =>
-  createHash('sha1').update(JSON.stringify(obs)).digest('base64url');
+  createHash('sha256').update(JSON.stringify(obs)).digest('base64url');
 
 function readWritten(sessionId: string): Map<string, string> {
   try {
