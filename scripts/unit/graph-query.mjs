@@ -57,6 +57,53 @@ export default async function run() {
   });
   check('a route that does not exist is reported as none', none.path.length === 0);
 
+  const loose = 'loose-project';
+  const symbol = (id, name) => ({
+    id,
+    project: loose,
+    name,
+    kind: 'function',
+    file: `${name}.ts`,
+    line: 1,
+    lang: 'ts',
+    signature: '',
+  });
+  const edge = (id, srcId, srcName, dstId, dstName) => ({
+    id,
+    project: loose,
+    srcId,
+    srcName,
+    dstId,
+    dstName,
+    relation: 'calls',
+    confidence: 'EXTRACTED',
+    score: 1,
+    file: 'x.ts',
+    line: 1,
+  });
+  await store.upsertGraph({
+    symbols: [symbol('s-start', 'start'), symbol('s-end', 'finish'), symbol('s-a', 'detourA')],
+    edges: [
+      edge('e1', 's-start', 'start', '', 'bridge'),
+      edge('e2', '', 'bridge', 's-end', 'finish'),
+      edge('e3', 's-start', 'start', 's-a', 'detourA'),
+      edge('e4', 's-a', 'detourA', '', 'detourB'),
+      edge('e5', '', 'detourB', 's-end', 'finish'),
+    ],
+    files: [],
+  });
+  const bridged = await queryGraph(store, loose, {
+    mode: 'path',
+    symbol: 'start',
+    target: 'finish',
+    limit: 50,
+  });
+  check(
+    'path crosses unresolved names and keeps the shortest route',
+    bridged.path.join('>') === 'start>bridge>finish',
+    bridged.path.join('>'),
+  );
+
   const missing = await queryGraph(store, repo, { mode: 'usages', symbol: 'nowhere', limit: 50 });
   check('an unknown symbol reports empty rather than inventing', missing.empty);
   check('the empty message names the symbol', formatGraph(missing, repo).includes('nowhere'));

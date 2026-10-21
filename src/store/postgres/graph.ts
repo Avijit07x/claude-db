@@ -142,6 +142,14 @@ export async function findEdges(pool: Pool, filter: EdgeFilter): Promise<CodeEdg
     values.push(ids);
     sides.push(`${column} = ANY($${values.length}::text[])`);
   }
+  for (const [side, names] of [
+    ['src', filter.unresolvedSrcNames],
+    ['dst', filter.unresolvedDstNames],
+  ] as const) {
+    if (!names || names.length === 0) continue;
+    values.push(names);
+    sides.push(`(${side}_id = '' AND ${side}_name = ANY($${values.length}::text[]))`);
+  }
   let where = sides.length > 0 ? ` AND (${sides.join(' OR ')})` : '';
   if (filter.dstName !== undefined) {
     values.push(filter.dstName, `%.${filter.dstName}`);
