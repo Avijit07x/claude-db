@@ -153,9 +153,15 @@ async function leanReads(same) {
   check('postgres fetches by id without the embedding', !/\*|embedding|tsv/.test(byId), byId);
 
   const titles = fakePool();
+  await list(titles.pool, { project: '/p', bodies: false });
   await list(titles.pool, { project: '/p', vectorStale: {} }, true);
   await list(titles.pool, { project: '/p', vectorStale: { embedder: 'm1' } }, false);
-  const [missing, other] = titles.seen;
+  const [noBody, missing, other] = titles.seen;
+  check(
+    'postgres can list titles without bodies',
+    !/\bbody\b/.test(noBody.sql) && /\btitle\b/.test(noBody.sql),
+    noBody.sql,
+  );
   check(
     'postgres asks only for rows that lack a vector',
     missing.sql.includes('(embedder IS NULL OR embedding IS NULL)'),

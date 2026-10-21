@@ -38,7 +38,7 @@ export function toObservation(row: Record<string, unknown>): Observation {
     project: row['project'] as string,
     kind: row['kind'] as ObservationKind,
     title: row['title'] as string,
-    body: row['body'] as string,
+    body: (row['body'] as string | undefined) ?? '',
     files: (row['files'] as string[]) ?? [],
     tags: (row['tags'] as string[]) ?? [],
     createdAt: Number(row['created_at']),

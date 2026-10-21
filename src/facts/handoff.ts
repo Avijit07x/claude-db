@@ -30,12 +30,16 @@ export async function newestHandoff(
     sessionId: MANUAL_SESSION,
     newest: true,
     limit: MANUAL_NOTES_SCANNED,
+    bodies: false,
   });
   const current = (obs: Observation): boolean =>
     obs.status !== 'replaced' &&
     obs.tags.includes(HANDOFF_TAG) &&
     now - obs.createdAt <= HANDOFF_MAX_AGE_MS;
-  return notes.find(current) ?? null;
+  const found = notes.find(current);
+  if (!found) return null;
+  const [full] = await ctx.store.getObservations([found.id]);
+  return full ?? null;
 }
 
 function clipLine(line: string): string {
