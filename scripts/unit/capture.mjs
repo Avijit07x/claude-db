@@ -2,8 +2,10 @@ import { observationsFromTurns, redact } from '../../dist/capture/index.js';
 import { ConfigSchema } from '../../dist/config/index.js';
 import { check } from '../lib/check.mjs';
 import { config, turn } from '../lib/fixtures.mjs';
+import { runIsolated } from '../lib/isolated.mjs';
 
 export default async function run() {
+  runIsolated(new URL('./isolated/flush-run.mjs', import.meta.url).pathname);
   const [built] = observationsFromTurns([turn()], 's1', '/p', config);
   check('observation is built from a turn', built !== undefined);
   check('api keys are redacted', !built.body.includes('sk-abcdefghijklmnopqrst'));

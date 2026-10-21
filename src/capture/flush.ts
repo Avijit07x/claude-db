@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { CONFIG_DIR } from '../config/index.js';
@@ -43,8 +44,12 @@ export async function flushSession(
     return { observations: 0, summary: null, lastReply };
   }
 
-  await embedObservations(ctx, observations);
-  await ctx.store.insertObservations(observations);
+  const written = rebuild ? new Map<string, string>() : readWritten(sessionId);
+  const prints = new Map(observations.map((obs) => [obs.id, printOf(obs)]));
+  const fresh = observations.filter((obs) => written.get(obs.id) !== prints.get(obs.id));
+  await embedObservations(ctx, fresh);
+  await ctx.store.insertObservations(fresh);
+  writeWritten(sessionId, prints);
   await closeLandedWork(ctx.store, project);
 
   const previous = rebuild ? null : await ctx.store.getSession(sessionId);
@@ -130,6 +135,34 @@ function cursorPath(sessionId: string): string {
   return join(CONFIG_DIR, 'cursors', cursorName(sessionId));
 }
 
+const writtenPath = (sessionId: string): string =>
+  cursorPath(sessionId).replace(/\.offset$/, '.written');
+
+const printOf = (obs: Observation): string =>
+  createHash('sha1').update(JSON.stringify(obs)).digest('base64url');
+
+function readWritten(sessionId: string): Map<string, string> {
+  try {
+    const parsed = JSON.parse(readFileSync(writtenPath(sessionId), 'utf8')) as unknown;
+    if (!parsed || typeof parsed !== 'object') return new Map();
+    return new Map(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      ),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function writeWritten(sessionId: string, prints: ReadonlyMap<string, string>): void {
+  const path = writtenPath(sessionId);
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(Object.fromEntries(prints)), 'utf8');
+  } catch {}
+}
+
 function readCursor(sessionId: string): number {
   try {
     const value = Number.parseInt(readFileSync(cursorPath(sessionId), 'utf8'), 10);
@@ -149,11 +182,13 @@ function writeCursor(sessionId: string, offset: number): void {
 
 export function resetCursor(sessionId: string): void {
   writeCursor(sessionId, 0);
+  rmSync(writtenPath(sessionId), { force: true });
 }
 
 export function clearCursor(sessionId: string): void {
   rmSync(cursorPath(sessionId), { force: true });
   rmSync(cursorPath(sessionId).replace(/\.offset$/, '.shown'), { force: true });
+  rmSync(writtenPath(sessionId), { force: true });
 }
 
 export function sweepCursors(): number {
@@ -168,7 +203,7 @@ export function sweepCursors(): number {
   const live = new Set(sessionIdsOnDisk().map((id) => id.replace(/[^\w-]/g, '_')));
   let removed = 0;
   for (const file of files) {
-    const match = /^(.+)\.(offset|shown)$/.exec(file);
+    const match = /^(.+)\.(offset|shown|written)$/.exec(file);
     if (!match?.[1] || live.has(match[1])) continue;
     rmSync(join(dir, file), { force: true });
     removed += 1;
