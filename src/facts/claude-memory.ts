@@ -122,7 +122,12 @@ async function importedFacts(ctx: RecallContext, project: string): Promise<Obser
   const mine = [machineTag(), originTag(project)];
   const rows: Observation[] = [];
   for (const owner of [project, youScope()]) {
-    const batch = await ctx.store.list({ project: owner, sessionId: FACT_SESSION, limit: 5000 });
+    const batch = await ctx.store.list({
+      project: owner,
+      sessionId: FACT_SESSION,
+      tag: CLAUDE_MEMORY_TAG,
+      limit: 5000,
+    });
     rows.push(
       ...batch.filter(
         (obs) =>

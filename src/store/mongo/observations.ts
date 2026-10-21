@@ -1,5 +1,5 @@
 import type { Collection, Doc } from './driver.js';
-import type { ListFilter, Observation, RemoveFilter } from '../../types.js';
+import type { CountFilter, ListFilter, Observation, RemoveFilter } from '../../types.js';
 import type { ProjectSummary } from '../adapter.js';
 import { isWholeScope } from '../adapter.js';
 import type { EdgeDoc, ObservationDoc, ScannedFileDoc, SessionDoc, SymbolDoc } from './docs.js';
@@ -89,6 +89,24 @@ export async function remove(
   return count;
 }
 
+function scopeQuery(filter: CountFilter): Record<string, unknown> {
+  const query: Record<string, unknown> = {};
+  Object.assign(query, projectMatch(filter.project));
+  Object.assign(query, sessionMatch(filter.sessionId, filter.excludeSessions));
+  if (filter.kind) query['kind'] = filter.kind;
+  if (filter.status) query['status'] = filter.status;
+  if (filter.tag) query['tags'] = filter.tag;
+  return query;
+}
+
+export async function count(
+  observations: Collection<ObservationDoc>,
+  filter: CountFilter,
+): Promise<number> {
+  if (noProjects(filter.project)) return 0;
+  return observations.countDocuments(scopeQuery(filter));
+}
+
 export async function list(
   observations: Collection<ObservationDoc>,
   sessions: Collection<SessionDoc>,
@@ -98,11 +116,7 @@ export async function list(
   filter: ListFilter,
 ): Promise<Observation[]> {
   if (noProjects(filter.project)) return [];
-  const query: Record<string, unknown> = {};
-  Object.assign(query, projectMatch(filter.project));
-  Object.assign(query, sessionMatch(filter.sessionId, filter.excludeSessions));
-  if (filter.kind) query['kind'] = filter.kind;
-  if (filter.status) query['status'] = filter.status;
+  const query = scopeQuery(filter);
   if (filter.after !== undefined) {
     if (filter.afterId === undefined) query['createdAt'] = { $gt: filter.after };
     else

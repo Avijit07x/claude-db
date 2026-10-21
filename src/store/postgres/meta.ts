@@ -85,3 +85,10 @@ export async function writeMeta(
     [SCHEMA_VERSION, vectorEnabled, vectorDims],
   );
 }
+
+export async function indexEmbeddings(pool: Pool): Promise<void> {
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_obs_embedding
+       ON observations USING hnsw (embedding vector_cosine_ops)`,
+  );
+}

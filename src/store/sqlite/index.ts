@@ -6,6 +6,7 @@ import * as projectLinksOps from './project-links.js';
 import type {
   CodeEdge,
   CodeSymbol,
+  CountFilter,
   EdgeFilter,
   ListFilter,
   Observation,
@@ -128,6 +129,10 @@ export class SqliteStore implements MemoryStore {
 
   async list(filter: ListFilter): Promise<Observation[]> {
     return observationsOps.list(this.db, filter);
+  }
+
+  async count(filter: CountFilter): Promise<number> {
+    return observationsOps.count(this.db, filter);
   }
 
   async listProjects(): Promise<ProjectSummary[]> {

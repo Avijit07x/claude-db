@@ -1,4 +1,5 @@
 import type {
+  CountFilter,
   ListFilter,
   Observation,
   ObservationIndexEntry,
@@ -17,6 +18,7 @@ type Overrides = Pick<
   | 'recentSessions'
   | 'remove'
   | 'list'
+  | 'count'
   | 'searchKeyword'
   | 'searchVector'
 >;
@@ -56,6 +58,11 @@ export function withProjectScope(inner: MemoryStore, resolver: ScopeResolver): M
     async list(filter: ListFilter): Promise<Observation[]> {
       const project = await expand(filter.project);
       return inner.list(project === undefined ? filter : { ...filter, project });
+    },
+
+    async count(filter: CountFilter): Promise<number> {
+      const project = await expand(filter.project);
+      return inner.count(project === undefined ? filter : { ...filter, project });
     },
 
     async searchKeyword(query: SearchQuery): Promise<ObservationIndexEntry[]> {

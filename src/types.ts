@@ -67,12 +67,18 @@ export interface ListFilter {
   excludeSessions?: string[];
   kind?: ObservationKind;
   status?: ObservationStatus;
+  tag?: string;
   after?: number;
   afterId?: string;
   limit?: number;
   newest?: boolean;
   vectors?: boolean;
 }
+
+export type CountFilter = Pick<
+  ListFilter,
+  'project' | 'sessionId' | 'excludeSessions' | 'kind' | 'status' | 'tag'
+>;
 
 export interface TimelineQuery {
   observationId: string;

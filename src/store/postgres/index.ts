@@ -9,6 +9,7 @@ import * as projectLinksOps from './project-links.js';
 import type {
   CodeEdge,
   CodeSymbol,
+  CountFilter,
   EdgeFilter,
   ListFilter,
   Observation,
@@ -29,9 +30,7 @@ export class PostgresStore implements MemoryStore {
   readonly kind = 'postgres';
 
   private vectorEnabled = false;
-
   private vectorDims: number | null = null;
-
   private warnedDims = false;
 
   private constructor(private readonly pool: Pool) {}
@@ -87,10 +86,7 @@ export class PostgresStore implements MemoryStore {
     await this.pool.query('ALTER TABLE observations DROP COLUMN IF EXISTS embedding');
     await this.pool.query(`ALTER TABLE observations ADD COLUMN embedding vector(${dims})`);
     await this.pool.query('UPDATE observations SET embedder = NULL');
-    await this.pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_obs_embedding
-         ON observations USING hnsw (embedding vector_cosine_ops)`,
-    );
+    await metaOps.indexEmbeddings(this.pool);
     this.vectorDims = await this.readVectorDims();
     this.warnedDims = false;
     await this.writeMeta();
@@ -109,10 +105,7 @@ export class PostgresStore implements MemoryStore {
       await this.pool.query(
         `ALTER TABLE observations ADD COLUMN IF NOT EXISTS embedding vector(${dims})`,
       );
-      await this.pool.query(
-        `CREATE INDEX IF NOT EXISTS idx_obs_embedding
-           ON observations USING hnsw (embedding vector_cosine_ops)`,
-      );
+      await metaOps.indexEmbeddings(this.pool);
       this.vectorDims = await this.readVectorDims();
       await this.writeMeta();
     }
@@ -183,6 +176,10 @@ export class PostgresStore implements MemoryStore {
 
   async list(filter: ListFilter): Promise<Observation[]> {
     return observationsOps.list(this.pool, filter);
+  }
+
+  async count(filter: CountFilter): Promise<number> {
+    return observationsOps.count(this.pool, filter);
   }
 
   async listProjects(): Promise<ProjectSummary[]> {
