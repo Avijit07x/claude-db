@@ -25,13 +25,13 @@ export async function cmdSync(argv: (string | undefined)[]): Promise<void> {
     await remote.init();
 
     const localStatus = new Map<string, ObservationStatus>();
-    await eachRemoteObservation(local.store, (batch) => {
+    await eachRemoteObservation(local.store, false, (batch) => {
       for (const obs of batch) localStatus.set(obs.id, obs.status ?? 'done');
     });
 
     const remoteStatus = new Map<string, ObservationStatus>();
     let pulled = 0;
-    await eachRemoteObservation(remote, async (batch) => {
+    await eachRemoteObservation(remote, true, async (batch) => {
       for (const obs of batch) remoteStatus.set(obs.id, obs.status ?? 'done');
       const fresh = batch.filter((obs) => !localStatus.has(obs.id));
       if (fresh.length === 0) return;
@@ -40,7 +40,7 @@ export async function cmdSync(argv: (string | undefined)[]): Promise<void> {
     });
 
     let pushed = 0;
-    await eachRemoteObservation(local.store, async (batch) => {
+    await eachRemoteObservation(local.store, true, async (batch) => {
       const fresh = batch.filter((obs) => !remoteStatus.has(obs.id));
       if (fresh.length === 0) return;
       pushed += fresh.length;
@@ -165,6 +165,7 @@ async function reconcileSession(
 
 async function eachRemoteObservation(
   store: MemoryStore,
+  vectors: boolean,
   visit: (batch: Observation[]) => Promise<void> | void,
 ): Promise<void> {
   let after: number | undefined;
@@ -174,6 +175,7 @@ async function eachRemoteObservation(
       ...(after === undefined ? {} : { after }),
       ...(afterId === undefined ? {} : { afterId }),
       limit: BATCH,
+      vectors,
     });
     if (batch.length === 0) return;
 

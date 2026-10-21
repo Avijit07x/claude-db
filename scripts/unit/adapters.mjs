@@ -3,13 +3,14 @@ import { insertObservations } from '../../dist/store/postgres/insert.js';
 import { toDoc, toObservation } from '../../dist/store/mongo/docs.js';
 import { sessionMatch } from '../../dist/store/mongo/filters.js';
 import { excludeSessionsClause } from '../../dist/store/postgres/filters.js';
+import { getObservations, list } from '../../dist/store/postgres/observations.js';
 
-function fakePool() {
+function fakePool(rows = []) {
   const seen = [];
   const client = {
     query: async (sql, values) => {
       seen.push({ sql, values: values ?? [] });
-      return { rows: [], rowCount: 0 };
+      return { rows, rowCount: rows.length };
     },
     release: () => {},
   };
@@ -100,4 +101,48 @@ export default async function run() {
     excludeSessionsClause(['b', 'c'], values) === 'session_id <> ALL($2::text[])' &&
       same(values[1], ['b', 'c']),
   );
+
+  await leanReads();
+}
+
+const conflictOf = async (obs) => {
+  const { pool, seen } = fakePool();
+  await insertObservations(pool, async () => true, [obs], true);
+  const insert = seen.find((q) => /INSERT INTO observations/.test(q.sql));
+  return /ON CONFLICT \(id\) DO UPDATE SET (.+)$/s.exec(insert.sql)?.[1] ?? '';
+};
+
+async function leanReads() {
+  const kept = await conflictOf(observation({ embedder: 'local-384' }));
+  check(
+    'postgres keeps the stored vector of a row read without one',
+    !kept.includes('embedding = NULL') && !kept.includes('embedder ='),
+    kept,
+  );
+  const cleared = await conflictOf(observation());
+  check(
+    'postgres still clears the vector of a row that has none',
+    cleared.includes('embedding = NULL') && cleared.includes('embedder = EXCLUDED.embedder'),
+    cleared,
+  );
+  const fresh = await conflictOf(observation({ embedding: [0.1, 0.2], embedder: 'local-2' }));
+  check(
+    'postgres writes a new vector over the stored one',
+    fresh.includes('embedding = EXCLUDED.embedding') &&
+      fresh.includes('embedder = EXCLUDED.embedder'),
+    fresh,
+  );
+
+  const { pool, seen } = fakePool();
+  await list(pool, { project: '/p' });
+  await list(pool, { project: '/p', vectors: true });
+  await getObservations(pool, ['o1']);
+  const [lean, full, byId] = seen.map((q) => q.sql);
+  check(
+    'postgres lists without the embedding or tsv unless asked',
+    !/\*|embedding|tsv/.test(lean) && /\bbody\b/.test(lean),
+    lean,
+  );
+  check('postgres lists every column when vectors are asked for', /SELECT \*/.test(full), full);
+  check('postgres fetches by id without the embedding', !/\*|embedding|tsv/.test(byId), byId);
 }

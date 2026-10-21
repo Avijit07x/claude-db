@@ -18,6 +18,7 @@ export async function eachObservation(
       ...(after === undefined ? {} : { after }),
       ...(afterId === undefined ? {} : { afterId }),
       limit: PAGE,
+      vectors: true,
     });
     if (batch.length === 0) return total;
 

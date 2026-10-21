@@ -13,6 +13,10 @@ import { excludeSessionsClause, projectClause } from './filters.js';
 import { toIndexEntry, toObservation } from './rows.js';
 import { noProjects } from '../project-scope.js';
 
+const COLUMNS =
+  'id, session_id, project, kind, title, body, files, tags, created_at, embedder, author, status';
+const WITH_VECTORS = '*';
+
 export async function getObservations(pool: Pool, ids: string[]): Promise<Observation[]> {
   if (ids.length === 0) return [];
   const { exact, prefixes } = partitionIds(ids);
@@ -29,7 +33,10 @@ export async function getObservations(pool: Pool, ids: string[]): Promise<Observ
     clauses.push(`id LIKE $${values.length}`);
   }
 
-  const res = await pool.query(`SELECT * FROM observations WHERE ${clauses.join(' OR ')}`, values);
+  const res = await pool.query(
+    `SELECT ${COLUMNS} FROM observations WHERE ${clauses.join(' OR ')}`,
+    values,
+  );
   return res.rows.map(toObservation);
 }
 
@@ -127,7 +134,7 @@ export async function list(pool: Pool, filter: ListFilter): Promise<Observation[
 
   const direction = filter.newest ? 'DESC' : 'ASC';
   const res = await pool.query(
-    `SELECT * FROM observations
+    `SELECT ${filter.vectors ? WITH_VECTORS : COLUMNS} FROM observations
        ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}
        ORDER BY created_at ${direction}, id ${direction} LIMIT $${values.length}`,
     values,

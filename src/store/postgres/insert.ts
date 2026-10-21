@@ -17,6 +17,7 @@ export async function insertObservations(
     await client.query('BEGIN');
     for (const obs of observations) {
       const vectorStored = vectors && obs.embedding?.length === width;
+      const vectorKept = !obs.embedding?.length && obs.embedder != null;
       const columns = [
         'id',
         'session_id',
@@ -52,8 +53,11 @@ export async function insertObservations(
       const holes = values.map((_, i) => `$${i + 1}`).join(', ');
       const updates = columns
         .slice(1)
+        .filter((column) => !(vectorKept && column === 'embedder'))
         .map((column) => `${column} = EXCLUDED.${column}`)
-        .concat(!vectorStored && (hasVectorColumn || vectors) ? ['embedding = NULL'] : [])
+        .concat(
+          !vectorStored && !vectorKept && (hasVectorColumn || vectors) ? ['embedding = NULL'] : [],
+        )
         .join(', ');
       await client.query(
         `INSERT INTO observations (${columns.join(', ')}) VALUES (${holes})

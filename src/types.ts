@@ -71,6 +71,7 @@ export interface ListFilter {
   afterId?: string;
   limit?: number;
   newest?: boolean;
+  vectors?: boolean;
 }
 
 export interface TimelineQuery {
