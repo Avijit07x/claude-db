@@ -46,7 +46,6 @@ export default async function run({ store, project, now, sessionId, expected }, 
 
   if (expected !== 'postgres') return;
 
-  // getObservations no longer returns vectors on Postgres; list does when asked.
   const withVector = async (id) =>
     (await store.list({ project, limit: 100, vectors: true })).find((row) => row.id === id);
 
