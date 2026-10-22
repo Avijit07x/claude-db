@@ -46,6 +46,10 @@ export default async function run({ store, project, now, sessionId, expected }, 
 
   if (expected !== 'postgres') return;
 
+  // getObservations no longer returns vectors on Postgres; list does when asked.
+  const withVector = async (id) =>
+    (await store.list({ project, limit: 100, vectors: true })).find((row) => row.id === id);
+
   const wider = {
     id: randomUUID(),
     sessionId,
@@ -60,7 +64,7 @@ export default async function run({ store, project, now, sessionId, expected }, 
     embedder: 'wider-model',
   };
   await store.insertObservations([wider]);
-  const [rejected] = await store.getObservations([wider.id]);
+  const rejected = await withVector(wider.id);
   check(
     'a row whose vector was rejected claims no embedder',
     rejected.embedder === undefined && !rejected.embedding,
@@ -76,7 +80,7 @@ export default async function run({ store, project, now, sessionId, expected }, 
     (await store.migrateVectorDims(4)) === false,
   );
 
-  const [cleared] = await store.getObservations([stamped.id]);
+  const cleared = await withVector(stamped.id);
   check(
     'migration clears embedder so reembed retries every row',
     cleared.embedder === undefined && !cleared.embedding,
@@ -84,7 +88,7 @@ export default async function run({ store, project, now, sessionId, expected }, 
   );
 
   await store.insertObservations([wider]);
-  const [stored] = await store.getObservations([wider.id]);
+  const stored = await withVector(wider.id);
   check(
     'the wider vector round-trips after migration',
     stored.embedder === 'wider-model' && stored.embedding?.length === 4,
