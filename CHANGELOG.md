@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.12.4
+
+### Fixed
+
+- **`find_usages` finds a path between two symbols anywhere in the code graph.** The search used to load only
+  the first 20,000 links of a project, so on a large repository it often said there was no path when there was
+  one. It now walks out from both ends and asks the database only for the links it needs.
+- **Each request's memories are saved once.** The last request of a chat is read again on the next save, and it
+  was embedded and written again even when nothing in it had changed. It is now skipped.
+
+### Changed
+
+- **claude-db downloads far less from a remote database.** Memories are read without their vectors unless a copy
+  needs them, and without their text where only titles are shown. Counting facts, finding imported Claude
+  memories and finding rows that need a vector now happen in the database instead of reading every row. This
+  matters most on a hosted Postgres that bills for data sent out, such as Neon.
+- **`graphology` and `graphology-shortest-path` are no longer dependencies.**
+
+By @alok-debnath (#36).
+
 ## 0.12.3
 
 ### Fixed
