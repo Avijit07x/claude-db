@@ -23,7 +23,7 @@ import type {
   TimelineQuery,
 } from '../../types.js';
 import type { MemoryStore, ProjectSummary } from '../adapter.js';
-import { Pool, importPg } from './driver.js';
+import { Pool, openPool } from './driver.js';
 import { DDL, SCHEMA_VERSION } from './schema.js';
 
 export class PostgresStore implements MemoryStore {
@@ -36,9 +36,7 @@ export class PostgresStore implements MemoryStore {
   private constructor(private readonly pool: Pool) {}
 
   static async create(uri: string): Promise<PostgresStore> {
-    const pg = await importPg();
-    const pool = new pg.Pool({ connectionString: uri });
-    return new PostgresStore(pool);
+    return new PostgresStore(await openPool(uri));
   }
 
   async init(): Promise<void> {
