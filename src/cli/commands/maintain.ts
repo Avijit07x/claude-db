@@ -5,6 +5,8 @@ import { createContext } from '../../context.js';
 import {
   finishReingest,
   finishScrub,
+  keepReingest,
+  keepScrub,
   redact,
   reingestProject,
   releaseReingest,
@@ -61,6 +63,7 @@ export async function cmdFlush(argv: (string | undefined)[]): Promise<void> {
   }
 
   let total: ProjectReingest;
+  keepReingest(project);
   try {
     total = await reingest(project, transcripts, repair);
   } catch (error) {
@@ -118,6 +121,7 @@ export async function cmdRedact(argv: (string | undefined)[]): Promise<void> {
   const background = argv.includes('--background');
   const ctx = await createContext();
   const database = ctx.config.database;
+  keepScrub(database);
   let result: Awaited<ReturnType<typeof scrubSecrets>>;
   try {
     result = await scrubSecrets(ctx);

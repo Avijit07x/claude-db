@@ -12,7 +12,7 @@ export type { Turn, TranscriptRead } from './transcript.js';
 export { observationsFromGit } from './git.js';
 export { observationsFromTurns } from './turn-extractor.js';
 export { redact } from './redact.js';
-export { claimScrub, finishScrub, releaseScrub, scrubSecrets } from './scrub.js';
+export { claimScrub, finishScrub, keepScrub, releaseScrub, scrubSecrets } from './scrub.js';
 export {
   flushSession,
   resetCursor,
@@ -34,6 +34,7 @@ export {
   REINGEST_VERSION,
   claimReingest,
   finishReingest,
+  keepReingest,
   reingestDone,
   reingestProject,
   rememberedTranscripts,

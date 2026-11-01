@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import type { RecallContext } from '../context.js';
-import { claimJob, finishJob, jobMark, releaseJob } from '../util/job-lock.js';
+import { claimJob, finishJob, jobMark, keepJob, releaseJob } from '../util/job-lock.js';
 import { flushSession, resetCursor } from './flush.js';
 import { readTranscript, transcriptsFor } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
@@ -82,6 +82,10 @@ export function reingestDone(project: string): boolean {
 export function claimReingest(project: string, now = Date.now()): boolean {
   if (reingestDone(project)) return false;
   return claimJob(JOB, project, now);
+}
+
+export function keepReingest(project: string): void {
+  keepJob(JOB, project);
 }
 
 export function finishReingest(project: string): void {
