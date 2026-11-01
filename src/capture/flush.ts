@@ -47,6 +47,11 @@ export async function flushSession(
   const written = rebuild ? new Map<string, string>() : readWritten(sessionId);
   const prints = new Map(observations.map((obs) => [obs.id, printOf(obs)]));
   const fresh = observations.filter((obs) => written.get(obs.id) !== prints.get(obs.id));
+  if (fresh.length === 0) {
+    await closeLandedWork(ctx.store, project);
+    writeCursor(sessionId, nextOffset);
+    return { observations: 0, summary: null, lastReply };
+  }
   await embedObservations(ctx, fresh);
   await ctx.store.insertObservations(fresh);
   writeWritten(sessionId, prints);
