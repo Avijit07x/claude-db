@@ -15,21 +15,37 @@ export interface HookPayload {
   session_crons?: unknown[];
 }
 
-export function capturingDisabled(scripted: boolean): boolean {
-  if (process.env['CLAUDE_DB_CAPTURE'] === 'off') return true;
-  return process.env['CLAUDE_CODE_ENTRYPOINT'] === 'sdk-cli' && !scripted;
+export type HookEnv = Readonly<Record<string, string | undefined>>;
+
+export type Write = (text: string) => void;
+
+export const writeStdout: Write = (text) => {
+  process.stdout.write(text);
+};
+
+export function capturingDisabled(scripted: boolean, env: HookEnv = process.env): boolean {
+  if (env['CLAUDE_DB_CAPTURE'] === 'off') return true;
+  return env['CLAUDE_CODE_ENTRYPOINT'] === 'sdk-cli' && !scripted;
 }
 
-export async function readPayload(): Promise<HookPayload> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin as AsyncIterable<Buffer>) chunks.push(chunk);
-  const raw = Buffer.concat(chunks).toString('utf8').trim();
-  if (raw.length === 0) return {};
+export function parsePayload(raw: string): HookPayload {
+  const text = raw.trim();
+  if (text.length === 0) return {};
   try {
-    return JSON.parse(raw) as HookPayload;
+    return JSON.parse(text) as HookPayload;
   } catch {
     return {};
   }
+}
+
+export async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin as AsyncIterable<Buffer>) chunks.push(chunk);
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+export async function readPayload(): Promise<HookPayload> {
+  return parsePayload(await readStdin());
 }
 
 export async function runHook(fn: () => Promise<void>): Promise<void> {
@@ -42,25 +58,29 @@ export async function runHook(fn: () => Promise<void>): Promise<void> {
   process.exit(0);
 }
 
-export function emitContext(text: string): void {
-  if (text.trim().length > 0) process.stdout.write(text);
+export function emitContext(text: string, write: Write = writeStdout): void {
+  if (text.trim().length > 0) write(text);
 }
 
-export function emitToolContext(text: string): void {
+export function emitToolContext(text: string, write: Write = writeStdout): void {
   if (text.trim().length === 0) return;
-  process.stdout.write(
+  write(
     JSON.stringify({
       hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: text },
     }),
   );
 }
 
-export function emitSessionStart(context: string, notice: string | null): void {
+export function emitSessionStart(
+  context: string,
+  notice: string | null,
+  write: Write = writeStdout,
+): void {
   if (!notice) {
-    emitContext(context);
+    emitContext(context, write);
     return;
   }
-  process.stdout.write(
+  write(
     JSON.stringify({
       systemMessage: notice,
       hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context },
