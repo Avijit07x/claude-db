@@ -22,7 +22,7 @@ import type {
   TimelineQuery,
 } from '../../types.js';
 import type { Collection, Db, Doc, MongoClient } from './driver.js';
-import type { MemoryStore, ProjectSummary } from '../adapter.js';
+import type { GraphRows, MemoryStore, ProjectSummary } from '../adapter.js';
 import {
   EdgeDoc,
   ObservationDoc,
@@ -205,12 +205,13 @@ export class MongoStore implements MemoryStore {
     return searchOps.hasAtlasVectorIndex(this.observations);
   }
 
-  async upsertGraph(scan: {
-    symbols: CodeSymbol[];
-    edges: CodeEdge[];
-    files: ScannedFile[];
-  }): Promise<void> {
+  async upsertGraph(scan: GraphRows): Promise<void> {
     return graphOps.upsertGraph(this.symbols, this.edges, this.scanned, scan);
+  }
+
+  async replaceGraph(project: string, files: string[] | null, scan: GraphRows): Promise<void> {
+    if (files === null || files.length > 0) await this.removeGraph(project, files ?? undefined);
+    await this.upsertGraph(scan);
   }
 
   async findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]> {

@@ -21,6 +21,12 @@ export interface ProjectSummary {
   lastActive: number;
 }
 
+export interface GraphRows {
+  symbols: CodeSymbol[];
+  edges: CodeEdge[];
+  files: ScannedFile[];
+}
+
 export interface MemoryStore {
   readonly kind: string;
 
@@ -61,11 +67,8 @@ export interface MemoryStore {
   closeObservations(ids: string[]): Promise<number>;
   markReplaced(ids: string[]): Promise<number>;
 
-  upsertGraph(scan: {
-    symbols: CodeSymbol[];
-    edges: CodeEdge[];
-    files: ScannedFile[];
-  }): Promise<void>;
+  upsertGraph(scan: GraphRows): Promise<void>;
+  replaceGraph(project: string, files: string[] | null, scan: GraphRows): Promise<void>;
 
   findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]>;
   symbolNames(project: string, limit: number): Promise<string[]>;

@@ -19,7 +19,7 @@ import type {
   SymbolFilter,
   TimelineQuery,
 } from '../../types.js';
-import type { MemoryStore, ProjectSummary } from '../adapter.js';
+import type { GraphRows, MemoryStore, ProjectSummary } from '../adapter.js';
 import { DatabaseSync } from 'node:sqlite';
 import { toFilePath } from './filters.js';
 import { dirname, resolve } from 'node:path';
@@ -167,12 +167,12 @@ export class SqliteStore implements MemoryStore {
     return searchOps.timeline(this.db, query);
   }
 
-  async upsertGraph(scan: {
-    symbols: CodeSymbol[];
-    edges: CodeEdge[];
-    files: ScannedFile[];
-  }): Promise<void> {
+  async upsertGraph(scan: GraphRows): Promise<void> {
     return graphOps.upsertGraph(this.db, scan);
+  }
+
+  async replaceGraph(project: string, files: string[] | null, scan: GraphRows): Promise<void> {
+    return graphOps.replaceGraph(this.db, project, files, scan);
   }
 
   async findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]> {

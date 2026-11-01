@@ -110,6 +110,39 @@ export default async function run({ store, project, expected }, check) {
     (await store.scannedFiles(project)).every((f) => f.path !== 'src/widget.ts'),
   );
 
+  await store.upsertGraph({ symbols, edges, files });
+  const moved = { ...symbols[0], id: 'sym-widget-moved', line: 30 };
+  const movedFile = { ...files[0], hash: 'h-widget-2' };
+  await store.replaceGraph(project, ['src/widget.ts', 'src/gone.ts'], {
+    symbols: [moved],
+    edges: [],
+    files: [movedFile],
+  });
+  const widgets = await store.findSymbols({ project, name: 'Widget' });
+  check(
+    'graph: replacing a file swaps its rows and keeps the others',
+    widgets.length === 1 &&
+      widgets[0].id === 'sym-widget-moved' &&
+      widgets[0].line === 30 &&
+      (await store.findSymbols({ project, name: 'build' })).length === 1 &&
+      (await store.findEdges({ project })).length === 2,
+    JSON.stringify(widgets),
+  );
+  check(
+    'graph: the replaced file has its new scan-cache hash',
+    (await store.scannedFiles(project)).some(
+      (f) => f.path === 'src/widget.ts' && f.hash === 'h-widget-2',
+    ),
+  );
+
+  await store.replaceGraph(project, null, { symbols: [symbols[1]], edges: [], files: [] });
+  check(
+    'graph: replacing the whole project leaves only the new rows',
+    (await store.findSymbols({ project })).map((s) => s.id).join() === 'sym-build' &&
+      (await store.findEdges({ project })).length === 0 &&
+      (await store.scannedFiles(project)).length === 0,
+  );
+
   await store.removeGraph(project);
   check(
     'graph: a whole-project drop clears everything',
