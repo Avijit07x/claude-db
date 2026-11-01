@@ -16,7 +16,7 @@ import {
 import type { ScanResult } from '../../graph/scan/index.js';
 import { PLATFORM } from '../../graph/grammars.js';
 import { GRAPH_JOB } from '../../graph/scan/job.js';
-import { releaseJob } from '../../util/job-lock.js';
+import { keepJob, releaseJob } from '../../util/job-lock.js';
 import { resolveProject } from '../../util/project.js';
 import { valueOf, withoutFlags } from '../args.js';
 
@@ -74,6 +74,7 @@ export async function cmdScan(argv: (string | undefined)[]): Promise<void> {
     await runScan(root, project, argv.includes('--force'));
     return;
   }
+  keepJob(GRAPH_JOB, project);
   try {
     await runRefresh(root, project);
   } finally {

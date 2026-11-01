@@ -1,7 +1,7 @@
 import type { RecallContext } from '../context.js';
 import { eachObservation } from '../store/each.js';
 import type { Observation } from '../types.js';
-import { claimJob, finishJob, jobMark, releaseJob } from '../util/job-lock.js';
+import { claimJob, finishJob, jobMark, keepJob, releaseJob } from '../util/job-lock.js';
 import { embedObservations } from './flush.js';
 import { redact } from './redact.js';
 
@@ -49,6 +49,10 @@ export function scrubDone(database: string): boolean {
 
 export function claimScrub(database: string, now = Date.now()): boolean {
   return !scrubDone(database) && claimJob(JOB, database, now);
+}
+
+export function keepScrub(database: string): void {
+  keepJob(JOB, database);
 }
 
 export function finishScrub(database: string): void {

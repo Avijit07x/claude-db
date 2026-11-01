@@ -13,7 +13,7 @@ import {
 } from '../../facts/distill.js';
 import { runHeadlessResult } from '../../util/claude-cli.js';
 import { describePause } from '../../util/daily-budget.js';
-import { finishJob, releaseJob } from '../../util/job-lock.js';
+import { finishJob, keepJob, releaseJob } from '../../util/job-lock.js';
 import { resolveProject } from '../../util/project.js';
 
 export async function cmdDistill(argv: (string | undefined)[]): Promise<void> {
@@ -48,6 +48,7 @@ export async function cmdDistill(argv: (string | undefined)[]): Promise<void> {
 }
 
 async function runBackfill(project: string): Promise<void> {
+  keepJob(FACTS_JOB, project);
   try {
     const ctx = await createContext();
     try {
