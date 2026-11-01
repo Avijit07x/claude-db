@@ -89,6 +89,27 @@ try {
   );
 
   clearCursor(sessionId);
+  rows = 0;
+  await Promise.all([
+    flushSession(ctx, sessionId, project, transcript),
+    flushSession(ctx, sessionId, project, transcript),
+  ]);
+  report('two flushes of one chat at once save each turn once', rows === 2, rows);
+
+  const lock = join(homedir(), '.claude-memory', 'cursors', `${sessionId}.lock`);
+  report('the flush lock is gone afterwards', !existsSync(lock));
+
+  writeFileSync(lock, '999999999');
+  save([...first, ...second, ...turn(1, 'log the reconnects', 'Reconnects are logged.', 'log.ts')]);
+  const started = Date.now();
+  const afterCrash = await flush();
+  report(
+    'a lock left by a process that died does not hold up the next flush',
+    afterCrash > 0 && Date.now() - started < 2_000 && !existsSync(lock),
+    `${afterCrash} rows in ${Date.now() - started} ms`,
+  );
+
+  clearCursor(sessionId);
   report('clearing the cursor forgets what was saved', !existsSync(written));
 } finally {
   await ctx.close();

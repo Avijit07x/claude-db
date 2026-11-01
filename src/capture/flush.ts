@@ -9,6 +9,7 @@ import type { Turn } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
 import { closeLandedWork } from './progress.js';
 import { noteMissingVectors } from './vectors.js';
+import { withFlushLock } from './flush-lock.js';
 
 export interface FlushResult {
   observations: number;
@@ -23,6 +24,19 @@ export async function flushSession(
   transcriptPath?: string,
   rebuild = false,
   finalReply = '',
+): Promise<FlushResult> {
+  return withFlushLock(sessionId, () =>
+    flushUnlocked(ctx, sessionId, project, transcriptPath, rebuild, finalReply),
+  );
+}
+
+async function flushUnlocked(
+  ctx: RecallContext,
+  sessionId: string,
+  project: string,
+  transcriptPath: string | undefined,
+  rebuild: boolean,
+  finalReply: string,
 ): Promise<FlushResult> {
   const path = transcriptPath ?? transcriptPathFor(project, sessionId);
   const cursor = readCursor(sessionId);
