@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -10,6 +10,7 @@ import { DAEMON_SCRIPT, socketPath } from './paths.js';
 const FORWARDED = ['CLAUDE_DB_CAPTURE', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_DB_USAGES_HOOK'];
 const OWN_SETUP = ['CLAUDE_DB_URL', 'CLAUDE_DB_GRAPH_CACHE'];
 const STARTING_FOR_MS = 15_000;
+export const STARTING_PREFIX = 'daemon.starting.';
 
 export type Asked = DaemonReply | { kind: 'unreachable' } | { kind: 'timeout' };
 
@@ -72,14 +73,8 @@ export function askDaemon(request: DaemonRequest, timeoutMs: number): Promise<As
 }
 
 export function startDaemon(now = Date.now()): boolean {
-  const marker = join(CONFIG_DIR, 'daemon.starting');
-  try {
-    const age = now - statSync(marker).mtimeMs;
-    if (age < STARTING_FOR_MS) return false;
-    rmSync(marker, { force: true });
-  } catch {
-    rmSync(marker, { force: true });
-  }
+  const window = Math.floor(now / STARTING_FOR_MS);
+  const marker = join(CONFIG_DIR, `${STARTING_PREFIX}${window}`);
   try {
     writeFileSync(marker, String(now), { flag: 'wx' });
   } catch {
