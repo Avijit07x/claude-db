@@ -1,6 +1,6 @@
 import '../../lib/require-isolated.mjs';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
@@ -96,9 +96,11 @@ try {
   ]);
   report('two flushes of one chat at once save each turn once', rows === 2, rows);
 
-  const lock = join(homedir(), '.claude-memory', 'cursors', `${sessionId}.lock`);
-  report('the flush lock is gone afterwards', !existsSync(lock));
+  const cursors = join(homedir(), '.claude-memory', 'cursors');
+  const lockName = `${sessionId}.lock`;
+  report('the flush lock is gone afterwards', !readdirSync(cursors).includes(lockName));
 
+  const lock = join(cursors, lockName);
   writeFileSync(lock, '999999999');
   save([...first, ...second, ...turn(1, 'log the reconnects', 'Reconnects are logged.', 'log.ts')]);
   const started = Date.now();
