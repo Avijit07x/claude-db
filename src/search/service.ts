@@ -20,8 +20,9 @@ export class SearchService {
       maxScanCandidates: query.maxScanCandidates ?? this.maxScanCandidates,
     };
 
+    const embedded = this.embed(wide.text);
     const keyword = await this.store.searchKeyword(wide).catch(() => []);
-    const vector = await this.vectorSearch(wide);
+    const vector = await this.vectorSearch(wide, await embedded);
 
     const fused = fuse(
       [keyword, vector].filter((r) => r.length > 0),
@@ -30,19 +31,28 @@ export class SearchService {
     return applyRecencyBoost(fused, Date.now());
   }
 
-  private async vectorSearch(query: SearchQuery): Promise<ObservationIndexEntry[]> {
+  private async embed(text: string): Promise<{ embedder: Embedder; embedding: number[] } | null> {
     try {
       const embedder = typeof this.embedder === 'function' ? await this.embedder() : this.embedder;
-      if (embedder.dimensions === 0) return [];
+      if (embedder.dimensions === 0) return null;
+      const [embedding] = await embedder.embed([text]);
+      return embedding && embedding.length > 0 ? { embedder, embedding } : null;
+    } catch {
+      return null;
+    }
+  }
 
-      const [embedding] = await embedder.embed([query.text]);
-      if (!embedding || embedding.length === 0) return [];
-
+  private async vectorSearch(
+    query: SearchQuery,
+    embedded: { embedder: Embedder; embedding: number[] } | null,
+  ): Promise<ObservationIndexEntry[]> {
+    if (!embedded) return [];
+    const { embedder, embedding } = embedded;
+    try {
       const candidates = await this.store.searchVector(embedding, {
         ...query,
         embedder: embedder.id,
       });
-
       return candidates.filter((entry) => entry.score >= embedder.minRelevance);
     } catch {
       return [];
