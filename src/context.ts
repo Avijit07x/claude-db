@@ -26,13 +26,10 @@ export async function createContext(overrides?: Partial<Config>): Promise<Recall
     createScopeResolver({ store: raw, remote: config.project.remote }),
   );
 
-  let pending: Promise<Embedder> | null = null;
+  let loading: Promise<Embedder> | null = null;
   const embedder = (): Promise<Embedder> => {
-    pending ??= withTimeout(
-      createEmbedder(config.embeddings.provider).catch(() => new NoopEmbedder()),
-      config.embeddings.timeoutMs,
-    );
-    return pending;
+    loading ??= createEmbedder(config.embeddings.provider).catch(() => new NoopEmbedder());
+    return withTimeout(loading, config.embeddings.timeoutMs);
   };
 
   const search = new SearchService(store, embedder, config.embeddings.maxScanCandidates);
