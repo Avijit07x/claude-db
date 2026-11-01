@@ -24,10 +24,14 @@ await runHook(async () => {
   const ctx = await createContext();
 
   try {
-    await ctx.store.upsertSession({ id: sessionId, project, startedAt: Date.now() });
+    const startedAt = Date.now();
     recordActive(sessionId, project, payload.prompt ?? '');
 
-    const { lastReply } = await flushSession(ctx, sessionId, project, payload.transcript_path);
+    const flushed = await flushSession(ctx, sessionId, project, payload.transcript_path);
+    const { lastReply } = flushed;
+    if (flushed.observations === 0) {
+      await ctx.store.upsertSession({ id: sessionId, project, startedAt });
+    }
 
     const candidates = await promptCandidates(ctx, {
       prompt: payload.prompt ?? '',
