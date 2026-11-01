@@ -8,6 +8,11 @@ export function distillUsage(now = Date.now()): BudgetUsage {
   return budgetUsage(BUDGET, now);
 }
 
+export function distillBlocked(limit: number, now = Date.now()): boolean {
+  const { used, pausedUntil } = budgetUsage(BUDGET, now);
+  return pausedUntil > now || used >= limit;
+}
+
 export function takeDistillCalls(limit: number, count: number, now = Date.now()): boolean {
   return takeBudget(BUDGET, limit, count, now);
 }
