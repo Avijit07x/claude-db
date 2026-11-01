@@ -41,7 +41,8 @@ interface StoredCache {
 export const cacheHome = (): string =>
   process.env['CLAUDE_DB_GRAPH_CACHE'] ?? join(CONFIG_DIR, 'graph-cache');
 
-const cachePath = (project: string): string => join(cacheHome(), `${scopeToken(project)}.json`);
+export const cachePath = (project: string): string =>
+  join(cacheHome(), `${scopeToken(project)}.json`);
 
 function receiverTable(): ReceiverTable {
   const list: Receiver[] = [];

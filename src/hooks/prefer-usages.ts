@@ -2,11 +2,13 @@
 import { createContext } from '../context.js';
 import type { RecallContext } from '../context.js';
 import { addText, answerQuery, formatGraph, formatText } from '../graph/index.js';
+import { hasGraph } from '../graph/query/answer.js';
 import type { GraphAnswer } from '../graph/query/lookup.js';
 import { staleFiles } from '../graph/query/stale.js';
 import type { MemoryStore } from '../store/adapter.js';
 import { repoRootFor } from '../usages/index.js';
 import { DECLARED, isSymbol, isWord, symbolsGreppedIn } from './grep-symbols.js';
+import { graphCachedHere, graphKnownAbsent, noteGraphPresence } from './graph-presence.js';
 import { refreshGraphInBackground } from './graph-refresh.js';
 import { readPayload, runHook } from './payload.js';
 import { resolveProject } from '../util/project.js';
@@ -92,6 +94,8 @@ async function answerSymbols(
   if (answered.blocks.length > 0) {
     const note = await freshnessNote(ctx.store, project);
     if (note) answered.blocks.push(note);
+  } else if (!graphCachedHere(project) && !(await hasGraph(ctx.store, project))) {
+    noteGraphPresence(project, false);
   }
   return answered;
 }
@@ -105,6 +109,7 @@ await runHook(async () => {
   if (symbols.length === 0) return;
 
   const project = resolveProject(payload.cwd);
+  if (graphKnownAbsent(project)) return;
   const ctx = await createContext();
   let answered: Answered;
   try {
