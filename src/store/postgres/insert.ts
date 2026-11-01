@@ -18,6 +18,11 @@ const COLUMNS = [
 
 const ROWS_PER_STATEMENT = 400;
 
+const KEEP_CLOSED = `status = CASE
+    WHEN observations.status = 'done' AND EXCLUDED.status = 'open'
+         AND observations.files = EXCLUDED.files THEN observations.status
+    ELSE EXCLUDED.status END`;
+
 interface Shape {
   vectorStored: boolean;
   vectorKept: boolean;
@@ -58,7 +63,7 @@ function statement(rows: Observation[], shape: Shape, clearVector: boolean): Sta
   const updates = columns
     .slice(1)
     .filter((column) => !(shape.vectorKept && column === 'embedder'))
-    .map((column) => `${column} = EXCLUDED.${column}`)
+    .map((column) => (column === 'status' ? KEEP_CLOSED : `${column} = EXCLUDED.${column}`))
     .concat(clearVector ? ['embedding = NULL'] : [])
     .join(', ');
   return {

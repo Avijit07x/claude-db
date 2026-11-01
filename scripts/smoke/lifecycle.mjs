@@ -71,5 +71,28 @@ export default async function run({ store, project, now, sessionId }, check) {
       (await store.list({ project, status: 'open', limit: 50 })).length === 0,
     );
     check('closing again is a no-op', (await store.closeObservations(['status-open'])) === 0);
+
+    await store.insertObservations([openObs]);
+    const [kept] = await store.getObservations(['status-open']);
+    check('saving a closed row again does not reopen it', kept?.status === 'done', kept?.status);
+
+    await store.insertObservations([
+      { ...openObs, files: [...openObs.files, '/tmp/demo-project/y.ts'] },
+    ]);
+    const [reopened] = await store.getObservations(['status-open']);
+    check(
+      'a closed row saved again with new files is open again',
+      reopened?.status === 'open',
+      reopened?.status,
+    );
+
+    await store.markReplaced(['status-open']);
+    await store.insertObservations([{ ...openObs, status: 'done' }]);
+    const [revived] = await store.getObservations(['status-open']);
+    check(
+      'a replaced row saved again takes the new status',
+      revived?.status === 'done',
+      revived?.status,
+    );
   }
 }
