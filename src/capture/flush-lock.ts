@@ -1,4 +1,12 @@
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  fstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { CONFIG_DIR } from '../config/index.js';
 import { safeName } from '../util/json-file.js';
@@ -20,12 +28,20 @@ function alive(pid: number): boolean {
 }
 
 function abandoned(lock: string, now: number): boolean {
+  let fd: number;
   try {
-    if (now - statSync(lock).mtimeMs > STALE_MS) return true;
-    const pid = Number(readFileSync(lock, 'utf8'));
+    fd = openSync(lock, 'r');
+  } catch {
+    return false;
+  }
+  try {
+    if (now - fstatSync(fd).mtimeMs > STALE_MS) return true;
+    const pid = Number(readFileSync(fd, 'utf8'));
     return !Number.isInteger(pid) || pid <= 0 || !alive(pid);
   } catch {
     return false;
+  } finally {
+    closeSync(fd);
   }
 }
 
