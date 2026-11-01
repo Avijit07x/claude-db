@@ -17,6 +17,7 @@ import { cmdLanguages } from './commands/languages.js';
 import { cmdSeed } from './commands/seed.js';
 import { cmdAdoption } from './commands/adoption.js';
 import { cmdView } from './commands/view.js';
+import { cmdDaemon } from './commands/daemon.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 import { packageVersion } from '../update.js';
 
@@ -119,6 +120,9 @@ async function run(): Promise<void> {
       break;
     case 'sync':
       await cmdSync(args);
+      break;
+    case 'daemon':
+      await cmdDaemon(args);
       break;
     case '--version':
     case '-v':

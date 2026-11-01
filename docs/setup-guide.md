@@ -76,6 +76,11 @@ claude-db use "postgres://user:pass@host:5432/memory"
 For MongoDB, install `mongodb` and use a `mongodb+srv://` address. Clones of one repository share
 memory by git remote, so every machine must run 0.11.0 or newer.
 
+On a remote database each hook pays to start node, open a connection and load the embedding model before
+it does any work, about a second in all. `claude-db daemon on` keeps one process warm that the hooks hand
+their work to, so the next hooks skip that cost. It stops after 15 idle minutes (`daemon.idleMinutes`)
+and starts again with the next hook. `claude-db daemon off` turns it off.
+
 ## Upgrading
 
 ```bash

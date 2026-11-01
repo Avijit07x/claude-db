@@ -122,6 +122,14 @@ The six hooks:
 
 Every hook catches its own errors and exits with success. A broken memory never stops your chat.
 
+**The optional daemon.** With `daemon.enabled` on, the five hooks that use the database hand their input
+to one long-lived process over a socket in the data folder (`daemon.sock`, readable only by you), and
+print what it sends back. That process keeps the database connection, the embedding model and the loaded
+code, and saves finished turns itself instead of starting a worker. A hook that finds no daemon does its
+own work as before and starts one for the next hook. The daemon exits after `daemon.idleMinutes` with
+nothing to do, and a hook from a newer install replaces it. `CLAUDE_DB_URL` or `CLAUDE_DB_GRAPH_CACHE` in a
+hook's environment keeps that hook in its own process.
+
 ---
 
 ## 3. One chat, start to end
@@ -699,6 +707,8 @@ Settings live in `~/.claude-memory/config.json`. The full list is in [setup-guid
 | `project.remote`       | origin  | The remote that names a project                      |
 | `capture.summarize`    | off     | An extra AI summary at chat end, when facts are off  |
 | `updates`              | notify  | `auto`, `notify` or `off`                            |
+| `daemon.enabled`       | off     | Hooks hand their work to one warm process            |
+| `daemon.idleMinutes`   | 15      | Minutes with nothing to do before the daemon exits   |
 
 **When a Haiku call fails, that feature pauses and says why.**
 
@@ -835,7 +845,8 @@ something to find. Facts and picks become useful after a few chats.
 
 ```
 src/
- ├── hooks/      the six hooks, the background save, and what they share
+ ├── hooks/      the six hooks, their handlers, the background save, and what they share
+ ├── daemon/     the optional warm process the hooks hand their work to
  ├── capture/    chat log reader, turn extractor, redaction, not-finished requests, flush
  ├── search/     keyword + vector fusion, recency, stopwords        (database-independent)
  ├── facts/      facts (Haiku), the start block, other chats, handoff, Claude's own memory files

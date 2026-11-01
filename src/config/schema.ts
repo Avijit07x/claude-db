@@ -14,6 +14,13 @@ export const ConfigSchema = z.object({
 
   updates: z.enum(['auto', 'notify', 'off']).default('notify'),
 
+  daemon: z
+    .object({
+      enabled: z.boolean().default(false),
+      idleMinutes: z.number().int().positive().default(15),
+    })
+    .prefault({}),
+
   project: z
     .object({
       remote: z
