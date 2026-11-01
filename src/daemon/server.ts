@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmodSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 import type { Server, Socket } from 'node:net';
 import { join } from 'node:path';
@@ -12,6 +12,7 @@ import { isHookName, loadHandler } from '../hooks/run.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 import type { DaemonReply, DaemonRequest } from './paths.js';
 import { buildId, socketPath } from './paths.js';
+import { STARTING_PREFIX } from './client.js';
 
 silenceSqliteWarning();
 
@@ -158,6 +159,16 @@ async function shutdown(reason: string): Promise<void> {
   process.exit(0);
 }
 
+function clearStartMarkers(): void {
+  try {
+    for (const name of readdirSync(CONFIG_DIR)) {
+      if (name.startsWith(STARTING_PREFIX)) rmSync(join(CONFIG_DIR, name), { force: true });
+    }
+  } catch {
+    return;
+  }
+}
+
 function inUse(): Promise<boolean> {
   return new Promise((settle) => {
     const probe = createConnection(SOCKET);
@@ -182,7 +193,7 @@ async function start(): Promise<void> {
   });
   server.listen(SOCKET, () => {
     if (process.platform !== 'win32') chmodSync(SOCKET, 0o600);
-    rmSync(join(CONFIG_DIR, 'daemon.starting'), { force: true });
+    clearStartMarkers();
     log(`listening on ${SOCKET}`);
     touch();
     void context()
