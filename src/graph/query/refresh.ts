@@ -1,5 +1,6 @@
 import type { MemoryStore } from '../../store/adapter.js';
 import { currentHashes, saveScan, scanRepository } from '../scan/index.js';
+import { staleFiles } from './stale.js';
 
 function changesOnDisk(
   root: string,
@@ -16,7 +17,9 @@ export async function refreshGraph(
   root: string,
   project: string,
 ): Promise<string[]> {
-  const stored = new Map((await store.scannedFiles(project)).map((file) => [file.path, file.hash]));
+  const scanned = await store.scannedFiles(project);
+  if (scanned.length > 0 && staleFiles(root, scanned).length === 0) return [];
+  const stored = new Map(scanned.map((file) => [file.path, file.hash]));
   const hashes = changesOnDisk(root, stored);
   if (!hashes) return [];
 
