@@ -7,6 +7,7 @@ import { createContext } from '../context.js';
 import { distillNotice } from '../facts/notice.js';
 import { recentWorkBlock, startFacts } from '../facts/start.js';
 import { startBackgroundWork } from './background.js';
+import { noteGraphPresence } from './graph-presence.js';
 import { refreshGraphInBackground } from './graph-refresh.js';
 import { recoverAfterCompact } from './compact.js';
 import { capturingDisabled, emitSessionStart, readPayload, runHook } from './payload.js';
@@ -40,6 +41,15 @@ function refreshInstalledQuietly(project: string): void {
     refreshInstalled(resolve(dirname(fileURLToPath(import.meta.url)), '..'), project);
   } catch {
     return;
+  }
+}
+
+function isGitRepo(project: string): boolean {
+  try {
+    repoRootFor(project);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -87,7 +97,8 @@ await runHook(async () => {
       );
     }
     const scanned = (await ctx.store.scannedFiles(project, 1)).length > 0;
-    if (!scanned) parts.push(SCAN_HINT);
+    noteGraphPresence(project, scanned);
+    if (!scanned && isGitRepo(project)) parts.push(SCAN_HINT);
     const update = ctx.config.updates === 'off' ? null : updateNotice();
     if (update) parts.push(update);
 
