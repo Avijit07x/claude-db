@@ -36,7 +36,7 @@ export async function startFacts(
       await ctx.store.list({ project: owner, sessionId, newest: true, limit, bodies: false })
     ).filter(visible);
 
-  const you = onePerKey(await list(youScope(), FACT_SESSION, 50));
+  const you = onePerKey(await list(youScope(project), FACT_SESSION, 50));
   const facts = onePerKey(await list(project, FACT_SESSION, 300));
   const handoff = await newestHandoff(ctx, project);
   const shownHandoff = handoff && visible(handoff) ? handoff : null;

@@ -9,7 +9,7 @@ const EXISTING_LIMIT = 80;
 export async function existingFacts(ctx: RecallContext, project: string): Promise<ExistingFact[]> {
   const owners: [string, ExistingFact['scope']][] = [
     [project, 'project'],
-    [youScope(), 'you'],
+    [youScope(project), 'you'],
   ];
   const facts: ExistingFact[] = [];
   for (const [owner, scope] of owners) {
