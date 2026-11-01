@@ -2,15 +2,9 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { CodeEdge, CodeSymbol, EdgeFilter, ScannedFile, SymbolFilter } from '../../types.js';
 import type { Row } from './rows.js';
 import { toEdge, toSymbol } from './rows.js';
+import type { GraphRows } from '../adapter.js';
 
-export async function upsertGraph(
-  db: DatabaseSync,
-  scan: {
-    symbols: CodeSymbol[];
-    edges: CodeEdge[];
-    files: ScannedFile[];
-  },
-): Promise<void> {
+function writeGraphRows(db: DatabaseSync, scan: GraphRows): void {
   const symbol = db.prepare(
     `INSERT OR REPLACE INTO symbols
          (id, project, name, kind, file, line, lang, signature)
@@ -26,35 +20,73 @@ export async function upsertGraph(
     `INSERT OR REPLACE INTO scanned_files (project, path, hash, scanned_at)
        VALUES (?, ?, ?, ?)`,
   );
+  for (const s of scan.symbols) {
+    symbol.run(s.id, s.project, s.name, s.kind, s.file, s.line, s.lang, s.signature);
+  }
+  for (const e of scan.edges) {
+    edge.run(
+      e.id,
+      e.project,
+      e.srcId,
+      e.srcName,
+      e.dstId,
+      e.dstName,
+      e.relation,
+      e.confidence,
+      e.score,
+      e.file,
+      e.line,
+    );
+  }
+  for (const f of scan.files) file.run(f.project, f.path, f.hash, f.scannedAt);
+}
 
+const DELETE_BATCH = 500;
+
+function deleteGraphRows(db: DatabaseSync, project: string, files: string[] | null): number {
+  const batches: (string[] | null)[] = files === null ? [null] : [];
+  for (let start = 0; files !== null && start < files.length; start += DELETE_BATCH) {
+    batches.push(files.slice(start, start + DELETE_BATCH));
+  }
+  let removed = 0;
+  for (const batch of batches) {
+    const holes = batch?.map(() => '?').join(',');
+    const where = batch ? `project = ? AND file IN (${holes})` : 'project = ?';
+    const cacheWhere = batch ? `project = ? AND path IN (${holes})` : 'project = ?';
+    const params = (batch ? [project, ...batch] : [project]) as never[];
+    removed += Number(db.prepare(`DELETE FROM symbols WHERE ${where}`).run(...params).changes);
+    db.prepare(`DELETE FROM symbol_edges WHERE ${where}`).run(...params);
+    db.prepare(`DELETE FROM scanned_files WHERE ${cacheWhere}`).run(...params);
+  }
+  return removed;
+}
+
+function inTransaction<T>(db: DatabaseSync, work: () => T): T {
   db.exec('BEGIN');
   try {
-    for (const s of scan.symbols) {
-      symbol.run(s.id, s.project, s.name, s.kind, s.file, s.line, s.lang, s.signature);
-    }
-    for (const e of scan.edges) {
-      edge.run(
-        e.id,
-        e.project,
-        e.srcId,
-        e.srcName,
-        e.dstId,
-        e.dstName,
-        e.relation,
-        e.confidence,
-        e.score,
-        e.file,
-        e.line,
-      );
-    }
-    for (const f of scan.files) {
-      file.run(f.project, f.path, f.hash, f.scannedAt);
-    }
+    const result = work();
     db.exec('COMMIT');
+    return result;
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;
   }
+}
+
+export async function upsertGraph(db: DatabaseSync, scan: GraphRows): Promise<void> {
+  inTransaction(db, () => writeGraphRows(db, scan));
+}
+
+export async function replaceGraph(
+  db: DatabaseSync,
+  project: string,
+  files: string[] | null,
+  scan: GraphRows,
+): Promise<void> {
+  inTransaction(db, () => {
+    deleteGraphRows(db, project, files);
+    writeGraphRows(db, scan);
+  });
 }
 
 export async function findSymbols(db: DatabaseSync, filter: SymbolFilter): Promise<CodeSymbol[]> {
@@ -145,28 +177,6 @@ export async function removeGraph(
   project: string,
   files?: string[],
 ): Promise<number> {
-  const scoped = files && files.length > 0;
-  const where = scoped
-    ? `project = ? AND file IN (${files.map(() => '?').join(',')})`
-    : 'project = ?';
-  const params = scoped ? [project, ...files] : [project];
-
-  const count = db
-    .prepare(`SELECT COUNT(*) AS n FROM symbols WHERE ${where}`)
-    .get(...(params as never[])) as { n: number } | undefined;
-
-  db.exec('BEGIN');
-  try {
-    db.prepare(`DELETE FROM symbols WHERE ${where}`).run(...(params as never[]));
-    db.prepare(`DELETE FROM symbol_edges WHERE ${where}`).run(...(params as never[]));
-    const cacheWhere = scoped
-      ? `project = ? AND path IN (${files.map(() => '?').join(',')})`
-      : 'project = ?';
-    db.prepare(`DELETE FROM scanned_files WHERE ${cacheWhere}`).run(...(params as never[]));
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
-  return count?.n ?? 0;
+  const scoped = files !== undefined && files.length > 0;
+  return inTransaction(db, () => deleteGraphRows(db, project, scoped ? files : null));
 }

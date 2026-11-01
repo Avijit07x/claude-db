@@ -1,8 +1,11 @@
-import type { Pool } from './driver.js';
+import type { Pool, PoolClient, QueryResult } from './driver.js';
 import type { CodeEdge, CodeSymbol, EdgeFilter, ScannedFile, SymbolFilter } from '../../types.js';
 import { toEdge, toSymbol } from './rows.js';
+import type { GraphRows } from '../adapter.js';
 
 const CHUNK = 500;
+
+type Client = { query: (text: string, values?: unknown[]) => Promise<QueryResult> };
 
 function lastById<T>(rows: T[], key: (row: T) => string): T[] {
   const byId = new Map<string, T>();
@@ -21,7 +24,7 @@ function placeholders(count: number, width: number): string {
 }
 
 async function upsertChunked<T>(
-  client: { query: (text: string, values: unknown[]) => Promise<unknown> },
+  client: Client,
   rows: T[],
   width: number,
   sql: (values: string) => string,
@@ -35,75 +38,106 @@ async function upsertChunked<T>(
   }
 }
 
-export async function upsertGraph(
-  pool: Pool,
-  scan: {
-    symbols: CodeSymbol[];
-    edges: CodeEdge[];
-    files: ScannedFile[];
-  },
-): Promise<void> {
+async function writeGraphRows(client: Client, scan: GraphRows): Promise<void> {
+  await upsertChunked(
+    client,
+    lastById(scan.symbols, (s) => s.id),
+    8,
+    (values) => `INSERT INTO symbols (id, project, name, kind, file, line, lang, signature)
+         VALUES ${values}
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name, kind = EXCLUDED.kind, file = EXCLUDED.file,
+           line = EXCLUDED.line, lang = EXCLUDED.lang,
+           signature = EXCLUDED.signature`,
+    (s) => [s.id, s.project, s.name, s.kind, s.file, s.line, s.lang, s.signature],
+  );
+
+  await upsertChunked(
+    client,
+    lastById(scan.edges, (e) => e.id),
+    11,
+    (values) => `INSERT INTO symbol_edges (id, project, src_id, src_name, dst_id, dst_name,
+                                   relation, confidence, score, file, line)
+         VALUES ${values}
+         ON CONFLICT (id) DO UPDATE SET
+           dst_id = EXCLUDED.dst_id, dst_name = EXCLUDED.dst_name,
+           relation = EXCLUDED.relation, confidence = EXCLUDED.confidence,
+           score = EXCLUDED.score, file = EXCLUDED.file, line = EXCLUDED.line`,
+    (e) => [
+      e.id,
+      e.project,
+      e.srcId,
+      e.srcName,
+      e.dstId,
+      e.dstName,
+      e.relation,
+      e.confidence,
+      e.score,
+      e.file,
+      e.line,
+    ],
+  );
+
+  await upsertChunked(
+    client,
+    lastById(scan.files, (f) => `${f.project}\u0000${f.path}`),
+    4,
+    (values) => `INSERT INTO scanned_files (project, path, hash, scanned_at)
+         VALUES ${values}
+         ON CONFLICT (project, path) DO UPDATE SET
+           hash = EXCLUDED.hash, scanned_at = EXCLUDED.scanned_at`,
+    (f) => [f.project, f.path, f.hash, f.scannedAt],
+  );
+}
+
+async function deleteGraphRows(
+  client: Client,
+  project: string,
+  files: string[] | null,
+): Promise<number> {
+  if (files !== null && files.length === 0) return 0;
+  const values: unknown[] = files === null ? [project] : [project, files];
+  const where = files === null ? 'project = $1' : 'project = $1 AND file = ANY($2::text[])';
+  const cacheWhere = files === null ? 'project = $1' : 'project = $1 AND path = ANY($2::text[])';
+  const res = await client.query(
+    `WITH gone AS (DELETE FROM symbols WHERE ${where} RETURNING 1),
+          edges AS (DELETE FROM symbol_edges WHERE ${where}),
+          cached AS (DELETE FROM scanned_files WHERE ${cacheWhere})
+     SELECT COUNT(*)::int AS n FROM gone`,
+    values,
+  );
+  return Number(res.rows[0]?.['n'] ?? 0);
+}
+
+async function inTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    await upsertChunked(
-      client,
-      lastById(scan.symbols, (s) => s.id),
-      8,
-      (values) => `INSERT INTO symbols (id, project, name, kind, file, line, lang, signature)
-           VALUES ${values}
-           ON CONFLICT (id) DO UPDATE SET
-             name = EXCLUDED.name, kind = EXCLUDED.kind, file = EXCLUDED.file,
-             line = EXCLUDED.line, lang = EXCLUDED.lang,
-             signature = EXCLUDED.signature`,
-      (s) => [s.id, s.project, s.name, s.kind, s.file, s.line, s.lang, s.signature],
-    );
-
-    await upsertChunked(
-      client,
-      lastById(scan.edges, (e) => e.id),
-      11,
-      (values) => `INSERT INTO symbol_edges (id, project, src_id, src_name, dst_id, dst_name,
-                                     relation, confidence, score, file, line)
-           VALUES ${values}
-           ON CONFLICT (id) DO UPDATE SET
-             dst_id = EXCLUDED.dst_id, dst_name = EXCLUDED.dst_name,
-             relation = EXCLUDED.relation, confidence = EXCLUDED.confidence,
-             score = EXCLUDED.score, file = EXCLUDED.file, line = EXCLUDED.line`,
-      (e) => [
-        e.id,
-        e.project,
-        e.srcId,
-        e.srcName,
-        e.dstId,
-        e.dstName,
-        e.relation,
-        e.confidence,
-        e.score,
-        e.file,
-        e.line,
-      ],
-    );
-
-    await upsertChunked(
-      client,
-      lastById(scan.files, (f) => `${f.project}\u0000${f.path}`),
-      4,
-      (values) => `INSERT INTO scanned_files (project, path, hash, scanned_at)
-           VALUES ${values}
-           ON CONFLICT (project, path) DO UPDATE SET
-             hash = EXCLUDED.hash, scanned_at = EXCLUDED.scanned_at`,
-      (f) => [f.project, f.path, f.hash, f.scannedAt],
-    );
-
+    const result = await work(client);
     await client.query('COMMIT');
+    return result;
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
   }
+}
+
+export async function upsertGraph(pool: Pool, scan: GraphRows): Promise<void> {
+  await inTransaction(pool, (client) => writeGraphRows(client, scan));
+}
+
+export async function replaceGraph(
+  pool: Pool,
+  project: string,
+  files: string[] | null,
+  scan: GraphRows,
+): Promise<void> {
+  await inTransaction(pool, async (client) => {
+    await deleteGraphRows(client, project, files);
+    await writeGraphRows(client, scan);
+  });
 }
 
 const SYMBOL_COLUMNS = 'id, name, kind, file, line, lang, signature';
@@ -192,26 +226,5 @@ export async function scannedFiles(
 
 export async function removeGraph(pool: Pool, project: string, files?: string[]): Promise<number> {
   const scoped = files !== undefined && files.length > 0;
-  const values: unknown[] = scoped ? [project, files] : [project];
-  const where = scoped ? 'project = $1 AND file = ANY($2::text[])' : 'project = $1';
-  const cacheWhere = scoped ? 'project = $1 AND path = ANY($2::text[])' : 'project = $1';
-
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const counted = await client.query(
-      `SELECT COUNT(*)::int AS n FROM symbols WHERE ${where}`,
-      values,
-    );
-    await client.query(`DELETE FROM symbols WHERE ${where}`, values);
-    await client.query(`DELETE FROM symbol_edges WHERE ${where}`, values);
-    await client.query(`DELETE FROM scanned_files WHERE ${cacheWhere}`, values);
-    await client.query('COMMIT');
-    return Number(counted.rows[0]?.['n'] ?? 0);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  return deleteGraphRows(pool, project, scoped ? files : null);
 }

@@ -22,7 +22,7 @@ import type {
   SymbolFilter,
   TimelineQuery,
 } from '../../types.js';
-import type { MemoryStore, ProjectSummary } from '../adapter.js';
+import type { GraphRows, MemoryStore, ProjectSummary } from '../adapter.js';
 import { Pool, openPool } from './driver.js';
 import { DDL, SCHEMA_VERSION } from './schema.js';
 
@@ -216,12 +216,12 @@ export class PostgresStore implements MemoryStore {
     return metaOps.tryEnableVector(this.pool);
   }
 
-  async upsertGraph(scan: {
-    symbols: CodeSymbol[];
-    edges: CodeEdge[];
-    files: ScannedFile[];
-  }): Promise<void> {
+  async upsertGraph(scan: GraphRows): Promise<void> {
     return graphOps.upsertGraph(this.pool, scan);
+  }
+
+  async replaceGraph(project: string, files: string[] | null, scan: GraphRows): Promise<void> {
+    return graphOps.replaceGraph(this.pool, project, files, scan);
   }
 
   async findSymbols(filter: SymbolFilter): Promise<CodeSymbol[]> {
