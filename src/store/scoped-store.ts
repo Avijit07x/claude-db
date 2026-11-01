@@ -24,7 +24,7 @@ type Overrides = Pick<
 >;
 
 export function withProjectScope(inner: MemoryStore, resolver: ScopeResolver): MemoryStore {
-  const keyOf = async (project: string): Promise<string> => (await resolver.resolve(project)).key;
+  const keyOf = (project: string): Promise<string> => resolver.key(project);
 
   async function expand(filter: ProjectFilter | undefined): Promise<ProjectFilter | undefined> {
     if (filter === undefined) return undefined;

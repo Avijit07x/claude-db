@@ -2,13 +2,15 @@ import { statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { projectKey } from '../util/project-key.js';
 import type { MemoryStore } from './adapter.js';
-import { orderScope } from './project-scope.js';
+import { isLinkable, orderScope } from './project-scope.js';
 
 export interface ScopeResolverOptions {
   store: Pick<MemoryStore, 'linkProject' | 'projectScope'>;
   remote: string;
   isFolder?: (value: string) => boolean;
   keyOf?: (folder: string, remote: string) => string;
+  scopeTtlMs?: number;
+  now?: () => number;
 }
 
 export interface ProjectScope {
@@ -17,8 +19,11 @@ export interface ProjectScope {
 }
 
 export interface ScopeResolver {
+  key(value: string): Promise<string>;
   resolve(value: string): Promise<ProjectScope>;
 }
+
+const SCOPE_TTL_MS = 60_000;
 
 export function isExistingFolder(value: string): boolean {
   if (!isAbsolute(value)) return false;
@@ -29,43 +34,65 @@ export function isExistingFolder(value: string): boolean {
   }
 }
 
+interface CachedScope {
+  at: number;
+  scope: Promise<ProjectScope>;
+}
+
 export function createScopeResolver(options: ScopeResolverOptions): ScopeResolver {
   const {
     store,
     remote,
     isFolder = isExistingFolder,
     keyOf = (folder, name) => projectKey(folder, { remote: name }),
+    scopeTtlMs = SCOPE_TTL_MS,
+    now = Date.now,
   } = options;
-  const keys = new Map<string, Promise<string>>();
+  const scopes = new Map<string, CachedScope>();
 
-  async function linkedKey(folder: string): Promise<string> {
-    const key = keyOf(folder, remote);
-    try {
-      await store.linkProject(folder, key);
-    } catch {
-      return key;
-    }
-    return key;
+  function forgetOthers(folder: string): void {
+    for (const cached of [...scopes.keys()]) if (cached !== folder) scopes.delete(cached);
   }
 
-  async function namesFor(folder: string, key: string): Promise<string[]> {
+  async function linked(folder: string): Promise<string[] | null> {
     try {
-      return orderScope(folder, [...(await store.projectScope(folder)), key]);
+      return await store.projectScope(folder);
     } catch {
-      return orderScope(folder, [key]);
+      return null;
     }
+  }
+
+  async function lookUp(folder: string): Promise<ProjectScope> {
+    const key = keyOf(folder, remote);
+    let related = await linked(folder);
+    if (isLinkable(folder, key) && !related?.includes(key)) {
+      const before = related;
+      related = await store.linkProject(folder, key).then(
+        () => {
+          forgetOthers(folder);
+          return linked(folder);
+        },
+        () => before,
+      );
+    }
+    return { key, names: orderScope(folder, [...(related ?? []), key]) };
+  }
+
+  function scopeOf(folder: string): Promise<ProjectScope> {
+    const cached = scopes.get(folder);
+    if (cached && now() - cached.at < scopeTtlMs) return cached.scope;
+    const scope = lookUp(folder);
+    scopes.set(folder, { at: now(), scope });
+    return scope;
   }
 
   return {
+    async key(value) {
+      return isFolder(value) ? (await scopeOf(value)).key : value;
+    },
+
     async resolve(value) {
-      if (!isFolder(value)) return { key: value, names: [value] };
-      let pending = keys.get(value);
-      if (!pending) {
-        pending = linkedKey(value);
-        keys.set(value, pending);
-      }
-      const key = await pending;
-      return { key, names: await namesFor(value, key) };
+      return isFolder(value) ? scopeOf(value) : { key: value, names: [value] };
     },
   };
 }
