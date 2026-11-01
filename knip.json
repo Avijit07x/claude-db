@@ -3,6 +3,7 @@
   "entry": [
     "src/hooks/{session-start,session-end,user-prompt,prefer-usages,pick-deliver,turn-end,turn-save}.ts",
     "src/hooks/handlers/*.ts",
+    "src/daemon/server.ts",
     "src/mcp/server.ts",
     "src/pick/worker.ts",
     "scripts/**/*.mjs"

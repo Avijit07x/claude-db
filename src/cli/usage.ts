@@ -34,6 +34,7 @@ export function usage(): void {
   export [--all] > out.jsonl  Dump memory as JSONL, for backup or migration
   import <file.jsonl>         Load a dump back in (safe to repeat)
   sync <url> [--yes]          Two-way merge with another database
+  daemon [on|off|start|stop]  Serve hooks from one warm process; no argument shows status
   update                      Install a newer compatible release now
   reembed [--project]         Re-embed with the current model
   prune --older-than <days>   Delete old memory (dry run without --yes)
