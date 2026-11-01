@@ -76,8 +76,11 @@ export default async function run() {
 
   const conflict = /ON CONFLICT \(id\) DO UPDATE SET (.+)$/s.exec(insert.sql)?.[1] ?? '';
   check(
-    're-ingesting updates status rather than leaving the old value',
-    conflict.includes('status = EXCLUDED.status'),
+    're-ingesting updates status, except back to open on a closed row with the same files',
+    /status = CASE[\s\S]*observations\.files = EXCLUDED\.files[\s\S]*ELSE EXCLUDED\.status END/.test(
+      conflict,
+    ),
+    conflict,
   );
 
   const doc = toDoc(observation({ status: 'open' }));

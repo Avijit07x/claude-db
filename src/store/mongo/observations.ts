@@ -18,8 +18,20 @@ export async function insertObservations(
   rows: Observation[],
 ): Promise<void> {
   if (rows.length === 0) return;
+  const reopening = rows.filter((obs) => obs.status === 'open').map((obs) => obs.id);
+  const closed = new Map<string, string[]>();
+  if (reopening.length > 0) {
+    const docs = await collection
+      .find({ _id: { $in: reopening }, status: 'done' }, { projection: { files: 1 } })
+      .toArray();
+    for (const doc of docs) closed.set(doc._id, doc.files);
+  }
+  const kept = (obs: Observation): Observation =>
+    closed.has(obs.id) && JSON.stringify(closed.get(obs.id)) === JSON.stringify(obs.files)
+      ? { ...obs, status: 'done' }
+      : obs;
   await collection.bulkWrite(
-    rows.map((obs) => ({
+    rows.map(kept).map((obs) => ({
       replaceOne: {
         filter: { _id: obs.id },
         replacement: toDoc(obs),

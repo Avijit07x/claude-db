@@ -20,12 +20,16 @@ export async function insertObservations(
     `INSERT OR REPLACE INTO observations
         (id, session_id, project, scope, kind, title, body, files, tags,
          created_at, embedding, embedder, author, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         COALESCE((SELECT status FROM observations
+                    WHERE id = ? AND status = 'done' AND ? = 'open' AND files = ?), ?))`,
   );
 
   db.exec('BEGIN');
   try {
     for (const obs of observations) {
+      const files = JSON.stringify(obs.files);
+      const status = obs.status ?? 'done';
       stmt.run(
         obs.id,
         obs.sessionId,
@@ -34,13 +38,16 @@ export async function insertObservations(
         obs.kind,
         obs.title,
         obs.body,
-        JSON.stringify(obs.files),
+        files,
         JSON.stringify(obs.tags),
         obs.createdAt,
         obs.embedding ? packVector(obs.embedding) : null,
         obs.embedder ?? null,
         obs.author ?? null,
-        obs.status ?? 'done',
+        obs.id,
+        status,
+        files,
+        status,
       );
     }
     db.exec('COMMIT');
