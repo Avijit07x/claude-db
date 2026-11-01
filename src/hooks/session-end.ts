@@ -4,7 +4,6 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   aiSummary,
-  clearCursor,
   flushSession,
   observationsFromTurns,
   readTranscript,
@@ -55,7 +54,6 @@ await runHook(async () => {
       ...(summary ? { summary } : {}),
     });
 
-    clearCursor(sessionId);
     clearPick(sessionId);
     sweepPicks();
     dropTurnSave(sessionId);
