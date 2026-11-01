@@ -115,7 +115,7 @@ async function distillWindow(
   const retiring = ops
     .filter((op) => op.op === 'retire' && !kept.has(op.key))
     .flatMap((op) => existing.filter((fact) => fact.key === op.key))
-    .map((fact) => factId(fact.scope === 'you' ? youScope() : project, fact.key));
+    .map((fact) => factId(fact.scope === 'you' ? youScope(project) : project, fact.key));
   const retired = await ctx.store.markReplaced(retiring);
   return { ok: true, set: facts.length, retired, texts: sets.map((op) => op.text) };
 }
@@ -220,5 +220,5 @@ export async function factCounts(
       (await ctx.store.count(scope)) - (await ctx.store.count({ ...scope, status: 'replaced' }))
     );
   };
-  return { project: await count(project), you: await count(youScope()) };
+  return { project: await count(project), you: await count(youScope(project)) };
 }

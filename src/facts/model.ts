@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { hostname } from 'node:os';
+import { existsSync } from 'node:fs';
+import { homedir, hostname } from 'node:os';
+import { isAbsolute } from 'node:path';
 import type { Observation, ObservationKind } from '../types.js';
 import { currentAuthor, observationId } from '../capture/identity.js';
 import { redact } from '../capture/redact.js';
@@ -42,20 +44,29 @@ const LABELS: Record<FactType, string> = {
   fact: 'Fact',
 };
 
-let you: string | null = null;
+const you = new Map<string, string>();
 
-export function youScope(): string {
-  if (you === null) {
+function folderOf(project: string | undefined): string {
+  if (project && isAbsolute(project) && existsSync(project)) return project;
+  return homedir();
+}
+
+export function youScope(project?: string): string {
+  const folder = folderOf(project);
+  let scope = you.get(folder);
+  if (scope === undefined) {
     let email = '';
     try {
       email = execFileSync('git', ['config', '--get', 'user.email'], {
+        cwd: folder,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       }).trim();
     } catch {}
-    you = `@you:${email || currentAuthor() || 'unknown'}`;
+    scope = `@you:${email || currentAuthor() || 'unknown'}`;
+    you.set(folder, scope);
   }
-  return you;
+  return scope;
 }
 
 export function machineTag(): string {
@@ -67,7 +78,7 @@ export function originTag(project: string): string {
 }
 
 export function scopeProject(scope: FactScope, project: string): string {
-  return scope === 'you' ? youScope() : project;
+  return scope === 'you' ? youScope(project) : project;
 }
 
 export function factId(owner: string, key: string): string {

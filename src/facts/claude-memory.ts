@@ -121,7 +121,7 @@ function memoryFiles(dir: string): MemoryFile[] {
 async function importedFacts(ctx: RecallContext, project: string): Promise<Observation[]> {
   const mine = [machineTag(), originTag(project)];
   const rows: Observation[] = [];
-  for (const owner of [project, youScope()]) {
+  for (const owner of [project, youScope(project)]) {
     const batch = await ctx.store.list({
       project: owner,
       sessionId: FACT_SESSION,
