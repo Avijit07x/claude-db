@@ -101,6 +101,6 @@ report(
   !existsSync(join(memoryDir, 'pick', 'pending', `${sessionId}.json`)),
 );
 report(
-  'the read position for this chat is cleared',
-  !existsSync(join(memoryDir, 'cursors', `${sessionId}.offset`)),
+  'the read position is kept, so a resumed chat does not save every turn again',
+  existsSync(join(memoryDir, 'cursors', `${sessionId}.offset`)),
 );
