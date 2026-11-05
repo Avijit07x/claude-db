@@ -1,14 +1,12 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { CONFIG_DIR } from '../config/index.js';
 import type { RecallContext } from '../context.js';
 import type { Observation, ObservationKind } from '../types.js';
-import { readTranscript, sessionIdsOnDisk, transcriptPathFor } from './transcript.js';
+import { readTranscript, transcriptPathFor } from './transcript.js';
 import type { Turn } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
 import { closeLandedWork } from './progress.js';
 import { noteMissingVectors } from './vectors.js';
+import { advanceCursor, readCursor, readWritten, writeWritten } from './cursors.js';
 import { withFlushLock } from './flush-lock.js';
 
 export interface FlushResult {
@@ -47,14 +45,14 @@ async function flushUnlocked(
   const lastReply = turns.at(-1)?.reasoning ?? '';
   if (turns.length === 0) {
     await closeLandedWork(ctx.store, project);
-    writeCursor(sessionId, nextOffset);
+    advanceCursor(sessionId, cursor, nextOffset);
     return { observations: 0, summary: null, lastReply };
   }
 
   const observations = observationsFromTurns(turns, sessionId, project, ctx.config);
   if (observations.length === 0) {
     await closeLandedWork(ctx.store, project);
-    writeCursor(sessionId, nextOffset);
+    advanceCursor(sessionId, cursor, nextOffset);
     return { observations: 0, summary: null, lastReply };
   }
 
@@ -63,7 +61,7 @@ async function flushUnlocked(
   const fresh = observations.filter((obs) => written.get(obs.id) !== prints.get(obs.id));
   if (fresh.length === 0) {
     await closeLandedWork(ctx.store, project);
-    writeCursor(sessionId, nextOffset);
+    advanceCursor(sessionId, cursor, nextOffset);
     return { observations: 0, summary: null, lastReply };
   }
   await embedObservations(ctx, fresh);
@@ -80,7 +78,7 @@ async function flushUnlocked(
     summary,
   });
 
-  writeCursor(sessionId, nextOffset);
+  advanceCursor(sessionId, cursor, nextOffset);
   return { observations: observations.length, summary, lastReply };
 }
 
@@ -146,102 +144,7 @@ export function summarize(observations: Observation[], previous?: string): strin
   return kept.join(' | ');
 }
 
-function cursorName(sessionId: string): string {
-  return `${sessionId.replace(/[^\w-]/g, '_')}.offset`;
-}
-
-function cursorPath(sessionId: string): string {
-  return join(CONFIG_DIR, 'cursors', cursorName(sessionId));
-}
-
-const writtenPath = (sessionId: string): string =>
-  cursorPath(sessionId).replace(/\.offset$/, '.written');
-
 const printOf = (obs: Observation): string =>
   createHash('sha256').update(JSON.stringify(obs)).digest('base64url');
 
-function readWritten(sessionId: string): Map<string, string> {
-  try {
-    const parsed = JSON.parse(readFileSync(writtenPath(sessionId), 'utf8')) as unknown;
-    if (!parsed || typeof parsed !== 'object') return new Map();
-    return new Map(
-      Object.entries(parsed).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string',
-      ),
-    );
-  } catch {
-    return new Map();
-  }
-}
-
-function writeWritten(sessionId: string, prints: ReadonlyMap<string, string>): void {
-  const path = writtenPath(sessionId);
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify(Object.fromEntries(prints)), 'utf8');
-  } catch {}
-}
-
-function readCursor(sessionId: string): number {
-  try {
-    const value = Number.parseInt(readFileSync(cursorPath(sessionId), 'utf8'), 10);
-    return Number.isFinite(value) && value >= 0 ? value : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writeCursor(sessionId: string, offset: number): void {
-  const path = cursorPath(sessionId);
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, String(offset), 'utf8');
-  } catch {}
-}
-
-export function resetCursor(sessionId: string): void {
-  writeCursor(sessionId, 0);
-  rmSync(writtenPath(sessionId), { force: true });
-}
-
-export function clearCursor(sessionId: string): void {
-  rmSync(cursorPath(sessionId), { force: true });
-  rmSync(cursorPath(sessionId).replace(/\.offset$/, '.shown'), { force: true });
-  rmSync(writtenPath(sessionId), { force: true });
-}
-
-const SWEEP_EVERY_MS = 24 * 60 * 60 * 1000;
-
-export function sweepCursorsDaily(now = Date.now()): number {
-  const marker = join(CONFIG_DIR, 'cursors', '.swept');
-  try {
-    if (now - statSync(marker).mtimeMs < SWEEP_EVERY_MS) return 0;
-  } catch {}
-  try {
-    mkdirSync(dirname(marker), { recursive: true });
-    writeFileSync(marker, String(now), 'utf8');
-  } catch {
-    return 0;
-  }
-  return sweepCursors();
-}
-
-export function sweepCursors(): number {
-  const dir = join(CONFIG_DIR, 'cursors');
-  let files: string[];
-  try {
-    files = readdirSync(dir);
-  } catch {
-    return 0;
-  }
-
-  const live = new Set(sessionIdsOnDisk().map((id) => id.replace(/[^\w-]/g, '_')));
-  let removed = 0;
-  for (const file of files) {
-    const match = /^(.+)\.(offset|shown|written)$/.exec(file);
-    if (!match?.[1] || live.has(match[1])) continue;
-    rmSync(join(dir, file), { force: true });
-    removed += 1;
-  }
-  return removed;
-}
+export { clearCursor, resetCursor, sweepCursors, sweepCursorsDaily } from './cursors.js';
