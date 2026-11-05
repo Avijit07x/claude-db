@@ -1,6 +1,7 @@
 import '../../lib/require-isolated.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { createConnection } from 'node:net';
 import {
   existsSync,
   mkdirSync,
@@ -140,6 +141,26 @@ while (rows === 0 && Date.now() < end) {
   if (rows === 0) await new Promise((settle) => setTimeout(settle, 100));
 }
 report('the daemon saves a finished turn itself', stop.status === 0 && rows > 0, rows);
+
+const sendRaw = (text) =>
+  new Promise((settle) => {
+    const client = createConnection(socket);
+    client.on('connect', () => client.write(text));
+    client.on('close', () => settle());
+    client.on('error', () => settle());
+  });
+const starts = () => readFileSync(logFile, 'utf8').split('daemon listening').length - 1;
+const startsBefore = starts();
+await sendRaw('null\n');
+await sendRaw('{"hook":"session-start"}\n');
+const afterJunk = hook('session-start');
+report(
+  'a malformed request is dropped and the daemon keeps serving',
+  afterJunk.status === 0 &&
+    afterJunk.stdout === hook('session-start', { CLAUDE_DB_DAEMON: 'off' }).stdout &&
+    starts() === startsBefore,
+  `${starts() - startsBefore} restart(s)`,
+);
 
 const marker = join(homedir(), 'worker-env.txt');
 const probe = join(homedir(), 'worker-env.mjs');
