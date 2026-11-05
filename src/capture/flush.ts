@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { CONFIG_DIR } from '../config/index.js';
 import type { RecallContext } from '../context.js';
@@ -194,6 +194,22 @@ export function clearCursor(sessionId: string): void {
   rmSync(cursorPath(sessionId), { force: true });
   rmSync(cursorPath(sessionId).replace(/\.offset$/, '.shown'), { force: true });
   rmSync(writtenPath(sessionId), { force: true });
+}
+
+const SWEEP_EVERY_MS = 24 * 60 * 60 * 1000;
+
+export function sweepCursorsDaily(now = Date.now()): number {
+  const marker = join(CONFIG_DIR, 'cursors', '.swept');
+  try {
+    if (now - statSync(marker).mtimeMs < SWEEP_EVERY_MS) return 0;
+  } catch {}
+  try {
+    mkdirSync(dirname(marker), { recursive: true });
+    writeFileSync(marker, String(now), 'utf8');
+  } catch {
+    return 0;
+  }
+  return sweepCursors();
 }
 
 export function sweepCursors(): number {

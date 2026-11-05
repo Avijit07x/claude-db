@@ -6,7 +6,12 @@ import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
 import { createContext } from '../../../dist/context.js';
 import { loadConfig } from '../../../dist/config/load.js';
-import { clearCursor, flushSession, resetCursor } from '../../../dist/capture/flush.js';
+import {
+  clearCursor,
+  flushSession,
+  resetCursor,
+  sweepCursorsDaily,
+} from '../../../dist/capture/flush.js';
 
 mkdirSync(join(homedir(), 'shop'), { recursive: true });
 const project = realpathSync(join(homedir(), 'shop'));
@@ -90,6 +95,25 @@ try {
 
   clearCursor(sessionId);
   report('clearing the cursor forgets what was saved', !existsSync(written));
+
+  const cursors = join(homedir(), '.claude-memory', 'cursors');
+  writeFileSync(join(cursors, 'gone-chat.offset'), '10');
+  const swept = sweepCursorsDaily();
+  report(
+    'the daily sweep removes read positions of chats whose transcript is gone',
+    swept >= 1 && !existsSync(join(cursors, 'gone-chat.offset')),
+    swept,
+  );
+  writeFileSync(join(cursors, 'gone-again.offset'), '10');
+  report(
+    'a second sweep on the same day does nothing',
+    sweepCursorsDaily() === 0 && existsSync(join(cursors, 'gone-again.offset')),
+  );
+  report(
+    'the sweep runs again a day later',
+    sweepCursorsDaily(Date.now() + 25 * 60 * 60 * 1000) >= 1 &&
+      !existsSync(join(cursors, 'gone-again.offset')),
+  );
 } finally {
   await ctx.close();
 }

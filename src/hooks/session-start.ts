@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sweepCursorsDaily } from '../capture/index.js';
 import { createContext } from '../context.js';
 import { distillNotice } from '../facts/notice.js';
 import { recentWorkBlock, startFacts } from '../facts/start.js';
@@ -31,6 +32,14 @@ const SCAN_HINT =
 function refreshGraphQuietly(project: string): void {
   try {
     refreshGraphInBackground(project, repoRootFor(project));
+  } catch {
+    return;
+  }
+}
+
+function sweepCursorsQuietly(): void {
+  try {
+    sweepCursorsDaily();
   } catch {
     return;
   }
@@ -106,6 +115,7 @@ await runHook(async () => {
     const notice = capturing ? await distillNotice(ctx, project) : null;
     emitSessionStart(`${body}\n(context ≈ ${Math.round(body.length / 4)} tokens)\n`, notice);
     if (scanned) refreshGraphQuietly(project);
+    sweepCursorsQuietly();
   } finally {
     await ctx.close();
   }
