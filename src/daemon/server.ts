@@ -114,6 +114,26 @@ async function answer(request: DaemonRequest): Promise<DaemonReply> {
   return { kind: 'done', out: out.join('') };
 }
 
+const isStringMap = (value: unknown): value is Record<string, string> =>
+  typeof value === 'object' &&
+  value !== null &&
+  Object.values(value).every((entry) => typeof entry === 'string');
+
+function parseRequest(line: string): DaemonRequest | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const { build, hook, raw, env, workerEnv } = parsed as Record<string, unknown>;
+  if (typeof build !== 'string' || typeof hook !== 'string' || typeof raw !== 'string') return null;
+  if (!isStringMap(env)) return null;
+  if (workerEnv !== undefined && !isStringMap(workerEnv)) return null;
+  return { build, hook, raw, env, ...(workerEnv ? { workerEnv } : {}) };
+}
+
 function serve(socket: Socket): void {
   let buffer = '';
   socket.setEncoding('utf8');
@@ -131,16 +151,18 @@ function serve(socket: Socket): void {
     socket.pause();
     running += 1;
     touch();
-    let request: DaemonRequest;
-    try {
-      request = JSON.parse(line) as DaemonRequest;
-    } catch {
+    const request = parseRequest(line);
+    if (!request) {
       running -= 1;
       socket.destroy();
       return;
     }
     void answer(request)
       .then((reply) => socket.end(`${JSON.stringify(reply)}\n`))
+      .catch((error: unknown) => {
+        log(`request failed: ${String(error)}`);
+        socket.destroy();
+      })
       .finally(() => {
         running -= 1;
         touch();
@@ -155,7 +177,6 @@ async function shutdown(reason: string): Promise<void> {
   clearTimeout(idleTimer);
   server?.close();
   await Promise.allSettled([...pending]);
-  if (process.platform !== 'win32') rmSync(SOCKET, { force: true });
   if (current) await current.ctx.then((ctx) => ctx.close()).catch(() => undefined);
   process.exit(0);
 }
