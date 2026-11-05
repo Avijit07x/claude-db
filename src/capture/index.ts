@@ -18,6 +18,7 @@ export {
   resetCursor,
   clearCursor,
   sweepCursors,
+  sweepCursorsDaily,
   summarize,
   embedObservations,
 } from './flush.js';
