@@ -3,6 +3,7 @@ import type { RecallContext } from '../context.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { toShortId } from '../util/shortid.js';
 import { capturingDisabled } from './payload.js';
+import type { HookEnv } from './payload.js';
 import { forgetShown } from './shown.js';
 
 const MAX_LINES = 8;
@@ -24,9 +25,10 @@ export async function recoverAfterCompact(
   project: string,
   sessionId: string,
   transcriptPath: string | undefined,
+  env: HookEnv = process.env,
 ): Promise<EarlierInChat | null> {
   forgetShown(sessionId);
-  if (!capturingDisabled(ctx.config.capture.scripted)) {
+  if (!capturingDisabled(ctx.config.capture.scripted, env)) {
     await flushSession(ctx, sessionId, project, transcriptPath);
   }
   const observations = await ctx.store.list({

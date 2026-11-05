@@ -1,4 +1,4 @@
-import { askDaemon, daemonWanted, forwardedEnv, startDaemon } from '../daemon/client.js';
+import { askDaemon, daemonWanted, forwardedEnv, startDaemon, workerEnv } from '../daemon/client.js';
 import { buildId } from '../daemon/paths.js';
 import { readStdin, runHook } from './payload.js';
 import type { HookName } from './run.js';
@@ -9,7 +9,7 @@ const DEFAULT_WAIT_MS = 50_000;
 async function viaDaemon(name: HookName, raw: string): Promise<boolean> {
   if (!daemonWanted()) return false;
   const asked = await askDaemon(
-    { build: buildId(), hook: name, raw, env: forwardedEnv() },
+    { build: buildId(), hook: name, raw, env: forwardedEnv(), workerEnv: workerEnv() },
     WAIT_MS[name] ?? DEFAULT_WAIT_MS,
   );
   if (asked.kind === 'done') {

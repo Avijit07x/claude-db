@@ -9,6 +9,7 @@ import type { RecallContext } from '../context.js';
 import { parsePayload } from '../hooks/payload.js';
 import type { HookRun } from '../hooks/run.js';
 import { isHookName, loadHandler } from '../hooks/run.js';
+import { withWorkerEnv } from '../hooks/detached.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 import type { DaemonReply, DaemonRequest } from './paths.js';
 import { buildId, socketPath } from './paths.js';
@@ -106,7 +107,7 @@ async function answer(request: DaemonRequest): Promise<DaemonReply> {
   };
   try {
     const handle = await loadHandler(request.hook);
-    await handle(run);
+    await withWorkerEnv(request.workerEnv, () => handle(run));
   } catch (error) {
     log(`${request.hook} failed: ${error instanceof Error ? error.message : String(error)}`);
   }
