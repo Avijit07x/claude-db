@@ -80,7 +80,13 @@ export default async function sessionStart(run: HookRun): Promise<void> {
 
     const earlier =
       payload.source === 'compact' && payload.session_id
-        ? await recoverAfterCompact(ctx, project, payload.session_id, payload.transcript_path)
+        ? await recoverAfterCompact(
+            ctx,
+            project,
+            payload.session_id,
+            payload.transcript_path,
+            run.env,
+          )
         : null;
     const restored = earlier?.ids ?? new Set<string>();
 

@@ -38,6 +38,14 @@ export function forwardedEnv(env: NodeJS.ProcessEnv = process.env): Record<strin
   return picked;
 }
 
+export function workerEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const picked: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (value !== undefined) picked[name] = value;
+  }
+  return picked;
+}
+
 export function askDaemon(request: DaemonRequest, timeoutMs: number): Promise<Asked> {
   return new Promise((settle) => {
     let sent = false;

@@ -14,6 +14,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
 import { createContext } from '../../../dist/context.js';
+import { recoverAfterCompact } from '../../../dist/hooks/compact.js';
+import { runDetached, withWorkerEnv } from '../../../dist/hooks/detached.js';
 
 const dist = new URL('../../../dist/', import.meta.url).pathname;
 const memory = join(homedir(), '.claude-memory');
@@ -138,6 +140,37 @@ while (rows === 0 && Date.now() < end) {
   if (rows === 0) await new Promise((settle) => setTimeout(settle, 100));
 }
 report('the daemon saves a finished turn itself', stop.status === 0 && rows > 0, rows);
+
+const marker = join(homedir(), 'worker-env.txt');
+const probe = join(homedir(), 'worker-env.mjs');
+writeFileSync(
+  probe,
+  `import { writeFileSync } from 'node:fs';\n` +
+    `writeFileSync(${JSON.stringify(marker)}, process.env.CLAUDE_DB_WORKER_MARK ?? 'none');\n`,
+);
+withWorkerEnv({ ...process.env, CLAUDE_DB_WORKER_MARK: 'from-hook' }, () =>
+  runDetached(probe, [], homedir(), () => {}),
+);
+report(
+  'a worker started for a hook gets that hook env, not the daemon env',
+  (await until(() => existsSync(marker))) && readFileSync(marker, 'utf8') === 'from-hook',
+);
+
+{
+  const quietId = randomUUID();
+  const quietTranscript = join(homedir(), `${quietId}.jsonl`);
+  writeFileSync(quietTranscript, readFileSync(transcript, 'utf8'));
+  const ctx = await createContext({ database: join(homedir(), 'memory.db') });
+  try {
+    await recoverAfterCompact(ctx, project, quietId, quietTranscript, {
+      CLAUDE_DB_CAPTURE: 'off',
+    });
+    const quiet = await ctx.store.list({ project, sessionId: quietId, limit: 10 });
+    report('compacting a chat with capture off saves nothing', quiet.length === 0, quiet.length);
+  } finally {
+    await ctx.close();
+  }
+}
 
 const script = join(dist, 'daemon', 'server.js');
 const { atime, mtime } = statSync(script);
