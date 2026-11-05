@@ -19,6 +19,8 @@ import { capturingDisabled } from '../payload.js';
 import type { HookRun } from '../run.js';
 import { dropTurnSave, sweepTurnSaves } from '../turn-job.js';
 
+const END_LOCK_WAIT_MS = 1_000;
+
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'cli', 'index.js');
 
 export default async function sessionEnd(run: HookRun): Promise<void> {
@@ -29,7 +31,10 @@ export default async function sessionEnd(run: HookRun): Promise<void> {
 
   const project = resolveProject(payload.cwd);
   await run.withContext(async (ctx) => {
-    const result = await flushSession(ctx, sessionId, project, payload.transcript_path);
+    const result = await flushSession(ctx, sessionId, project, payload.transcript_path, false, '', {
+      waitMs: END_LOCK_WAIT_MS,
+      onTimeout: 'run',
+    });
 
     let summary = result.summary;
     if (!ctx.config.distill.enabled && ctx.config.capture.summarize === 'on') {
