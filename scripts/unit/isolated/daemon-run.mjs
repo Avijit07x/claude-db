@@ -1,7 +1,15 @@
 import '../../lib/require-isolated.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
@@ -10,8 +18,8 @@ import { createContext } from '../../../dist/context.js';
 const dist = new URL('../../../dist/', import.meta.url).pathname;
 const memory = join(homedir(), '.claude-memory');
 const socket = join(memory, 'daemon.sock');
-const project = join(homedir(), 'shop');
-mkdirSync(join(project, '.git'), { recursive: true });
+mkdirSync(join(homedir(), 'shop', '.git'), { recursive: true });
+const project = realpathSync(join(homedir(), 'shop'));
 mkdirSync(memory, { recursive: true });
 writeFileSync(
   join(memory, 'config.json'),
