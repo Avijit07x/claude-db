@@ -13,6 +13,7 @@ import { renderPromptContext } from '../../dist/hooks/relevance.js';
 import { symbolsGreppedIn } from '../../dist/hooks/grep-symbols.js';
 import { redact } from '../../dist/capture/redact.js';
 import { findUsages } from '../../dist/usages/find.js';
+import { embedderWithDeadline } from '../../dist/context.js';
 
 const ts = languageFor('a.ts');
 const parse = (path, source, spec = ts) => extractFile({ path, spec, source, hash: 'h' }, '/p');
@@ -304,5 +305,38 @@ export default async function run() {
       `${found.matches.filter((m) => m.isMatch).length} vs total ${found.total}`,
     );
     rmSync(dir, { recursive: true, force: true });
+  }
+  {
+    let clock = 0;
+    let finish;
+    const real = { id: 'real', dimensions: 3, embed: async () => [] };
+    const loads = [];
+    const get = embedderWithDeadline(
+      () => {
+        loads.push(clock);
+        return new Promise((settle) => {
+          finish = () => settle(real);
+        });
+      },
+      50,
+      () => clock,
+    );
+    // The deadline timer is unref'd, so keep the process alive while it runs.
+    const keepAlive = setInterval(() => {}, 1000);
+    const started = Date.now();
+    const first = await get();
+    clock = 60;
+    const second = await get();
+    const waited = Date.now() - started;
+    clearInterval(keepAlive);
+    check(
+      'two embedder calls in one process share one deadline instead of waiting twice',
+      first.dimensions === 0 && second.dimensions === 0 && waited < 95 && loads.length === 1,
+      `waited ${waited}ms, loads ${loads.length}`,
+    );
+    finish();
+    await new Promise((settle) => setImmediate(settle));
+    const third = await get();
+    check('a load that lands after the deadline is used by later calls', third === real);
   }
 }

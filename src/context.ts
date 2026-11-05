@@ -26,19 +26,41 @@ export async function createContext(overrides?: Partial<Config>): Promise<Recall
     createScopeResolver({ store: raw, remote: config.project.remote }),
   );
 
-  let loading: Promise<Embedder> | null = null;
-  const embedder = (): Promise<Embedder> => {
-    loading ??= createEmbedder(config.embeddings.provider).catch(() => new NoopEmbedder());
-    return withTimeout(loading, config.embeddings.timeoutMs);
-  };
+  const embedder = embedderWithDeadline(
+    () => createEmbedder(config.embeddings.provider),
+    config.embeddings.timeoutMs,
+  );
 
   const search = new SearchService(store, embedder, config.embeddings.maxScanCandidates);
 
   return { config, store, embedder, search, close: () => store.close() };
 }
 
+export function embedderWithDeadline(
+  load: () => Promise<Embedder>,
+  timeoutMs: number,
+  now: () => number = Date.now,
+): () => Promise<Embedder> {
+  let loading: Promise<Embedder> | null = null;
+  let ready: Embedder | null = null;
+  let deadline = 0;
+
+  return () => {
+    if (ready) return Promise.resolve(ready);
+    if (!loading) {
+      deadline = now() + timeoutMs;
+      loading = load().catch(() => new NoopEmbedder());
+      void loading.then((embedder) => {
+        ready = embedder;
+      });
+    }
+    if (timeoutMs <= 0) return loading;
+    return withTimeout(loading, deadline - now());
+  };
+}
+
 async function withTimeout(pending: Promise<Embedder>, ms: number): Promise<Embedder> {
-  if (ms <= 0) return pending;
+  if (ms <= 0) return Promise.race([pending, Promise.resolve(new NoopEmbedder())]);
 
   let timer: NodeJS.Timeout | undefined;
   const limit = new Promise<Embedder>((settle) => {
