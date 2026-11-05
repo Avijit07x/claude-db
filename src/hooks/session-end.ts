@@ -23,6 +23,8 @@ import { dropTurnSave, sweepTurnSaves } from './turn-job.js';
 
 silenceSqliteWarning();
 
+const END_LOCK_WAIT_MS = 1_000;
+
 await runHook(async () => {
   if (capturingDisabled(loadConfig().capture.scripted)) return;
   const payload = await readPayload();
@@ -33,7 +35,10 @@ await runHook(async () => {
   const ctx = await createContext();
 
   try {
-    const result = await flushSession(ctx, sessionId, project, payload.transcript_path);
+    const result = await flushSession(ctx, sessionId, project, payload.transcript_path, false, '', {
+      waitMs: END_LOCK_WAIT_MS,
+      onTimeout: 'run',
+    });
 
     let summary = result.summary;
     if (!ctx.config.distill.enabled && ctx.config.capture.summarize === 'on') {

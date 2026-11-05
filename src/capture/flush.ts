@@ -8,11 +8,13 @@ import { closeLandedWork } from './progress.js';
 import { noteMissingVectors } from './vectors.js';
 import { advanceCursor, readCursor, readWritten, writeWritten } from './cursors.js';
 import { withFlushLock } from './flush-lock.js';
+import type { FlushLockOptions } from './flush-lock.js';
 
 export interface FlushResult {
   observations: number;
   summary: string | null;
   lastReply: string;
+  skipped?: boolean;
 }
 
 export async function flushSession(
@@ -22,10 +24,15 @@ export async function flushSession(
   transcriptPath?: string,
   rebuild = false,
   finalReply = '',
+  lock: FlushLockOptions = {},
 ): Promise<FlushResult> {
-  return withFlushLock(sessionId, () =>
-    flushUnlocked(ctx, sessionId, project, transcriptPath, rebuild, finalReply),
+  const result = await withFlushLock(
+    sessionId,
+    () => flushUnlocked(ctx, sessionId, project, transcriptPath, rebuild, finalReply),
+    lock,
   );
+  if (result.ran) return result.value;
+  return { observations: 0, summary: null, lastReply: '', skipped: true };
 }
 
 async function flushUnlocked(

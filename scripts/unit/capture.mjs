@@ -6,6 +6,7 @@ import { runIsolated } from '../lib/isolated.mjs';
 
 export default async function run() {
   runIsolated(new URL('./isolated/flush-run.mjs', import.meta.url).pathname);
+  runIsolated(new URL('./isolated/flush-lock-run.mjs', import.meta.url).pathname);
   const [built] = observationsFromTurns([turn()], 's1', '/p', config);
   check('observation is built from a turn', built !== undefined);
   check('api keys are redacted', !built.body.includes('sk-abcdefghijklmnopqrst'));

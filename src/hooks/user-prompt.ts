@@ -27,7 +27,15 @@ await runHook(async () => {
     const startedAt = Date.now();
     recordActive(sessionId, project, payload.prompt ?? '');
 
-    const flushed = await flushSession(ctx, sessionId, project, payload.transcript_path);
+    const flushed = await flushSession(
+      ctx,
+      sessionId,
+      project,
+      payload.transcript_path,
+      false,
+      '',
+      { onTimeout: 'skip' },
+    );
     const { lastReply } = flushed;
     if (flushed.observations === 0) {
       await ctx.store.upsertSession({ id: sessionId, project, startedAt });
