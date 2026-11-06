@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.13.0
+
+### Added
+
+- **An optional daemon keeps one process warm for the hooks.** Each hook starts node, opens a database
+  connection and loads the embedding model before it does any work. `claude-db daemon on` keeps one process
+  that the hooks hand their work to, so they skip that cost, and `claude-db daemon off` turns it off. It stops
+  after `daemon.idleMinutes` (15) with nothing to do and starts again with the next hook. It is off by default.
+
+### Changed
+
+- **Hooks send fewer queries to a remote database.** A folder's project scope is read once per process, a batch
+  of memories is saved in one statement on Postgres, the session row is written once per prompt, and the prompt
+  is embedded while the keyword search runs.
+- **A grep in a repository with no code graph no longer asks the database.** The hook remembers for ten minutes
+  that the project has no graph.
+- **A chat's read position is kept when it ends**, so a resumed chat no longer saves its earlier turns again.
+  Read positions of chats that are gone are cleared once a day.
+- **Session end no longer starts distill when the day's budget is used up or paused.**
+- **`find_usages` and background graph refreshes no longer read every file when nothing changed since the
+  scan.**
+
+### Fixed
+
+- **A dropped connection to a remote Postgres no longer stops memory.** An idle connection closed by the server,
+  as Neon does, could end the MCP server for the rest of the chat.
+- **One slow load of the embedding model no longer turns vectors off for good.** The model is used as soon as it
+  loads, and all calls in a process share one wait of `embeddings.timeoutMs`.
+- **Only one save of a chat runs at a time.** Two hooks that saved the same chat at once embedded and wrote the
+  same turns twice.
+- **A background job never runs twice at once.** A stale lock is taken over by one process only, and long jobs
+  keep their lock fresh.
+- **Code graph changes are saved in one transaction**, so a reader never sees a changed file with no symbols.
+- **Closed work stays closed when its row is saved again.**
+
+By @alok-debnath (#38, #39, #41).
+
 ## 0.12.4
 
 ### Fixed
