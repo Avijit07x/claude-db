@@ -95,7 +95,9 @@ export function sweepCursors(): number {
     return 0;
   }
 
-  const live = new Set(sessionIdsOnDisk().map((id) => id.replace(/[^\w-]/g, '_')));
+  const onDisk = sessionIdsOnDisk();
+  if (onDisk === null) return 0;
+  const live = new Set(onDisk.map((id) => id.replace(/[^\w-]/g, '_')));
   let removed = 0;
   for (const file of files) {
     const match = /^(.+)\.(offset|shown|written)$/.exec(file);

@@ -4,9 +4,61 @@ import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { newRepo } from '../lib/repo.mjs';
 import { createStore } from '../../dist/store/index.js';
+import { createScopeResolver } from '../../dist/store/project-resolver.js';
+import { withProjectScope } from '../../dist/store/scoped-store.js';
 import { closeLandedWork, openWork } from '../../dist/capture/index.js';
 
+async function otherClonesStayOpen() {
+  const remote = 'https://github.com/acme/shop.git';
+  const clones = ['a', 'b'].map((name) => {
+    const { repo, git } = newRepo(`progress-clone-${name}-`);
+    git('remote', 'add', 'origin', remote);
+    writeFileSync(join(repo, 'f.ts'), 'export const f = 1;\n');
+    git('add', '-A');
+    git('commit', '-qm', 'seed');
+    return repo;
+  });
+  const [repoA, repoB] = clones;
+
+  const dir = mkdtempSync(join(tmpdir(), 'progress-scope-'));
+  const raw = await createStore(join(dir, 'memory.db'));
+  await raw.init();
+  const store = withProjectScope(raw, createScopeResolver({ store: raw, remote: 'origin' }));
+
+  const row = (id, project) => ({
+    id,
+    sessionId: 's1',
+    project,
+    kind: 'decision',
+    title: id,
+    body: id,
+    files: [join(project, 'f.ts')],
+    tags: [],
+    createdAt: Date.now(),
+    status: 'open',
+  });
+  await store.insertObservations([row('in-a', repoA), row('in-b', repoB)]);
+  check(
+    'both clones see each other through the shared project',
+    (await openWork(store, repoA)).length === 2,
+    (await openWork(store, repoA)).length,
+  );
+
+  const closed = await closeLandedWork(store, repoA);
+  const stillOpen = (await openWork(store, repoA)).map((o) => o.id);
+  check(
+    'a flush in one clone closes its own landed work and leaves the other clone open',
+    closed === 1 && stillOpen.join() === 'in-b',
+    `${closed} closed, open: ${stillOpen.join()}`,
+  );
+
+  await raw.close();
+  rmSync(dir, { recursive: true, force: true });
+  for (const repo of clones) rmSync(repo, { recursive: true, force: true });
+}
+
 export default async function run() {
+  await otherClonesStayOpen();
   const { repo, git } = newRepo('progress-');
   mkdirSync(join(repo, 'src'));
   writeFileSync(join(repo, 'src', 'a.ts'), 'export const a = 1;\n');

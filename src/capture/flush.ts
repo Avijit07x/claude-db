@@ -73,7 +73,6 @@ async function flushUnlocked(
   }
   await embedObservations(ctx, fresh);
   await ctx.store.insertObservations(fresh);
-  writeWritten(sessionId, prints);
   await closeLandedWork(ctx.store, project);
 
   const previous = rebuild ? null : await ctx.store.getSession(sessionId);
@@ -85,6 +84,7 @@ async function flushUnlocked(
     summary,
   });
 
+  writeWritten(sessionId, prints);
   advanceCursor(sessionId, cursor, nextOffset);
   return { observations: observations.length, summary, lastReply };
 }

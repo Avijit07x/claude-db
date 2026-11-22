@@ -53,6 +53,7 @@ const second = turn(2, 'cap the retry delay', 'Retries are capped at 30s.', 'ret
 const base = loadConfig();
 const ctx = await createContext({ embeddings: { ...base.embeddings, provider: 'none' } });
 let rows = 0;
+let failSessionWrite = false;
 const store = ctx.store;
 ctx.store = new Proxy(store, {
   get(target, property) {
@@ -60,6 +61,10 @@ ctx.store = new Proxy(store, {
     if (typeof value !== 'function') return value;
     return (...args) => {
       if (property === 'insertObservations') rows += args[0].length;
+      if (property === 'upsertSession' && failSessionWrite) {
+        failSessionWrite = false;
+        return Promise.reject(new Error('session write failed'));
+      }
       return value.apply(target, args);
     };
   },
@@ -135,6 +140,26 @@ try {
     'the sweep runs again a day later',
     sweepCursorsDaily(Date.now() + 25 * 60 * 60 * 1000) >= 1 &&
       !existsSync(join(cursors, 'gone-again.offset')),
+  );
+
+  const halfway = randomUUID();
+  const halfwayTranscript = join(homedir(), `${halfway}.jsonl`);
+  writeFileSync(
+    halfwayTranscript,
+    [...first, ...second].map((entry) => JSON.stringify(entry)).join('\n') + '\n',
+  );
+  failSessionWrite = true;
+  const failed = await flushSession(ctx, halfway, project, halfwayTranscript).then(
+    () => false,
+    () => true,
+  );
+  report('a flush whose session write fails throws', failed);
+  const retried = await flushSession(ctx, halfway, project, halfwayTranscript);
+  const session = await store.getSession(halfway);
+  report(
+    'the retry after a failed session write still saves the chat summary',
+    retried.summary !== null && Boolean(session?.summary),
+    `${retried.summary} | ${session?.summary}`,
   );
 } finally {
   await ctx.close();
