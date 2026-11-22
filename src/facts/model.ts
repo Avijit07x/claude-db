@@ -107,7 +107,7 @@ export function onePerKey(rows: Observation[]): Observation[] {
 export function factLabel(obs: Observation): string | null {
   const type = factType(obs);
   if (type) return LABELS[type];
-  return obs.sessionId === 'manual' ? LABELS.rule : null;
+  return obs.sessionId === 'manual' || obs.kind === 'preference' ? LABELS.rule : null;
 }
 
 export function factToObservation(fact: Fact, project: string): Observation {

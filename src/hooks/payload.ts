@@ -80,10 +80,9 @@ export function emitSessionStart(
     emitContext(context, write);
     return;
   }
-  write(
-    JSON.stringify({
-      systemMessage: notice,
-      hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context },
-    }),
-  );
+  const claudeSees =
+    context.trim().length > 0
+      ? { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context } }
+      : {};
+  write(JSON.stringify({ systemMessage: notice, ...claudeSees }));
 }

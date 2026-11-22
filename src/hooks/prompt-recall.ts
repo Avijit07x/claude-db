@@ -66,7 +66,3 @@ export async function strictRecall(
   );
   return block ? { block, ids } : null;
 }
-
-export function withCost(block: string): string {
-  return `${block}\n(context ≈ ${Math.round(block.length / 4)} tokens)\n`;
-}

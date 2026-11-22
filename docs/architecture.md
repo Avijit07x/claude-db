@@ -425,11 +425,11 @@ Where you stopped:
 | `Where you stopped`                | Open to-dos, and saved work no commit has covered yet                    |
 
 Every line that carries an id can be opened in full with `get_observations`. Lines the chat already sees in
-Claude Code's own memory files are not repeated. A project with no facts yet, right after install, gets the
-older chat summaries and the other-chats part instead.
+Claude Code's own memory files are not repeated, and no line is printed twice. A project with no rule facts
+shows the rules caught in chats under `This project`. A chat summary shows only the parts not listed as a request.
 
 Also at this moment: a **hint to scan** when the repository has no code graph, an **update notice** when a newer
-compatible version exists, and a **one-time notice** that explains the facts feature.
+compatible version exists, and a **one-time notice** that explains the facts feature. You see these; Claude does not.
 
 **Settings.**
 
@@ -494,7 +494,7 @@ uncommitted.
  - Not committed: src/ws/client.ts
 ```
 
-At most 8 lines.
+At most 8 lines. The start block that follows does not repeat them.
 
 ---
 

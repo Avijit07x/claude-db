@@ -17,6 +17,7 @@ import { report } from '../../lib/isolated.mjs';
 import { createContext } from '../../../dist/context.js';
 import { recoverAfterCompact } from '../../../dist/hooks/compact.js';
 import { runDetached, withWorkerEnv } from '../../../dist/hooks/detached.js';
+import { remember } from '../../../dist/capture/index.js';
 
 const dist = new URL('../../../dist/', import.meta.url).pathname;
 const memory = join(homedir(), '.claude-memory');
@@ -56,6 +57,15 @@ const until = async (test, ms = 10_000) => {
   while (!test() && Date.now() < end) await new Promise((settle) => setTimeout(settle, 50));
   return test();
 };
+
+{
+  const seeded = await createContext({ database: join(homedir(), 'memory.db') });
+  try {
+    await remember(seeded, { project, kind: 'preference', text: 'Keep replies short and plain' });
+  } finally {
+    await seeded.close();
+  }
+}
 
 const once = hook('session-start', { CLAUDE_DB_DAEMON: 'off' });
 const local = hook('session-start', { CLAUDE_DB_DAEMON: 'off' });

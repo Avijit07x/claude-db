@@ -91,7 +91,9 @@ try {
   );
   report(
     'unfinished work and todos are where you stopped',
-    block.includes('To do (') && block.includes('- Not committed: Padding added'),
+    block.includes('To do (') &&
+      block.split('\n').filter((line) => line.includes('Padding added')).length === 1,
+    block,
   );
   report(
     'the start block reports only rows it showed: 3 facts and the 3 last chat rows',

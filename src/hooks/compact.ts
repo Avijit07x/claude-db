@@ -18,6 +18,7 @@ const LABELS: Partial<Record<ObservationKind, string>> = {
 export interface EarlierInChat {
   block: string;
   ids: ReadonlySet<string>;
+  titles: ReadonlySet<string>;
 }
 
 export async function recoverAfterCompact(
@@ -61,5 +62,5 @@ export function renderEarlierInChat(newestFirst: Observation[]): EarlierInChat |
 
   if (lines.length === 0) return null;
   const block = ['<memory>', 'Earlier in this chat:', ...lines.reverse(), '</memory>'].join('\n');
-  return { block, ids };
+  return { block, ids, titles };
 }

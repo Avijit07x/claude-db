@@ -24,6 +24,15 @@ export default async function run() {
   }
 
   {
+    const old = ConfigSchema.parse({ inject: { sessions: 3, maxChars: 123 } }).inject;
+    check(
+      'a saved config with the removed inject.sessions still loads and keeps its other settings',
+      !('sessions' in old) && old.maxChars === 123,
+      JSON.stringify(old),
+    );
+  }
+
+  {
     const saved = (inject) => ConfigSchema.parse(dropSupersededDefaults({ inject })).inject;
     const untouched = saved({ ...fresh, promptResults: 4, minOverlap: 1 });
     check(

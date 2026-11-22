@@ -8,6 +8,8 @@ import { handoffBodyLines, handoffHeading, newestHandoff, passedNote } from './h
 import { latestRequestAt, recentChats, turnLine } from './last-chat.js';
 import type { RecentChat } from './last-chat.js';
 import { MANUAL_SESSION, factLine, seenByClaude } from './render.js';
+import { entry, render, summaryEntry } from './start-render.js';
+import type { Entry, Section, StartFacts } from './start-render.js';
 import { formatDay, formatDayTime } from '../util/day.js';
 import { toShortId } from '../util/shortid.js';
 
@@ -15,19 +17,18 @@ const ABOUT_YOU = 6;
 const THIS_PROJECT = 10;
 const TODOS = 4;
 const UNCOMMITTED = 3;
+const CHAT_RULES = 8;
 
 const ORDER = ['rule', 'decision', 'deadend', 'fact'];
 
-export interface StartFacts {
-  block: string;
-  ids: Set<string>;
-}
+export type { StartFacts } from './start-render.js';
 
 export async function startFacts(
   ctx: RecallContext,
   project: string,
   hidden: ReadonlySet<string> = new Set(),
   current?: string,
+  earlier: ReadonlySet<string> = new Set(),
 ): Promise<StartFacts | null> {
   const visible = (obs: Observation) =>
     obs.status !== 'replaced' && !hidden.has(obs.id) && !seenByClaude(obs, project);
@@ -41,13 +42,13 @@ export async function startFacts(
   const handoff = await newestHandoff(ctx, project);
   const shownHandoff = handoff && visible(handoff) ? handoff : null;
   const manual = (await list(project, MANUAL_SESSION, 20)).filter((obs) => obs.id !== handoff?.id);
-  if (you.length + facts.length + manual.length === 0 && !shownHandoff) return null;
+  const chatRules = await chatRulesFor(ctx, project, [...facts, ...manual], visible);
 
   const rank = (obs: Observation) => {
     const index = ORDER.indexOf(factType(obs) ?? 'rule');
     return index === -1 ? ORDER.length : index;
   };
-  const known = [...manual, ...facts.filter((obs) => factType(obs) !== 'todo')].sort(
+  const known = [...manual, ...chatRules, ...facts.filter((obs) => factType(obs) !== 'todo')].sort(
     (a, b) => rank(a) - rank(b) || b.createdAt - a.createdAt,
   );
   const todos = facts.filter((obs) => factType(obs) === 'todo').slice(0, TODOS);
@@ -55,10 +56,11 @@ export async function startFacts(
     .filter((obs) => !hidden.has(obs.id))
     .slice(0, UNCOMMITTED);
   const recent = await recentWork(ctx, project, current);
+  const factEntry = (obs: Observation) => entry(factLine(obs), obs.id, obs.title);
 
   const sections: Section[] = [
-    ['About you:', you.slice(0, ABOUT_YOU).map((obs) => [factLine(obs), obs.id])],
-    ['This project:', known.slice(0, THIS_PROJECT).map((obs) => [factLine(obs), obs.id])],
+    ['About you:', you.slice(0, ABOUT_YOU).map(factEntry)],
+    ['This project:', known.slice(0, THIS_PROJECT).map(factEntry)],
     ...recentSections(recent, hidden),
     [
       shownHandoff
@@ -69,16 +71,32 @@ export async function startFacts(
     [
       'Where you stopped:',
       [
-        ...todos.map((obs): [string, string] => [factLine(obs), obs.id]),
-        ...uncommitted.map((obs): [string, null] => [`- Not committed: ${obs.title}`, null]),
+        ...todos.map(factEntry),
+        ...uncommitted.map((obs) => entry(`- Not committed: ${obs.title}`, obs.id, obs.title)),
       ],
     ],
   ];
 
-  return render(sections, ctx.config.inject.maxChars);
+  return render(sections, ctx.config.inject.maxChars, earlier);
 }
 
-type Section = [string, [string, string | null][]];
+async function chatRulesFor(
+  ctx: RecallContext,
+  project: string,
+  rulesAndFacts: Observation[],
+  visible: (obs: Observation) => boolean,
+): Promise<Observation[]> {
+  if (rulesAndFacts.some((obs) => obs.kind === 'preference')) return [];
+  const rows = await ctx.store.list({
+    project,
+    kind: 'preference',
+    excludeSessions: [FACT_SESSION, MANUAL_SESSION],
+    newest: true,
+    limit: CHAT_RULES,
+    bodies: false,
+  });
+  return rows.filter(visible);
+}
 
 interface RecentWork {
   unfinished: ActiveRequest[];
@@ -103,41 +121,10 @@ function recentSections(recent: RecentWork, hidden: ReadonlySet<string>): Sectio
   ];
 }
 
-export async function recentWorkBlock(
-  ctx: RecallContext,
-  project: string,
-  current?: string,
-  hidden: ReadonlySet<string> = new Set(),
-): Promise<StartFacts | null> {
-  const sections = recentSections(await recentWork(ctx, project, current), hidden);
-  return sections.some(([, entries]) => entries.length > 0)
-    ? render(sections, ctx.config.inject.maxChars)
-    : null;
-}
-
-function render(sections: Section[], maxChars: number): StartFacts {
-  const lines = ['<memory>'];
-  const ids = new Set<string>();
-  let budget = maxChars;
-  for (const [heading, entries] of sections) {
-    if (entries.length === 0) continue;
-    if (lines.length > 1) lines.push('');
-    lines.push(heading);
-    for (const [line, id] of entries) {
-      if (line.length > budget) break;
-      budget -= line.length + 1;
-      lines.push(line);
-      if (id) ids.add(id);
-    }
-  }
-  lines.push('</memory>');
-  return { block: lines.join('\n'), ids };
-}
-
-function unfinishedSection(entry: ActiveRequest): Section {
+function unfinishedSection(item: ActiveRequest): Section {
   return [
-    `Not finished yet in another chat (${formatDayTime(entry.askedAt)}):`,
-    [[`- asked "${entry.request}"`, null]],
+    `Not finished yet in another chat (${formatDayTime(item.askedAt)}):`,
+    [entry(`- asked "${item.request}"`, null, item.request)],
   ];
 }
 
@@ -145,13 +132,14 @@ function chatSection(chat: RecentChat, index: number, hidden: ReadonlySet<string
   const heading = `${index === 0 ? 'Last chat' : 'Chat before'} (${formatDay(chat.at)}):`;
   const turns = chat.turns
     .filter((turn) => !hidden.has(turn.id))
-    .map((turn): [string, string] => [`- ${turnLine(turn)} (${toShortId(turn.id)})`, turn.id]);
-  return [heading, chat.summary ? [[`- Summary: ${chat.summary}`, null], ...turns] : turns];
+    .map((turn) => entry(`- ${turnLine(turn)} (${toShortId(turn.id)})`, turn.id, turn.title));
+  return [heading, chat.summary.length > 0 ? [summaryEntry(chat.summary), ...turns] : turns];
 }
 
-function handoffEntries(handoff: Observation): [string, string | null][] {
-  return handoffBodyLines(handoff).map((line, index) => [
-    index === 0 ? `${line} (${toShortId(handoff.id)})` : line,
-    index === 0 ? handoff.id : null,
-  ]);
+function handoffEntries(handoff: Observation): Entry[] {
+  return handoffBodyLines(handoff).map((line, index) =>
+    index === 0
+      ? entry(`${line} (${toShortId(handoff.id)})`, handoff.id, line)
+      : entry(line, null, line),
+  );
 }

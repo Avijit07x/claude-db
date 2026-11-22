@@ -59,7 +59,6 @@ export const ConfigSchema = z.object({
 
   inject: z
     .object({
-      sessions: z.number().int().nonnegative().default(5),
       maxChars: z.number().int().positive().default(6000),
 
       perPrompt: z.boolean().default(true),
