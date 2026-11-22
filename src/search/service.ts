@@ -4,6 +4,13 @@ import type { Observation, ObservationIndexEntry, SearchQuery, TimelineQuery } f
 import { applyRecencyBoost, fuse } from './rank.js';
 import { meaningfulTokens } from './stopwords.js';
 
+const WIDE_FACTOR = 3;
+
+export interface RankedCandidates {
+  keyword: ObservationIndexEntry[];
+  fused: ObservationIndexEntry[];
+}
+
 export class SearchService {
   constructor(
     private readonly store: MemoryStore,
@@ -12,12 +19,17 @@ export class SearchService {
   ) {}
 
   async search(query: SearchQuery): Promise<ObservationIndexEntry[]> {
+    const { fused } = await this.candidates(query);
+    return applyRecencyBoost(fused, query.until ?? Date.now());
+  }
+
+  async candidates(query: SearchQuery): Promise<RankedCandidates> {
     const keywordText = meaningfulTokens(query.text).join(' ');
-    if (keywordText === '') return [];
+    if (keywordText === '') return { keyword: [], fused: [] };
 
     const wide: SearchQuery = {
       ...query,
-      limit: query.limit * 3,
+      limit: query.limit * WIDE_FACTOR,
       maxScanCandidates: query.maxScanCandidates ?? this.maxScanCandidates,
     };
 
@@ -29,7 +41,7 @@ export class SearchService {
       [keyword, vector].filter((r) => r.length > 0),
       query.limit,
     );
-    return applyRecencyBoost(fused, query.until ?? Date.now());
+    return { keyword, fused };
   }
 
   private async embed(text: string): Promise<{ embedder: Embedder; embedding: number[] } | null> {

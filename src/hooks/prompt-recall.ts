@@ -1,6 +1,6 @@
 import type { RecallContext } from '../context.js';
 import { FACT_SESSION } from '../facts/model.js';
-import type { ObservationIndexEntry } from '../types.js';
+import type { ObservationIndexEntry, SearchQuery } from '../types.js';
 import { isSearchable, typedPrompt } from '../util/prompt.js';
 import { clearsOverlap, renderPromptContext } from './relevance.js';
 
@@ -25,6 +25,18 @@ export interface PromptRecall {
   ids: string[];
 }
 
+type QueryScope = Pick<PromptRecallRequest, 'project' | 'sessionId' | 'until'>;
+
+export function recallQuery(prompt: string, scope: QueryScope): SearchQuery {
+  return {
+    text: prompt,
+    project: scope.project,
+    excludeSessions: [scope.sessionId, FACT_SESSION],
+    limit: PICK_POOL,
+    ...(scope.until !== undefined ? { until: scope.until } : {}),
+  };
+}
+
 export async function promptCandidates(
   ctx: RecallContext,
   request: PromptRecallRequest,
@@ -33,13 +45,7 @@ export async function promptCandidates(
   const prompt = typedPrompt(request.prompt);
   if (!inject.perPrompt || prompt === null || !isSearchable(prompt)) return null;
 
-  const found = await ctx.search.search({
-    text: prompt,
-    project: request.project,
-    excludeSessions: [request.sessionId, FACT_SESSION],
-    limit: PICK_POOL,
-    ...(request.until !== undefined ? { until: request.until } : {}),
-  });
+  const found = await ctx.search.search(recallQuery(prompt, request));
 
   const entries = found.filter((entry) => !request.shown.has(entry.id));
   if (!entries.some((entry) => clearsOverlap(prompt, entry, inject.minOverlap))) return null;
