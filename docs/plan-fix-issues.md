@@ -62,7 +62,7 @@ Postgres and MongoDB suites were not run.
 
 | #   | Item                     | Plan                          | Status                                                     |
 | --- | ------------------------ | ----------------------------- | ---------------------------------------------------------- |
-| 4.1 | Daemon                   | `docs/plan-daemon.md`         | Measured on SQLite. Keep or remove waits for the owner     |
+| 4.1 | Daemon                   | `docs/plan-daemon.md`         | Researched. Recommend keep and fix its causes; owner decides |
 | 4.2 | Search ranking           | `docs/plan-search-ranking.md` | The bench comes first. The decision needs the owner's run  |
 | 4.3 | Flush with no lock       | `docs/plan-flush.md`          | Planned, for v0.14                                         |
 | 4.4 | Store drift              | `docs/plan-store.md`          | Bugs in v0.13.1, the contract test in v0.14                |
