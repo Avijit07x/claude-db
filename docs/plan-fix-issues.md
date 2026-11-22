@@ -1,6 +1,7 @@
 # Fix plan
 
-Status: Phases 1 to 3 are done and tested, on branch `v0.13.1`. Phase 4 is not started.
+Status: Phases 1 to 3, 4.6 and 4.7 are done and tested, on branch `v0.13.1`. The rest of Phase 4 has its own
+plans, listed below.
 
 ## Root causes
 
@@ -48,28 +49,26 @@ Postgres and MongoDB suites were not run.
 
 ## Open from this round
 
-- `getObservations` with `''` still reads every row. It is read-only, and some test fixtures use non-hex ids.
+- `get_observations` with `''` reads every row. Fixed by `docs/plan-store.md`, bug 1.
 - A `find_usages` `path` filter runs after a 1,000-edge fetch, so a symbol with more edges can show a partial
-  folder answer.
-- Decide whether `search` and `find_usages` should be loaded upfront (`anthropic/alwaysLoad` in the tool's
-  `_meta`, per the Claude Code MCP docs).
+  folder answer. Accepted: it is rare.
+- `search` and `find_usages` stay deferred by Claude Code's tool search, not loaded upfront. That costs fewer
+  tokens, the hooks deliver most memory, and the server instructions name the tools.
 - Test Claude Code's Code Mode (`CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`) in one real chat. Done when we know
   whether the `<memory>` pick and the grep hook's context still arrive. Both depend on `PreToolUse`, and the
-  docs do not say whether it fires for tool calls made from code.
+  docs do not say whether it fires for tool calls made from code. Needs the owner.
 
-## Phase 4: measure first, then decide
+## Phase 4
 
-No code in this phase until the measurement is in. Each item gets its own short plan.
-
-| #   | Item                                                                                                                                                                         | Done when                                                                                       |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 4.1 | **Daemon** (about 470 lines, 8 fix commits, off by default). Its savings were measured once on a remote database. It adds a new class of bugs: state that one process keeps for every hook (agent). | A bench of hook time with and without it, on SQLite and on Postgres. Keep it only if SQLite gains clearly. |
-| 4.2 | **Vectors and ranking.** The built-in embedder is a hashed bag of words, so it is a second keyword signal. The ranking knobs were never measured (agent).                    | Keyword-only against fused ranking on the labelled pairs. If fusion is not clearly better, plan to remove the vector stack. |
-| 4.3 | **Flush design.** Each flush re-reads the last turn (`transcript.ts:68`), and five triggers flush one chat. That is why the lock, `.written`, the "never move back" rule and the sweep exist. About 800 lines of file state, with two lock copies (agent). | A plan that picks the flush triggers and makes a repeat flush cheap, so the lock and `.written` can go. |
-| 4.4 | **Store parity.** 32 adapter methods, 3,584 lines in three backends, and drift: projections, the 25,000-row vector cap, Mongo `$text` reading `-word` as "not" (agent). | One contract test that runs every backend, then move shared rules above the adapter.            |
-| 4.5 | **`sync`** copies only missing ids (`src/cli/commands/sync.ts:36-48`, checked), so edits never travel and deleted rows come back. | A decision: carry edits and deletes, or document `sync` as add-only.                            |
-| 4.6 | **Overlap.** Three start-block builders, with the same summaries possible twice. `/catchup` repeats the start block. Six status commands (agent).                          | A list of what each path shows, then remove the duplicates.                                     |
-| 4.7 | **Tests.** `npm test` runs against `dist/` with no build first, so it tests the old code after an edit (checked: 82 test files import `dist`, `package.json` `test` has no build). There is also a custom runner (agent). | `npm test` builds first. Moving to `node:test` is decided separately.                           |
+| #   | Item                     | Plan                          | Status                                                     |
+| --- | ------------------------ | ----------------------------- | ---------------------------------------------------------- |
+| 4.1 | Daemon                   | `docs/plan-daemon.md`         | Measured on SQLite. Keep or remove waits for the owner     |
+| 4.2 | Search ranking           | `docs/plan-search-ranking.md` | The bench comes first. The decision needs the owner's run  |
+| 4.3 | Flush with no lock       | `docs/plan-flush.md`          | Planned, for v0.14                                         |
+| 4.4 | Store drift              | `docs/plan-store.md`          | Bugs in v0.13.1, the contract test in v0.14                |
+| 4.5 | `sync`                   | `docs/plan-store.md`          | Say that it only adds rows and moves status, in v0.13.1    |
+| 4.6 | Start block, nothing twice | `docs/plan-start-block.md`  | Done (629439b)                                             |
+| 4.7 | `npm test` builds first  | -                             | Done (204bd38)                                             |
 
 ## Leave alone
 
