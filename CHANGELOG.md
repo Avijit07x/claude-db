@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.14.0
+
+### Added
+
+- **A contract test runs the same checks on all three stores.** `npm test` runs it on SQLite, and CI on Postgres
+  and MongoDB.
+- **`npm run bench:inject -- <project> --compare-rank` compares four search rankings** on your own chats, judged
+  by Haiku or by a labels file (`--labels`).
+
+### Changed
+
+- **Install no longer writes to `CLAUDE.md`.** The MCP server's own instructions already tell Claude when to
+  search memory. A block an older version wrote into `CLAUDE.local.md` or `~/.claude/CLAUDE.md` is removed at the
+  next chat start, and your own text is kept.
+- **A grep for a code symbol runs as usual.** The graph's answer is added next to it, only for a symbol lookup
+  inside the repository. `CLAUDE_DB_USAGES_HOOK=deny` brings back the old blocking.
+- **The start of a chat shows each thing once.** One block replaces the three that could repeat a chat's
+  summary, its turns and its open work, and the next prompt's pick skips what the start already showed. The scan
+  hint and update notice are shown to you, not to Claude.
+- **Shorter `find_usages` and `search` descriptions.**
+- **`sync` says what it copies:** rows the other side is missing, and status changes. Edits and deletes do not
+  travel.
+- **Saving a chat writes only what changed.** A save compares its rows with the stored ones, so a chat with
+  nothing new writes nothing. The per-chat lock and `.written` files are gone, and old ones are cleared.
+- **`npm test` builds first.**
+- **The `capture.tools` and `inject.sessions` settings are removed.** A config that still has them loads.
+
+### Fixed
+
+- **`forget` refuses an empty, wildcard or too-short id.** One could delete memory in every project.
+- **`claude-db merge <subfolder>` no longer deletes the project it merges into.**
+- **Saving a turn no longer closes open work in other clones of the same repository.**
+- **`get_observations` and `timeline` refuse ids that are not observation ids.** An empty id read every row.
+- **`find_usages` takes its root from the project and uses `path` only as a filter**, so a path in another
+  repository no longer replaces this project's graph. `claude-db scan --path` does the same.
+- **The code graph is read again after an upgrade**, and a deleted file no longer keeps it stale.
+- **`find_usages` no longer lists false callers** on SQLite and Postgres for names that differ in case or
+  contain `_`.
+- **A chat summary is no longer lost when a save stops halfway.**
+- **With `CLAUDE_CONFIG_DIR` set, chats are found and their read positions are kept.**
+- **Haiku calls no longer receive the start block or start a graph scan.**
+- **A replaced row is no longer marked done on SQLite.**
+- **MongoDB search reads `-word` and quotes as plain words.**
+- **Postgres notices pgvector installed after its first run.**
+- **Two rows with one id in one save keep the last one on every backend.**
+- **An id prefix is matched literally on SQLite and Postgres.** `%` used to match every row.
+- **The pick at a prompt always has Claude's previous reply.** A save already running for the chat could make
+  it skip.
+- **With the daemon on, each hook uses its own environment.** `CLAUDE_CONFIG_DIR` and the `claude` binary for
+  Haiku calls came from the shell that started the daemon.
+- **A stuck daemon no longer holds up a hook.** One that does not answer within 2 s is replaced, and the hook
+  does its own work. A hook used to wait up to 50 s.
+- **A failed load of the embedding model is tried again after a minute**, instead of staying off for the life of
+  the process.
+- **Facts about you follow a changed git email within a minute.**
+
 ## 0.13.0
 
 ### Added
