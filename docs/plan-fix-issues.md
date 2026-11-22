@@ -63,10 +63,10 @@ Postgres and MongoDB suites were not run.
 | #   | Item                     | Plan                          | Status                                                     |
 | --- | ------------------------ | ----------------------------- | ---------------------------------------------------------- |
 | 4.1 | Daemon                   | `docs/plan-daemon.md`         | Researched. Recommend keep and fix its causes; owner decides |
-| 4.2 | Search ranking           | `docs/plan-search-ranking.md` | The bench comes first. The decision needs the owner's run  |
-| 4.3 | Flush with no lock       | `docs/plan-flush.md`          | Planned, for v0.14                                         |
-| 4.4 | Store drift              | `docs/plan-store.md`          | Bugs in v0.13.1, the contract test in v0.14                |
-| 4.5 | `sync`                   | `docs/plan-store.md`          | Say that it only adds rows and moves status, in v0.13.1    |
+| 4.2 | Search ranking           | `docs/plan-search-ranking.md` | Recency fix done. The bench is in progress; the decision needs the owner's run |
+| 4.3 | Flush with no lock       | `docs/plan-flush.md`          | Done on v0.14 (a96ae12)                                    |
+| 4.4 | Store drift              | `docs/plan-store.md`          | Bugs done (c1b4c95). The contract test is next, in v0.14   |
+| 4.5 | `sync`                   | `docs/plan-store.md`          | Done (c1b4c95)                                             |
 | 4.6 | Start block, nothing twice | `docs/plan-start-block.md`  | Done (629439b)                                             |
 | 4.7 | `npm test` builds first  | -                             | Done (204bd38)                                             |
 

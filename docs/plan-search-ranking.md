@@ -1,6 +1,6 @@
 # Plan: measure the search ranking, then keep or drop vectors (item 4.2)
 
-Status: plan, checked against the code. Nothing is coded.
+Status: step 1 is done (c1b4c95). The bench (step 2) is in progress, for v0.14.
 
 Goal: the ten notes the picker sees, and the order `search` shows, hold the useful memory. The code stays
 only if it earns its place.

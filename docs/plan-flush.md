@@ -1,6 +1,6 @@
 # Plan: a flush with no lock and no marker file (item 4.3)
 
-Status: plan, checked against the code. Nothing is coded.
+Status: done on v0.14 (a96ae12).
 
 Goal: saving a chat stays correct and cheap with fewer moving parts. `src/capture/flush.ts` has had 12 fix
 commits, and most of them came from the machinery below.

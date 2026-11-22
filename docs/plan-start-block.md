@@ -1,6 +1,6 @@
 # Plan: a start block with nothing twice (item 4.6)
 
-Status: plan, checked against the code and a seeded run. Nothing is coded.
+Status: done (629439b).
 
 Goal: Claude sees each thing once, at chat start and after it, and nothing it does not need.
 

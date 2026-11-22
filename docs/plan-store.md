@@ -1,6 +1,6 @@
 # Plan: store drift and sync (items 4.4 and 4.5)
 
-Status: plan, checked against the code. Nothing is coded.
+Status: bugs 1 to 8 and the sync wording are done (c1b4c95). The contract test is next, in v0.14.
 
 Goal: the three backends return the same results, and a drift is caught by a test before a user sees it.
 
