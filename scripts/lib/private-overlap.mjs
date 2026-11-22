@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { claudeProjectsDir } from '../../dist/util/claude-dir.js';
 
 const RUN = 6;
+const PROJECTS = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'projects');
 const GENERIC = [
   'another claude session',
   'image source tmp claude',
@@ -97,7 +97,7 @@ export async function findPrivateOverlap(texts) {
     }
   };
   (await savedTexts()).forEach(scan);
-  for (const path of transcriptFiles(claudeProjectsDir())) {
+  for (const path of transcriptFiles(PROJECTS)) {
     userTexts(path).forEach(scan);
   }
   return [...hits].map(([file, { count, example }]) => ({ file, count, example }));
