@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hookEnv } from '../../util/env.js';
 import { clearActive, sweepActive } from '../../capture/active.js';
 import {
   aiSummary,
@@ -19,22 +20,17 @@ import { capturingDisabled } from '../payload.js';
 import type { HookRun } from '../run.js';
 import { dropTurnSave, sweepTurnSaves } from '../turn-job.js';
 
-const END_LOCK_WAIT_MS = 1_000;
-
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'cli', 'index.js');
 
 export default async function sessionEnd(run: HookRun): Promise<void> {
-  if (capturingDisabled(loadConfig().capture.scripted, run.env)) return;
+  if (capturingDisabled(loadConfig().capture.scripted)) return;
   const { payload } = run;
   const sessionId = payload.session_id;
   if (!sessionId) return;
 
   const project = resolveProject(payload.cwd);
   await run.withContext(async (ctx) => {
-    const result = await flushSession(ctx, sessionId, project, payload.transcript_path, false, '', {
-      waitMs: END_LOCK_WAIT_MS,
-      onTimeout: 'run',
-    });
+    const result = await flushSession(ctx, sessionId, project, payload.transcript_path);
 
     let summary = result.summary;
     if (!ctx.config.distill.enabled && ctx.config.capture.summarize === 'on') {
@@ -69,6 +65,7 @@ export default async function sessionEnd(run: HookRun): Promise<void> {
 
     if (ctx.config.updates !== 'off' && isDue(readState())) {
       spawn(process.execPath, [CLI, 'update', '--quiet'], {
+        env: hookEnv(),
         detached: true,
         stdio: 'ignore',
       }).unref();

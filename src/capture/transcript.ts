@@ -1,7 +1,7 @@
 import { closeSync, fstatSync, openSync, readdirSync, readSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isRelayedMessage } from '../util/prompt.js';
+import { claudeProjectsDir } from '../util/claude-dir.js';
 import { resolveProject } from '../util/project.js';
 
 export interface Turn {
@@ -167,11 +167,11 @@ function projectSlug(project: string): string {
 }
 
 export function transcriptPathFor(project: string, sessionId: string): string {
-  return join(homedir(), '.claude', 'projects', projectSlug(project), `${sessionId}.jsonl`);
+  return join(claudeProjectsDir(), projectSlug(project), `${sessionId}.jsonl`);
 }
 
 export function transcriptsFor(project: string): string[] {
-  const root = join(homedir(), '.claude', 'projects');
+  const root = claudeProjectsDir();
   const slug = projectSlug(project);
 
   let candidates: string[];
@@ -198,14 +198,14 @@ export function transcriptsFor(project: string): string[] {
   return transcripts.sort();
 }
 
-export function sessionIdsOnDisk(): string[] {
-  const root = join(homedir(), '.claude', 'projects');
+export function sessionIdsOnDisk(): string[] | null {
+  const root = claudeProjectsDir();
   const ids: string[] = [];
   let dirs: string[];
   try {
     dirs = readdirSync(root);
-  } catch {
-    return ids;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? ids : null;
   }
 
   for (const dir of dirs) {

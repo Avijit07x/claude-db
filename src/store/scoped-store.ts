@@ -10,6 +10,7 @@ import type {
 } from '../types.js';
 import type { MemoryStore } from './adapter.js';
 import type { ScopeResolver } from './project-resolver.js';
+import { assertValidIds } from '../util/shortid.js';
 
 type Overrides = Pick<
   MemoryStore,
@@ -39,7 +40,7 @@ export function withProjectScope(inner: MemoryStore, resolver: ScopeResolver): M
       const keyed = await Promise.all(
         observations.map(async (obs) => ({ ...obs, project: await keyOf(obs.project) })),
       );
-      return inner.insertObservations(keyed);
+      return inner.insertObservations([...new Map(keyed.map((obs) => [obs.id, obs])).values()]);
     },
 
     async upsertSession(session: Session): Promise<void> {
@@ -51,6 +52,7 @@ export function withProjectScope(inner: MemoryStore, resolver: ScopeResolver): M
     },
 
     async remove(filter: RemoveFilter): Promise<number> {
+      assertValidIds(filter.ids ?? []);
       const project = await expand(filter.project);
       return inner.remove(project === undefined ? filter : { ...filter, project });
     },

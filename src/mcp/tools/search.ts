@@ -9,15 +9,10 @@ import { resolveProject } from '../../util/project.js';
 export function register(server: McpServer, ctx: RecallContext): void {
   server.tool(
     'search',
-    'USE THIS BEFORE re-deriving anything this project already decided — before ' +
-      'reading git history to reconstruct why code is the way it is, before saying ' +
-      'you lack context, and before asking the user to re-explain a past decision ' +
-      'or a failed approach. This answers WHY: decisions, dead ends, bugs and the ' +
-      'reasoning behind them, which the source code cannot tell you. Returns a ' +
-      'compact index (id, kind, date, title, and a line of the matching body) ' +
-      'without full bodies; use the snippet to decide which ids are worth passing ' +
-      'to get_observations rather than expanding on the title alone. For a code ' +
-      'symbol use find_usages instead.',
+    'Answers WHY: decisions, dead ends, bugs and the reasoning behind them, which the ' +
+      'source code cannot tell you. Returns a compact index (id, kind, date, title, a line ' +
+      'of the matching body) without full bodies; pick the ids worth passing to ' +
+      'get_observations from the snippet. For a code symbol use find_usages instead.',
     {
       query: z.string().describe('Natural language description of what you need'),
       project: z

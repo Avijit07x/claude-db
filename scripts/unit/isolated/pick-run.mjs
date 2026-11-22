@@ -205,7 +205,7 @@ report(
   'the first tool call carries the pick',
   delivered?.hookSpecificOutput?.hookEventName === 'PreToolUse' &&
     context.includes(`asked "why does the order feed drop after a minute?": ${QUOTE}`) &&
-    context.includes('(context ≈'),
+    !context.includes('(context ≈'),
   context,
 );
 report('the pick is delivered only once', deliver(live) === null);

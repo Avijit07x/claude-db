@@ -126,9 +126,10 @@ Every hook catches its own errors and exits with success. A broken memory never 
 to one long-lived process over a socket in the data folder (`daemon.sock`, readable only by you), and
 print what it sends back. That process keeps the database connection, the embedding model and the loaded
 code, and saves finished turns itself instead of starting a worker. A hook that finds no daemon does its
-own work as before and starts one for the next hook. The daemon exits after `daemon.idleMinutes` with
-nothing to do, and a hook from a newer install replaces it. `CLAUDE_DB_URL` or `CLAUDE_DB_GRAPH_CACHE` in a
-hook's environment keeps that hook in its own process.
+own work as before and starts one for the next hook. A daemon that does not acknowledge a request within
+2 s is treated as stuck: the hook stops it, starts a new one, and does its own work. The daemon exits after
+`daemon.idleMinutes` with nothing to do, and a hook from a newer install replaces it. `CLAUDE_DB_URL` or
+`CLAUDE_DB_GRAPH_CACHE` in a hook's environment keeps that hook in its own process.
 
 ---
 
@@ -425,11 +426,11 @@ Where you stopped:
 | `Where you stopped`                | Open to-dos, and saved work no commit has covered yet                    |
 
 Every line that carries an id can be opened in full with `get_observations`. Lines the chat already sees in
-Claude Code's own memory files are not repeated. A project with no facts yet, right after install, gets the
-older chat summaries and the other-chats part instead.
+Claude Code's own memory files are not repeated, and no line is printed twice. A project with no rule facts
+shows the rules caught in chats under `This project`. A chat summary shows only the parts not listed as a request.
 
 Also at this moment: a **hint to scan** when the repository has no code graph, an **update notice** when a newer
-compatible version exists, and a **one-time notice** that explains the facts feature.
+compatible version exists, and a **one-time notice** that explains the facts feature. You see these; Claude does not.
 
 **Settings.**
 
@@ -473,8 +474,6 @@ A request pushed out of these 5 lines stays in memory: search finds it, and each
 | A not-finished request shows for 2 hours at most                 | An interrupted reply fires no hook, so nothing else can clear it |
 | Files in `~/.claude-memory/active/` older than a day are deleted | A crashed chat leaves nothing behind                             |
 
-Every case, with examples, is in [improve-last-chat.md](./improve-last-chat.md).
-
 ---
 
 ## 10. After `/compact`
@@ -494,7 +493,7 @@ uncommitted.
  - Not committed: src/ws/client.ts
 ```
 
-At most 8 lines.
+At most 8 lines. The start block that follows does not repeat them.
 
 ---
 
@@ -570,18 +569,17 @@ installs, a language is read by pattern.
 **Imports.** In TypeScript, JavaScript, Python, Go, Rust, Java and Kotlin, an imported name is bound to the symbol
 in the module it came from, so two symbols with one name in different modules stay apart, and `usages` lists the
 importing files under `Imported by`. In Java and Kotlin, `x.method()` goes to the method of the declared type of
-`x`. A name from outside the repository is never matched to a symbol inside it. The design is in
-[plan-code-graph.md](./plan-code-graph.md), and adding a language is in
+`x`. A name from outside the repository is never matched to a symbol inside it. Adding a language is in
 [adding-a-language.md](./adding-a-language.md).
 
 **The grep helper.** When Claude runs `grep`, `rg` or the Grep tool for a code symbol the graph knows,
-`prefer-usages.js` answers from the graph instead: at most 2 symbols, 14 lines each, then up to 6 text matches the
+`prefer-usages.js` adds the graph's answer: at most 2 symbols, 14 lines each, then up to 6 text matches the
 graph could not link. A grep for plain text, or for a name the graph does not know, runs as normal.
 
 | `CLAUDE_DB_USAGES_HOOK` | What happens                                               |
 | ----------------------- | ---------------------------------------------------------- |
-| `deny` (default)        | The grep is blocked, and the graph answer is shown instead |
-| `directive`             | The grep runs, and the graph answer is added as context    |
+| `directive` (default)   | The grep runs, and the graph answer is added as context    |
+| `deny`                  | The grep is blocked, and the graph answer is shown instead |
 | `off`                   | The hook does nothing                                      |
 
 **The `/cdb-scan` skill.** After a scan, it writes five notes about the project: stack, layout, conventions,
@@ -623,7 +621,8 @@ desktop see the same memory, and a second worktree sees the first one's notes.
 ## 14. Databases and sync
 
 **What it does.** Memory lives in one database: SQLite by default, or Postgres or MongoDB to share it across
-machines and teammates. All three give the same results.
+machines and teammates. Ranking and fusion are shared, but keyword ranking differs per engine (FTS5, tsvector,
+`$text`), and SQLite and MongoDB vector search scans the newest rows up to a cap.
 
 **When it runs.** Always. You choose the database once.
 
@@ -637,7 +636,9 @@ machines and teammates. All three give the same results.
 | ------------------------- | --------------------------------------------------- |
 | `use <url>`               | Switch database, after checking it answers          |
 | `export`, `import <file>` | Back up to JSONL, or load a backup (safe to repeat) |
-| `sync <url>`              | Two-way merge with another database                 |
+| `sync <url>`              | Copy missing rows both ways and move status forward |
+
+`sync` adds rows the other side lacks and moves status forward. Edits to an existing row and deletes do not travel.
 
 ---
 
@@ -654,9 +655,8 @@ The MCP server is a small helper that Claude Code starts. Claude calls these too
 | `forget`           | Deletes notes by id, or clears one chat's summary      | Removing a wrong or private note       |
 | `find_usages`      | Who uses a symbol: `usages`, `explain`, `path`, `text` | Before editing, renaming or deleting   |
 
-A standing instruction block in `CLAUDE.local.md` tells Claude to search memory before asking you to explain a
-past decision, and to use `find_usages` for symbols. Hook output is context Claude may skip; a rule in the
-instruction file holds for the whole chat.
+The MCP server's own instructions tell Claude to search memory before asking you to explain a past decision,
+and to use `find_usages` for symbols.
 
 ---
 
@@ -684,7 +684,7 @@ instruction file holds for the whole chat.
 |            | `languages`                               | How each language is read                                          |
 |            | `usages [--mode m] <symbol>`              | Ask the graph or `git grep`                                        |
 | Data       | `use <url>`                               | Switch database, after checking it answers                         |
-|            | `export`, `import <file>`, `sync <url>`   | Back up, restore, or two-way merge                                 |
+|            | `export`, `import <file>`, `sync <url>`   | Back up, restore, or copy missing rows both ways                   |
 |            | `merge [<old-path>]`                      | Move memory from an old folder path onto this project              |
 |            | `reembed`, `redact`, `flush`, `seed`      | Recompute vectors, re-clean secrets, re-read chats, fill from git  |
 |            | `prune --older-than <days>`, `reset`      | Delete old or all memory (a dry run without `--yes`)               |
@@ -825,16 +825,14 @@ run. `claude-db doctor` shows which `claude` was found and from where.
 | ------------------------------------------------- | ----------------------------- | ------------------------- |
 | The six hooks                                     | `.claude/settings.local.json` | `~/.claude/settings.json` |
 | The MCP server                                    | `.mcp.json`                   | `~/.claude.json`          |
-| The standing instruction block                    | `CLAUDE.local.md`             | `~/.claude/CLAUDE.md`     |
 | The `/cdb-scan`, `/catchup` and `/handoff` skills | `.claude/skills/`             | `~/.claude/skills/`       |
 
 **Staying current.** The hooks point at the installed package, so they always run the newest code. At each chat
-start, claude-db adds any hook a newer version brought, and rewrites the skills and the instruction block when
-they differ from what shipped. So `npm i -g claude-db` alone is enough. A `/catchup` or `/handoff` skill of your
+start, claude-db adds any hook a newer version brought, and rewrites the skills when they differ
+from what shipped, and removes the instruction block older versions wrote into `CLAUDE.local.md` or `CLAUDE.md`. So `npm i -g claude-db` alone is enough. A `/catchup` or `/handoff` skill of your
 own with the same name is kept, and anything `uninstall` removed stays removed.
 
-**Uninstall.** `claude-db uninstall [--project]` removes the hooks, the server, the instruction block and the
-skills, and leaves your memory as it is.
+**Uninstall.** `claude-db uninstall [--project]` removes the hooks, the server and the skills, and leaves your memory as it is.
 
 **First days.** A fresh install has no history. Run `claude-db scan` and the `/cdb-scan` skill so search has
 something to find. Facts and picks become useful after a few chats.

@@ -15,7 +15,7 @@ const SUMMARY_PARTS = ' | ';
 export interface RecentChat {
   sessionId: string;
   at: number;
-  summary: string | null;
+  summary: string[];
   turns: Observation[];
 }
 
@@ -55,11 +55,13 @@ function toChat(
   return { sessionId, at, summary: chatSummary(session, at, turns), turns };
 }
 
-function chatSummary(session: Session | null, at: number, turns: Observation[]): string | null {
-  if (!session?.summary || session.endedAt === undefined || session.endedAt < at) return null;
+function chatSummary(session: Session | null, at: number, turns: Observation[]): string[] {
+  if (!session?.summary || session.endedAt === undefined || session.endedAt < at) return [];
   const shown = new Set(turns.map((turn) => turn.title));
-  if (session.summary.split(SUMMARY_PARTS).every((part) => shown.has(part))) return null;
-  return toSnippet(session.summary, SUMMARY_CHARS) ?? null;
+  return session.summary
+    .split(SUMMARY_PARTS)
+    .filter((part) => !shown.has(part))
+    .flatMap((part) => toSnippet(part, SUMMARY_CHARS) ?? []);
 }
 
 export function latestRequestAt(

@@ -10,7 +10,7 @@ import type {
 import type { ProjectSummary } from '../adapter.js';
 import { foreignNames, isWholeScope } from '../adapter.js';
 import { partitionIds } from '../../util/shortid.js';
-import { excludeSessionsClause, projectClause } from './filters.js';
+import { excludeSessionsClause, likePrefix, projectClause } from './filters.js';
 import { toIndexEntry, toObservation } from './rows.js';
 import { noProjects } from '../project-scope.js';
 
@@ -35,7 +35,7 @@ export async function getObservations(pool: Pool, ids: string[]): Promise<Observ
     clauses.push(`id = ANY($${values.length}::text[])`);
   }
   for (const prefix of prefixes) {
-    values.push(`${prefix.replace(/[%_]/g, '')}%`);
+    values.push(likePrefix(prefix));
     clauses.push(`id LIKE $${values.length}`);
   }
 
@@ -61,7 +61,7 @@ export async function remove(pool: Pool, filter: RemoveFilter): Promise<number> 
       alternatives.push(`id = ANY($${values.length}::text[])`);
     }
     for (const prefix of prefixes) {
-      values.push(`${prefix.replace(/[%_]/g, '')}%`);
+      values.push(likePrefix(prefix));
       alternatives.push(`id LIKE $${values.length}`);
     }
     conditions.push(`(${alternatives.join(' OR ')})`);

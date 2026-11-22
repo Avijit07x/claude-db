@@ -4,6 +4,9 @@ import { BATCH } from '../constants.js';
 import { createContext } from '../../context.js';
 import { createStore } from '../../store/index.js';
 
+const SYNC_SCOPE =
+  'Sync adds rows the other side is missing and moves status forward. Edits and deletes do not travel.';
+
 export async function cmdSync(argv: (string | undefined)[]): Promise<void> {
   const url = argv.find((arg) => typeof arg === 'string' && !arg.startsWith('-'));
   const confirmed = argv.includes('--yes') || argv.includes('-y');
@@ -56,7 +59,8 @@ export async function cmdSync(argv: (string | undefined)[]): Promise<void> {
         `This would pull ${pulled} and push ${pushed} observation(s), ` +
           `and bring ${moved} status(es) up to date.`,
       );
-      console.log('\nNothing was transferred. Re-run with --yes to confirm.');
+      console.log(`\n${SYNC_SCOPE}`);
+      console.log('Nothing was transferred. Re-run with --yes to confirm.');
       return;
     }
 
@@ -67,6 +71,7 @@ export async function cmdSync(argv: (string | undefined)[]): Promise<void> {
       `Pulled ${pulled}, pushed ${pushed}, brought ${moved} status(es) up to date, ` +
         `and reconciled ${sessions} session(s).`,
     );
+    console.log(SYNC_SCOPE);
   } finally {
     await remote.close();
     await local.close();

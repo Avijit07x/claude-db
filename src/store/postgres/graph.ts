@@ -194,8 +194,9 @@ export async function findEdges(pool: Pool, filter: EdgeFilter): Promise<CodeEdg
   }
   let where = sides.length > 0 ? ` AND (${sides.join(' OR ')})` : '';
   if (filter.dstName !== undefined) {
-    values.push(filter.dstName, `%.${filter.dstName}`);
-    where += ` AND (dst_name = $${values.length - 1} OR dst_name LIKE $${values.length})`;
+    values.push(filter.dstName, `.${filter.dstName}`);
+    const [exact, suffix] = [`$${values.length - 1}`, `$${values.length}`];
+    where += ` AND (dst_name = ${exact} OR right(dst_name, length(${suffix})) = ${suffix})`;
   }
   values.push(filter.limit ?? 2000);
 

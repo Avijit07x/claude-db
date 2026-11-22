@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { install } from '../../dist/cli/install.js';
+import { readText } from '../../dist/cli/files.js';
 import { refreshInstalled } from '../../dist/cli/refresh.js';
 import { instructionsPathFor, skillPathFor } from '../../dist/cli/paths.js';
 
@@ -36,23 +37,23 @@ async function checks() {
   check('a stale skill is repaired', readFileSync(skill, 'utf8') === packaged);
   check('and it reports what it fixed', afterSkill.includes(skill), afterSkill.join(','));
 
-  const current = readFileSync(instructions, 'utf8');
-  writeFileSync(
-    instructions,
-    current.replace('<!-- claude-db:start -->', '<!-- claude-db:start -->\nOLD TEXT FROM 0.4'),
-  );
-  refreshInstalled(dist, repo);
-  const healed = readFileSync(instructions, 'utf8');
-  check('a stale instruction block is rewritten', !healed.includes('OLD TEXT FROM 0.4'));
-  check('the block markers survive', healed.includes('<!-- claude-db:start -->'));
-
+  const oldBlock = '<!-- claude-db:start -->\nOLD TEXT FROM 0.4\n<!-- claude-db:end -->';
   const userText = 'my own notes, written by hand\n';
-  writeFileSync(instructions, userText + readFileSync(instructions, 'utf8'));
-  refreshInstalled(dist, repo);
+  check('install wrote no instruction block', readText(instructions) === '');
+
+  writeFileSync(instructions, `${userText}\n${oldBlock}\n`);
+  const afterBlock = refreshInstalled(dist, repo);
   check(
-    "a user's own text in the same file is preserved",
-    readFileSync(instructions, 'utf8').includes('my own notes, written by hand'),
+    'refresh removes an old instruction block and keeps the whole of the user text',
+    readFileSync(instructions, 'utf8') === userText,
+    readFileSync(instructions, 'utf8'),
   );
+  check('and it reports the file', afterBlock.includes(instructions), afterBlock.join(','));
+  check('a second refresh has nothing left to do', refreshInstalled(dist, repo).length === 0);
+
+  writeFileSync(instructions, `${oldBlock}\n`);
+  refreshInstalled(dist, repo);
+  check('a file holding only the old block is removed', !existsSync(instructions));
 
   rmSync(repo, { recursive: true, force: true });
 

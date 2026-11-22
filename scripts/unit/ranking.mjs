@@ -1,4 +1,5 @@
-import { fuse, applyRecencyBoost } from '../../dist/search/index.js';
+import { fuse, applyRecencyBoost, SearchService } from '../../dist/search/index.js';
+import { NoopEmbedder } from '../../dist/embed/index.js';
 import { check } from '../lib/check.mjs';
 import { e, now, day } from '../lib/fixtures.mjs';
 
@@ -39,5 +40,36 @@ export default async function run() {
     'recency breaks ties toward newer',
     boosted[0].id === 'new',
     boosted.map((b) => b.id).join(','),
+  );
+
+  const seen = [];
+  const keywordStore = (results) => ({
+    searchKeyword: async (query) => {
+      seen.push(query);
+      return results;
+    },
+    searchVector: async () => [],
+  });
+  const service = (results) => new SearchService(keywordStore(results), new NoopEmbedder());
+
+  await service([e('x', 1)]).search({ text: '-websocket "reconnect storm" OR NEAR(a', limit: 5 });
+  check(
+    'keyword search gets plain words, never operators or quotes',
+    seen[0]?.text === 'websocket reconnect storm near',
+    seen[0]?.text,
+  );
+
+  const until = now - 400 * day;
+  const olderAtThatTime = { ...e('older', 1), createdAt: until - 400 * day };
+  const newerAtThatTime = { ...e('newer', 1), createdAt: until - day };
+  const ranked = await service([olderAtThatTime, newerAtThatTime]).search({
+    text: 'websocket',
+    until,
+    limit: 5,
+  });
+  check(
+    'recency counts age at the until time, not today',
+    ranked[0]?.id === 'newer',
+    ranked.map((r) => r.id).join(','),
   );
 }

@@ -12,6 +12,8 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
+import { createStore } from '../../../dist/store/index.js';
+import { projectKey } from '../../../dist/util/project-key.js';
 
 const CLI = new URL('../../../dist/cli/index.js', import.meta.url).pathname;
 const home = homedir();
@@ -29,6 +31,11 @@ chmodSync(fakeClaude, 0o755);
 const baseEnv = { ...process.env, CLAUDE_CODE_EXECPATH: fakeClaude };
 delete baseEnv.CLAUDE_CODE_ENTRYPOINT;
 delete baseEnv.CLAUDE_DB_CAPTURE;
+report(
+  'an isolated run inherits no variable that points at a real user folder',
+  !process.env.CLAUDE_CONFIG_DIR && !process.env.CLAUDE_DB_GRAMMARS,
+  `${process.env.CLAUDE_CONFIG_DIR} ${process.env.CLAUDE_DB_GRAMMARS}`,
+);
 
 function cli(args, { env = baseEnv, cwd = project } = {}) {
   const run = spawnSync(process.execPath, ['--no-warnings', CLI, ...args], {
@@ -82,9 +89,9 @@ report(
   hookFiles.join(',') || installed.err,
 );
 report(
-  'install registers the MCP server and writes the guidance',
+  'install registers the MCP server and leaves CLAUDE.local.md alone',
   Boolean(readJson(join(project, '.mcp.json')).mcpServers?.memory) &&
-    readFileSync(join(project, 'CLAUDE.local.md'), 'utf8').includes('claude-db:start'),
+    !existsSync(join(project, 'CLAUDE.local.md')),
 );
 report(
   'install warns that .mcp.json should not be committed when nothing ignores it',
@@ -138,6 +145,10 @@ report(
     .join(' | '),
 );
 
+writeFileSync(
+  join(project, 'CLAUDE.local.md'),
+  '<!-- claude-db:start -->\nold block\n<!-- claude-db:end -->\n',
+);
 const removed = cli(['uninstall', '--project']);
 report(
   'uninstall removes the hooks, the server and the guidance',
@@ -210,6 +221,14 @@ const projects = cli(['projects']);
 report(
   'projects marks the one you are in',
   projects.out.includes(`*`) && projects.out.includes(project),
+);
+
+const refused = ['*', '_', 'a'].map((bad) => cli(['forget', bad]));
+report(
+  'forget refuses a wildcard or too short id, says why and deletes nothing',
+  refused.every((run) => run.code === 1 && run.err.includes('not an observation id')) &&
+    cli(['search', 'websocket']).out.includes(decisionId),
+  refused.map((run) => run.err).join(' | '),
 );
 
 const forgot = cli(['forget', decisionId]);
@@ -328,3 +347,39 @@ report(
   unreachable.err,
 );
 report('use without a database explains its usage', cli(['use'], { env: useEnv }).code === 1);
+
+const shopRoot = join(home, 'merge-shop');
+const shopSub = join(shopRoot, 'sub');
+mkdirSync(shopSub, { recursive: true });
+execFileSync('git', ['init', '-q'], { cwd: shopRoot });
+execFileSync('git', ['remote', 'add', 'origin', 'https://github.com/acme/merge-shop.git'], {
+  cwd: shopRoot,
+});
+const shopKey = projectKey(shopRoot);
+const shopRow = (title, where) => ({
+  id: randomUUID(),
+  sessionId: 'earlier-chat',
+  project: where,
+  kind: 'decision',
+  title,
+  body: title,
+  files: [],
+  tags: [],
+  createdAt: Date.now(),
+  status: 'done',
+});
+const shopStore = await createStore(process.env.CLAUDE_DB_URL);
+await shopStore.init();
+await shopStore.insertObservations([
+  shopRow('Kept under the key', shopKey),
+  shopRow('Kept under the repository path', shopRoot),
+  shopRow('Kept under the subfolder path', shopSub),
+]);
+const mergeSub = cli(['merge', shopSub, '--yes'], { cwd: shopRoot });
+const shopRows = (await shopStore.list({})).filter((obs) => obs.title.startsWith('Kept under'));
+await shopStore.close();
+report(
+  'merge of a subfolder keeps every row and leaves nothing under the old path',
+  mergeSub.code === 0 && shopRows.length === 3 && !shopRows.some((obs) => obs.project === shopSub),
+  `${mergeSub.out.trim()} | ${shopRows.map((obs) => obs.project).join(', ')}`,
+);

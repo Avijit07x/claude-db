@@ -39,7 +39,10 @@ export class LocalEmbedder implements Embedder {
       }
       transformers.env.allowLocalModels = false;
       return (await transformers.pipeline('feature-extraction', this.id)) as FeatureExtractor;
-    })();
+    })().catch((error: unknown) => {
+      this.pipelinePromise = null;
+      throw error;
+    });
     return this.pipelinePromise;
   }
 }

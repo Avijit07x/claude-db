@@ -8,6 +8,8 @@ import { createStore } from './store/index.js';
 import { createScopeResolver } from './store/project-resolver.js';
 import { withProjectScope } from './store/scoped-store.js';
 
+const RETRY_LOAD_MS = 60_000;
+
 export interface RecallContext {
   config: Config;
   store: MemoryStore;
@@ -44,16 +46,27 @@ export function embedderWithDeadline(
   let loading: Promise<Embedder> | null = null;
   let ready: Embedder | null = null;
   let deadline = 0;
+  let failedAt: number | null = null;
+
+  const startLoading = (): Promise<Embedder> => {
+    deadline = now() + timeoutMs;
+    failedAt = null;
+    return load().then(
+      (embedder) => {
+        ready = embedder;
+        return embedder;
+      },
+      () => {
+        failedAt = now();
+        return new NoopEmbedder();
+      },
+    );
+  };
 
   return () => {
     if (ready) return Promise.resolve(ready);
-    if (!loading) {
-      deadline = now() + timeoutMs;
-      loading = load().catch(() => new NoopEmbedder());
-      void loading.then((embedder) => {
-        ready = embedder;
-      });
-    }
+    if (failedAt !== null && now() - failedAt >= RETRY_LOAD_MS) loading = null;
+    loading ??= startLoading();
     if (timeoutMs <= 0) return loading;
     return withTimeout(loading, deadline - now());
   };

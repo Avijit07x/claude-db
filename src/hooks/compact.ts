@@ -5,6 +5,7 @@ import { toShortId } from '../util/shortid.js';
 import { capturingDisabled } from './payload.js';
 import type { HookEnv } from './payload.js';
 import { forgetShown } from './shown.js';
+import { hookEnv } from '../util/env.js';
 
 const MAX_LINES = 8;
 const SCANNED = 200;
@@ -18,6 +19,7 @@ const LABELS: Partial<Record<ObservationKind, string>> = {
 export interface EarlierInChat {
   block: string;
   ids: ReadonlySet<string>;
+  titles: ReadonlySet<string>;
 }
 
 export async function recoverAfterCompact(
@@ -25,7 +27,7 @@ export async function recoverAfterCompact(
   project: string,
   sessionId: string,
   transcriptPath: string | undefined,
-  env: HookEnv = process.env,
+  env: HookEnv = hookEnv(),
 ): Promise<EarlierInChat | null> {
   forgetShown(sessionId);
   if (!capturingDisabled(ctx.config.capture.scripted, env)) {
@@ -61,5 +63,5 @@ export function renderEarlierInChat(newestFirst: Observation[]): EarlierInChat |
 
   if (lines.length === 0) return null;
   const block = ['<memory>', 'Earlier in this chat:', ...lines.reverse(), '</memory>'].join('\n');
-  return { block, ids };
+  return { block, ids, titles };
 }

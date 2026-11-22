@@ -24,7 +24,8 @@ export interface DaemonRequest {
   hook: string;
   raw: string;
   env: Record<string, string>;
-  workerEnv?: Record<string, string>;
 }
 
 export type DaemonReply = { kind: 'done'; out: string } | { kind: 'stale' };
+
+export type DaemonMessage = DaemonReply | { kind: 'ack' };

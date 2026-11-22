@@ -1,20 +1,19 @@
-import { createHash } from 'node:crypto';
 import type { RecallContext } from '../context.js';
+import type { MemoryStore } from '../store/adapter.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { readTranscript, transcriptPathFor } from './transcript.js';
 import type { Turn } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
 import { closeLandedWork } from './progress.js';
 import { noteMissingVectors } from './vectors.js';
-import { advanceCursor, readCursor, readWritten, writeWritten } from './cursors.js';
-import { withFlushLock } from './flush-lock.js';
-import type { FlushLockOptions } from './flush-lock.js';
+import { readCursor, writeCursor } from './cursors.js';
+
+const LOOKUP_CHUNK = 500;
 
 export interface FlushResult {
   observations: number;
   summary: string | null;
   lastReply: string;
-  skipped?: boolean;
 }
 
 export async function flushSession(
@@ -24,57 +23,22 @@ export async function flushSession(
   transcriptPath?: string,
   rebuild = false,
   finalReply = '',
-  lock: FlushLockOptions = {},
-): Promise<FlushResult> {
-  const result = await withFlushLock(
-    sessionId,
-    () => flushUnlocked(ctx, sessionId, project, transcriptPath, rebuild, finalReply),
-    lock,
-  );
-  if (result.ran) return result.value;
-  return { observations: 0, summary: null, lastReply: '', skipped: true };
-}
-
-async function flushUnlocked(
-  ctx: RecallContext,
-  sessionId: string,
-  project: string,
-  transcriptPath: string | undefined,
-  rebuild: boolean,
-  finalReply: string,
 ): Promise<FlushResult> {
   const path = transcriptPath ?? transcriptPathFor(project, sessionId);
-  const cursor = readCursor(sessionId);
-
-  const read = readTranscript(path, cursor);
-  const { nextOffset } = read;
+  const read = readTranscript(path, readCursor(sessionId));
   const turns = withFinalReply(read.turns, finalReply);
   const lastReply = turns.at(-1)?.reasoning ?? '';
-  if (turns.length === 0) {
-    await closeLandedWork(ctx.store, project);
-    advanceCursor(sessionId, cursor, nextOffset);
-    return { observations: 0, summary: null, lastReply };
-  }
-
   const observations = observationsFromTurns(turns, sessionId, project, ctx.config);
-  if (observations.length === 0) {
-    await closeLandedWork(ctx.store, project);
-    advanceCursor(sessionId, cursor, nextOffset);
-    return { observations: 0, summary: null, lastReply };
-  }
 
-  const written = rebuild ? new Map<string, string>() : readWritten(sessionId);
-  const prints = new Map(observations.map((obs) => [obs.id, printOf(obs)]));
-  const fresh = observations.filter((obs) => written.get(obs.id) !== prints.get(obs.id));
-  if (fresh.length === 0) {
+  const stored = rebuild
+    ? new Map<string, Observation>()
+    : await storedRows(ctx.store, observations);
+  const changed = observations.filter((obs) => !sameRow(obs, stored.get(obs.id)));
+  if (changed.length === 0) {
     await closeLandedWork(ctx.store, project);
-    advanceCursor(sessionId, cursor, nextOffset);
+    writeCursor(sessionId, read.nextOffset);
     return { observations: 0, summary: null, lastReply };
   }
-  await embedObservations(ctx, fresh);
-  await ctx.store.insertObservations(fresh);
-  writeWritten(sessionId, prints);
-  await closeLandedWork(ctx.store, project);
 
   const previous = rebuild ? null : await ctx.store.getSession(sessionId);
   const summary = summarize(observations, previous?.summary);
@@ -85,8 +49,40 @@ async function flushUnlocked(
     summary,
   });
 
-  advanceCursor(sessionId, cursor, nextOffset);
+  await embedObservations(ctx, changed);
+  await ctx.store.insertObservations(changed);
+  await closeLandedWork(ctx.store, project);
+  writeCursor(sessionId, read.nextOffset);
   return { observations: observations.length, summary, lastReply };
+}
+
+async function storedRows(
+  store: MemoryStore,
+  observations: Observation[],
+): Promise<Map<string, Observation>> {
+  const ids = observations.map((obs) => obs.id);
+  const found = new Map<string, Observation>();
+  for (let start = 0; start < ids.length; start += LOOKUP_CHUNK) {
+    for (const row of await store.getObservations(ids.slice(start, start + LOOKUP_CHUNK))) {
+      found.set(row.id, row);
+    }
+  }
+  return found;
+}
+
+const sameList = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((item, index) => item === b[index]);
+
+function sameRow(fresh: Observation, stored: Observation | undefined): boolean {
+  return (
+    stored !== undefined &&
+    fresh.kind === stored.kind &&
+    fresh.title === stored.title &&
+    fresh.body === stored.body &&
+    fresh.createdAt === stored.createdAt &&
+    sameList(fresh.files, stored.files) &&
+    sameList(fresh.tags, stored.tags)
+  );
 }
 
 export async function embedObservations(
@@ -150,8 +146,5 @@ export function summarize(observations: Observation[], previous?: string): strin
   }
   return kept.join(' | ');
 }
-
-const printOf = (obs: Observation): string =>
-  createHash('sha256').update(JSON.stringify(obs)).digest('base64url');
 
 export { clearCursor, resetCursor, sweepCursors, sweepCursorsDaily } from './cursors.js';

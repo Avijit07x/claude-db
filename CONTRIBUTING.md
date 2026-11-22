@@ -29,7 +29,7 @@ node /path/to/claude-db/dist/cli/index.js install --project
 | ---------------- | --------------------------------- |
 | `npm run build`  | Compile to `dist/`                |
 | `npm run unit`   | The unit checks, the fastest loop |
-| `npm test`       | The full suite                    |
+| `npm test`       | Build, then the full suite        |
 | `npm run lint`   | House rules and ESLint            |
 | `npm run format` | Prettier over everything          |
 

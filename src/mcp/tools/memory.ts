@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { RecallContext } from '../../context.js';
 import { z } from 'zod';
+import { observationIdsSchema } from './ids.js';
 import { KINDS } from './kinds.js';
 import { remember as record } from '../../capture/index.js';
 import { toShortId } from '../../util/shortid.js';
@@ -34,7 +35,7 @@ export function register(server: McpServer, ctx: RecallContext): void {
     'forget',
     'Delete observations by id, for memory that is wrong or obsolete. Ids come ' +
       'from search. This cannot be undone, so confirm with the user first.',
-    { ids: z.array(z.string()).min(1).max(25) },
+    { ids: observationIdsSchema },
     (args) => forget(ctx, args),
   );
 }

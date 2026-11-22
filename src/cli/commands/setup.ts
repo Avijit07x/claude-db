@@ -4,7 +4,7 @@ import type { Scope } from '../paths.js';
 import { CONFIG_PATH } from '../../config/index.js';
 import { DIST_DIR } from '../constants.js';
 import { assertStableLocation, install, uninstall } from '../install.js';
-import { instructionsPathFor, mcpPathFor, settingsPathFor } from '../paths.js';
+import { mcpPathFor, settingsPathFor } from '../paths.js';
 import type { SkillInstallResult } from '../skills.js';
 import { createContext } from '../../context.js';
 import { join, resolve } from 'node:path';
@@ -45,7 +45,6 @@ export async function cmdInstall(scope: Scope): Promise<void> {
     `Scope    : ${scope === 'project' ? `this project only (${project})` : 'all projects on this machine'}`,
   );
   console.log(`Settings : ${settingsPath}`);
-  console.log(`Guidance : ${instructionsPathFor(scope, project)}`);
   printSkills(skills);
   console.log(`Config   : ${CONFIG_PATH}`);
   console.log(`Database : ${redact(ctx.config.database)}`);

@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { RecallContext } from '../context.js';
 import type { Observation } from '../types.js';
 import { embedObservations } from '../capture/flush.js';
+import { claudeProjectsDir } from '../util/claude-dir.js';
 import type { Fact, FactType } from './model.js';
 import {
   CLAUDE_MEMORY_TAG,
@@ -31,7 +31,7 @@ interface MemoryFile {
 }
 
 export function claudeMemoryDir(project: string): string {
-  return join(homedir(), '.claude', 'projects', project.replace(/[^a-zA-Z0-9]/g, '-'), 'memory');
+  return join(claudeProjectsDir(), project.replace(/[^a-zA-Z0-9]/g, '-'), 'memory');
 }
 
 export function parseMemoryFile(text: string, fallbackTime: number): MemoryFile | null {

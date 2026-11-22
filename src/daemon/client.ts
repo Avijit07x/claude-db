@@ -4,17 +4,20 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { CONFIG_DIR } from '../config/dir.js';
 import { runDetached } from '../hooks/detached.js';
-import type { DaemonReply, DaemonRequest } from './paths.js';
+import { hookEnv } from '../util/env.js';
+import { clearDaemonPid, readDaemonPid } from './pid.js';
+import type { DaemonMessage, DaemonReply, DaemonRequest } from './paths.js';
 import { DAEMON_SCRIPT, socketPath } from './paths.js';
 
-const FORWARDED = ['CLAUDE_DB_CAPTURE', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_DB_USAGES_HOOK'];
 const OWN_SETUP = ['CLAUDE_DB_URL', 'CLAUDE_DB_GRAPH_CACHE'];
 const STARTING_FOR_MS = 15_000;
+const ACK_MS = 2_000;
 export const STARTING_PREFIX = 'daemon.starting.';
 
-export type Asked = DaemonReply | { kind: 'unreachable' } | { kind: 'timeout' };
+export type Asked =
+  DaemonReply | { kind: 'unreachable' } | { kind: 'silent' } | { kind: 'timeout' };
 
-export function daemonWanted(env: NodeJS.ProcessEnv = process.env): boolean {
+export function daemonWanted(env: NodeJS.ProcessEnv = hookEnv()): boolean {
   if (OWN_SETUP.some((name) => env[name])) return false;
   const forced = env['CLAUDE_DB_DAEMON'];
   if (forced === 'on') return true;
@@ -29,16 +32,7 @@ export function daemonWanted(env: NodeJS.ProcessEnv = process.env): boolean {
   }
 }
 
-export function forwardedEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
-  const picked: Record<string, string> = {};
-  for (const name of FORWARDED) {
-    const value = env[name];
-    if (value !== undefined) picked[name] = value;
-  }
-  return picked;
-}
-
-export function workerEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+export function envForDaemon(env: NodeJS.ProcessEnv = hookEnv()): Record<string, string> {
   const picked: Record<string, string> = {};
   for (const [name, value] of Object.entries(env)) {
     if (value !== undefined) picked[name] = value;
@@ -46,37 +40,46 @@ export function workerEnv(env: NodeJS.ProcessEnv = process.env): Record<string, 
   return picked;
 }
 
-export function askDaemon(request: DaemonRequest, timeoutMs: number): Promise<Asked> {
+function parseMessage(line: string): DaemonMessage | null {
+  try {
+    return JSON.parse(line) as DaemonMessage;
+  } catch {
+    return null;
+  }
+}
+
+export function askDaemon(request: DaemonRequest, replyMs: number): Promise<Asked> {
   return new Promise((settle) => {
     let sent = false;
-    let reply = '';
+    let buffer = '';
     const socket = createConnection(socketPath());
     const finish = (asked: Asked): void => {
       clearTimeout(timer);
       socket.destroy();
       settle(asked);
     };
-    const timer = setTimeout(
-      () => finish(sent ? { kind: 'timeout' } : { kind: 'unreachable' }),
-      timeoutMs,
-    );
+    const failed = (): Asked => (sent ? { kind: 'timeout' } : { kind: 'unreachable' });
+    let timer = setTimeout(() => finish({ kind: 'silent' }), ACK_MS);
     socket.setEncoding('utf8');
     socket.on('connect', () => {
       sent = true;
       socket.write(`${JSON.stringify(request)}\n`);
     });
     socket.on('data', (chunk: string) => {
-      reply += chunk;
-      const end = reply.indexOf('\n');
-      if (end < 0) return;
-      try {
-        finish(JSON.parse(reply.slice(0, end)) as DaemonReply);
-      } catch {
-        finish({ kind: 'timeout' });
+      buffer += chunk;
+      for (let end = buffer.indexOf('\n'); end >= 0; end = buffer.indexOf('\n')) {
+        const message = parseMessage(buffer.slice(0, end));
+        buffer = buffer.slice(end + 1);
+        if (message?.kind !== 'ack') {
+          finish(message ?? { kind: 'timeout' });
+          return;
+        }
+        clearTimeout(timer);
+        timer = setTimeout(() => finish({ kind: 'timeout' }), replyMs);
       }
     });
-    socket.on('error', () => finish(sent ? { kind: 'timeout' } : { kind: 'unreachable' }));
-    socket.on('close', () => finish(sent ? { kind: 'timeout' } : { kind: 'unreachable' }));
+    socket.on('error', () => finish(failed()));
+    socket.on('close', () => finish(failed()));
   });
 }
 
@@ -90,4 +93,17 @@ export function startDaemon(now = Date.now()): boolean {
   }
   runDetached(DAEMON_SCRIPT, [], homedir(), () => rmSync(marker, { force: true }));
   return true;
+}
+
+export function replaceDaemon(asked: number | null): void {
+  if (asked !== null) {
+    try {
+      process.kill(asked, 'SIGKILL');
+    } catch {}
+  }
+  if (readDaemonPid() === asked) {
+    if (asked !== null) clearDaemonPid(asked);
+    if (process.platform !== 'win32') rmSync(socketPath(), { force: true });
+  }
+  startDaemon();
 }

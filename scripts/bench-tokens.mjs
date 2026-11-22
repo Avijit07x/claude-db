@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { claudeProjectsDir } from '../dist/util/claude-dir.js';
 
 const PROJECT = process.cwd();
 const SLUG = PROJECT.replace(/[/.]/g, '-');
-const TRANSCRIPTS = join(homedir(), '.claude', 'projects', SLUG);
+const TRANSCRIPTS = join(claudeProjectsDir(), SLUG);
 const CHARS_PER_TOKEN = 4;
 const MEMORY_TAGS = ['memory', 'recalled-memory', 'project-memory'];
 

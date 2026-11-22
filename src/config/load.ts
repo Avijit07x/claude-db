@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { CONFIG_DIR } from './dir.js';
 import type { Config } from './schema.js';
 import { ConfigSchema } from './schema.js';
+import { hookEnv } from '../util/env.js';
 
 export { CONFIG_DIR };
 export const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
@@ -35,7 +36,7 @@ export function loadConfig(): Config {
   } catch {}
 
   const config = ConfigSchema.parse(dropSupersededDefaults(fileConfig));
-  const envUrl = process.env['CLAUDE_DB_URL']?.trim();
+  const envUrl = hookEnv()['CLAUDE_DB_URL']?.trim();
 
   return {
     ...config,

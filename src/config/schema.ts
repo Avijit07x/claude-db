@@ -32,7 +32,6 @@ export const ConfigSchema = z.object({
 
   capture: z
     .object({
-      tools: z.array(z.string()).default(['Edit', 'Write', 'Bash', 'NotebookEdit']),
       exclude: z.array(z.string()).default(['.env', 'secrets', 'node_modules', '.git/']),
       maxBodyChars: z.number().int().positive().default(4000),
       scripted: z.boolean().default(false),
@@ -60,7 +59,6 @@ export const ConfigSchema = z.object({
 
   inject: z
     .object({
-      sessions: z.number().int().nonnegative().default(5),
       maxChars: z.number().int().positive().default(6000),
 
       perPrompt: z.boolean().default(true),

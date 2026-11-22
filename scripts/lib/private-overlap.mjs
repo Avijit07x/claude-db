@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const RUN = 6;
+const PROJECTS = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'projects');
 const GENERIC = [
   'another claude session',
   'image source tmp claude',
@@ -96,7 +97,7 @@ export async function findPrivateOverlap(texts) {
     }
   };
   (await savedTexts()).forEach(scan);
-  for (const path of transcriptFiles(join(homedir(), '.claude', 'projects'))) {
+  for (const path of transcriptFiles(PROJECTS)) {
     userTexts(path).forEach(scan);
   }
   return [...hits].map(([file, { count, example }]) => ({ file, count, example }));

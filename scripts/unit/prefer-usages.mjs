@@ -1,7 +1,66 @@
-import { isSymbol, isWord, symbolsGreppedIn } from '../../dist/hooks/grep-symbols.js';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  isSymbol,
+  isWord,
+  repoDirectory,
+  symbolsGreppedIn,
+} from '../../dist/hooks/grep-symbols.js';
 import { check } from '../lib/check.mjs';
 
+const QUIET = [
+  'grep -n handleRequest a.ts',
+  'grep -rn handleRequest CHANGELOG.md',
+  'grep -n handleRequest /var/log/app.log',
+  'grep -rn handleRequest /tmp',
+  'grep -rn handleRequest src a.ts',
+  'grep -rc handleRequest src',
+  'grep -rn --count handleRequest src',
+  'grep -rvn handleRequest src',
+  'grep -rn handleRequest src | wc -l',
+  'grep -rn handleRequest src 2>&1 | head',
+  'rg -c handleRequest src',
+  'git grep -n handleRequest HEAD~5',
+  'git grep -n handleRequest HEAD -- src',
+];
+
+const ANSWERED = [
+  'grep -rn handleRequest src',
+  'grep -rln handleRequest .',
+  'grep -rn handleRequest src 2>/dev/null',
+  'grep -rn handleRequest src || true',
+  'grep -rn handleRequest "src" --include=*.ts',
+  'rg handleRequest',
+  'git grep -n handleRequest',
+  'cd src && grep -rn handleRequest .',
+];
+
+function quietRules() {
+  const dir = mkdtempSync(join(tmpdir(), 'prefer-usages-'));
+  mkdirSync(join(dir, 'src'));
+  writeFileSync(join(dir, 'a.ts'), '');
+  writeFileSync(join(dir, 'CHANGELOG.md'), '');
+  const inRepo = repoDirectory(dir, dir);
+  for (const command of QUIET) {
+    check(
+      `quiet: ${command}`,
+      symbolsGreppedIn(command, inRepo).length === 0,
+      symbolsGreppedIn(command, inRepo).join(','),
+    );
+  }
+  for (const command of ANSWERED) {
+    check(
+      `answered: ${command}`,
+      symbolsGreppedIn(command, inRepo).join(',') === 'handleRequest',
+      symbolsGreppedIn(command, inRepo).join(','),
+    );
+  }
+  rmSync(dir, { recursive: true, force: true });
+}
+
 export default async function run() {
+  quietRules();
   const caught = (command) => symbolsGreppedIn(command).length > 0;
 
   check('a recursive symbol grep is caught', caught('grep -rn "cmdReembed" src/'));

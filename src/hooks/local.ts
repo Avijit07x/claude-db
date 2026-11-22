@@ -9,7 +9,6 @@ export async function runLocally(name: HookName, raw: string): Promise<void> {
   const handle = await loadHandler(name);
   await handle({
     payload: parsePayload(raw),
-    env: process.env,
     write: writeStdout,
     async withContext(work) {
       const ctx = await createContext();

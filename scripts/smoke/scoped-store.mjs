@@ -55,6 +55,35 @@ export default async function run({ store: raw }, check) {
   const plain = row(PLAIN, 'plain');
   await store.insertObservations([bare, plain]);
 
+  const batches = [];
+  const spied = Object.create(raw, {
+    insertObservations: {
+      configurable: true,
+      value: (batch) => {
+        batches.push(batch);
+        return raw.insertObservations(batch);
+      },
+    },
+  });
+  const twice = row(BARE, 'twice-first');
+  const batchStore = withProjectScope(
+    spied,
+    createScopeResolver({
+      store: raw,
+      remote: 'origin',
+      isFolder: (value) => value.startsWith('/scoped/'),
+      keyOf: (folder) => keys[folder] ?? folder,
+    }),
+  );
+  await batchStore.insertObservations([twice, { ...twice, title: 'twice-last' }]);
+  const [winner] = await raw.getObservations([twice.id]);
+  check(
+    'two rows with one id in one batch reach the store once, last one winning',
+    batches[0]?.length === 1 && winner?.title === 'twice-last',
+    `${batches[0]?.length} row(s), ${winner?.title}`,
+  );
+  await raw.remove({ ids: [twice.id] });
+
   const storedUnder = async (project) => (await raw.list({ project, limit: 100 })).map((r) => r.id);
   check(
     'a write from a folder with a remote is saved under the key',

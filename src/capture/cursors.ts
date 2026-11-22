@@ -1,9 +1,10 @@
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { CONFIG_DIR } from '../config/index.js';
 import { sessionIdsOnDisk } from './transcript.js';
 
 const SWEEP_EVERY_MS = 24 * 60 * 60 * 1000;
+const LEGACY_FILE = /\.(written|lock|lock\.break)$/;
 
 function cursorName(sessionId: string): string {
   return `${sessionId.replace(/[^\w-]/g, '_')}.offset`;
@@ -11,31 +12,6 @@ function cursorName(sessionId: string): string {
 
 function cursorPath(sessionId: string): string {
   return join(CONFIG_DIR, 'cursors', cursorName(sessionId));
-}
-
-const writtenPath = (sessionId: string): string =>
-  cursorPath(sessionId).replace(/\.offset$/, '.written');
-
-export function readWritten(sessionId: string): Map<string, string> {
-  try {
-    const parsed = JSON.parse(readFileSync(writtenPath(sessionId), 'utf8')) as unknown;
-    if (!parsed || typeof parsed !== 'object') return new Map();
-    return new Map(
-      Object.entries(parsed).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string',
-      ),
-    );
-  } catch {
-    return new Map();
-  }
-}
-
-export function writeWritten(sessionId: string, prints: ReadonlyMap<string, string>): void {
-  const path = writtenPath(sessionId);
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify(Object.fromEntries(prints)), 'utf8');
-  } catch {}
 }
 
 export function readCursor(sessionId: string): number {
@@ -47,13 +23,7 @@ export function readCursor(sessionId: string): number {
   }
 }
 
-export function advanceCursor(sessionId: string, from: number, to: number): void {
-  const now = readCursor(sessionId);
-  if (now !== from && now > to) return;
-  writeCursor(sessionId, to);
-}
-
-function writeCursor(sessionId: string, offset: number): void {
+export function writeCursor(sessionId: string, offset: number): void {
   const path = cursorPath(sessionId);
   try {
     mkdirSync(dirname(path), { recursive: true });
@@ -63,20 +33,20 @@ function writeCursor(sessionId: string, offset: number): void {
 
 export function resetCursor(sessionId: string): void {
   writeCursor(sessionId, 0);
-  rmSync(writtenPath(sessionId), { force: true });
 }
 
 export function clearCursor(sessionId: string): void {
   rmSync(cursorPath(sessionId), { force: true });
   rmSync(cursorPath(sessionId).replace(/\.offset$/, '.shown'), { force: true });
-  rmSync(writtenPath(sessionId), { force: true });
 }
 
 export function sweepCursorsDaily(now = Date.now()): number {
   const marker = join(CONFIG_DIR, 'cursors', '.swept');
+  let lastSweep = 0;
   try {
-    if (now - statSync(marker).mtimeMs < SWEEP_EVERY_MS) return 0;
+    lastSweep = Number(readFileSync(marker, 'utf8')) || 0;
   } catch {}
+  if (now - lastSweep < SWEEP_EVERY_MS) return 0;
   try {
     mkdirSync(dirname(marker), { recursive: true });
     writeFileSync(marker, String(now), 'utf8');
@@ -95,10 +65,15 @@ export function sweepCursors(): number {
     return 0;
   }
 
-  const live = new Set(sessionIdsOnDisk().map((id) => id.replace(/[^\w-]/g, '_')));
-  let removed = 0;
+  const legacy = files.filter((file) => LEGACY_FILE.test(file));
+  for (const file of legacy) rmSync(join(dir, file), { force: true });
+
+  const onDisk = sessionIdsOnDisk();
+  if (onDisk === null) return legacy.length;
+  const live = new Set(onDisk.map((id) => id.replace(/[^\w-]/g, '_')));
+  let removed = legacy.length;
   for (const file of files) {
-    const match = /^(.+)\.(offset|shown|written)$/.exec(file);
+    const match = /^(.+)\.(offset|shown)$/.exec(file);
     if (!match?.[1] || live.has(match[1])) continue;
     rmSync(join(dir, file), { force: true });
     removed += 1;

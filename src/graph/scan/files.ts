@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { grammarSignature } from '../grammars.js';
 import { BASIC_FINGERPRINT, LANGUAGES, languageFor } from '../languages/index.js';
@@ -42,7 +42,9 @@ export function listFiles(root: string): string[] {
 }
 
 export function sourceFiles(root: string): string[] {
-  return listFiles(root).filter((path) => languageFor(path) !== null);
+  return listFiles(root).filter(
+    (path) => languageFor(path) !== null && existsSync(join(root, path)),
+  );
 }
 
 export function readSource(root: string, path: string): SourceFile | null {

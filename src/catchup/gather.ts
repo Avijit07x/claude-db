@@ -65,7 +65,7 @@ export async function gatherCatchup(
     unfinished: unfinished.map((entry) => ({ at: entry.askedAt, request: entry.request })),
     chats: chats.map((chat) => ({
       at: chat.at,
-      summary: chat.summary,
+      summary: chat.summary.join('; ') || null,
       work: chat.turns.map(turnLine),
     })),
     todos,

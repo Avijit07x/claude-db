@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { basename, delimiter, isAbsolute, join } from 'node:path';
 import { CONFIG_DIR } from '../config/dir.js';
+import { hookEnv } from './env.js';
 
 const REMEMBERED_FILE = join(CONFIG_DIR, 'claude-binary');
 const MAX_ANCESTORS = 8;
@@ -79,7 +80,7 @@ export function rememberedBinary(file = REMEMBERED_FILE): string | null {
 }
 
 export function rememberClaudeBinary(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = hookEnv(),
   file = REMEMBERED_FILE,
   find: () => string | null = findClaudeAncestor,
 ): void {
@@ -105,7 +106,7 @@ export interface ClaudeLookup {
   onPath: (env: NodeJS.ProcessEnv) => string | null;
 }
 
-export function findOnPath(env: NodeJS.ProcessEnv = process.env): string | null {
+export function findOnPath(env: NodeJS.ProcessEnv = hookEnv()): string | null {
   const names = process.platform === 'win32' ? ['claude.exe', 'claude.cmd'] : ['claude'];
   for (const dir of (env['PATH'] ?? '').split(delimiter)) {
     if (dir === '') continue;
@@ -122,7 +123,7 @@ export function findOnPath(env: NodeJS.ProcessEnv = process.env): string | null 
 }
 
 export function resolveClaude(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = hookEnv(),
   lookup: Partial<ClaudeLookup> = {},
 ): ClaudeLocation | null {
   const {
@@ -141,7 +142,7 @@ export function resolveClaude(
 }
 
 export function claudeBinary(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = hookEnv(),
   lookup: Partial<ClaudeLookup> = {},
 ): string {
   return resolveClaude(env, lookup)?.path ?? 'claude';

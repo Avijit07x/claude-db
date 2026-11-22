@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import type { MemoryStore } from '../store/adapter.js';
 import type { Observation } from '../types.js';
 
@@ -31,6 +31,8 @@ function uncommittedFiles(project: string): Set<string> | null {
   }
 }
 
+const isInside = (file: string, folder: string): boolean => file.startsWith(folder + sep);
+
 export async function closeLandedWork(store: MemoryStore, project: string): Promise<number> {
   const dirty = uncommittedFiles(project);
   if (!dirty) return 0;
@@ -51,7 +53,8 @@ export async function closeLandedWork(store: MemoryStore, project: string): Prom
     if (batch.length === 0) break;
 
     for (const obs of batch) {
-      if (obs.files.every((file) => !dirty.has(file))) landed.push(obs.id);
+      const mine = obs.files.every((file) => isInside(file, project));
+      if (mine && obs.files.every((file) => !dirty.has(file))) landed.push(obs.id);
     }
 
     const last = batch[batch.length - 1];

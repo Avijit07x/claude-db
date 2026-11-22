@@ -5,6 +5,7 @@ import type { CodeSymbol } from '../../types.js';
 import { scopeToken } from '../../util/scope.js';
 import type { Receiver, Reference } from '../types.js';
 import { CACHE_KEY } from './files.js';
+import { hookEnv } from '../../util/env.js';
 
 const MEMO_IDLE_MS = 10 * 60 * 1000;
 
@@ -39,7 +40,7 @@ interface StoredCache {
 }
 
 export const cacheHome = (): string =>
-  process.env['CLAUDE_DB_GRAPH_CACHE'] ?? join(CONFIG_DIR, 'graph-cache');
+  hookEnv()['CLAUDE_DB_GRAPH_CACHE'] ?? join(CONFIG_DIR, 'graph-cache');
 
 export const cachePath = (project: string): string =>
   join(cacheHome(), `${scopeToken(project)}.json`);

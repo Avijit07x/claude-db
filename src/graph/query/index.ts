@@ -3,3 +3,4 @@ export { formatGraph, formatText } from './format.js';
 export { queryGraph } from './lookup.js';
 export { refreshGraph } from './refresh.js';
 export { nearest, suggestFor } from './suggest.js';
+export { usagesAnswer } from './usages.js';

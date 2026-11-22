@@ -12,6 +12,10 @@ export function projectClause(
   return `${column} = ANY($${values.length}::text[])`;
 }
 
+export function likePrefix(prefix: string): string {
+  return `${prefix.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
 export function excludeSessionsClause(
   sessions: string[] | undefined,
   values: unknown[],

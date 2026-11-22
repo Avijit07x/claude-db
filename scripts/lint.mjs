@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { readsProcessEnv } from './lib/lint-rules.mjs';
 
 const MAX_LINES = 250;
 const HOOK_STDOUT_OWNERS = new Set(['payload.ts']);
@@ -82,6 +83,9 @@ function checkFile(file) {
         'no-raw-database-url',
         'connection strings carry passwords; wrap in redact()',
       );
+    }
+    if (readsProcessEnv(file, line)) {
+      fail(file, number, 'no-process-env', 'read the environment through hookEnv()');
     }
     if (
       file.startsWith('src/hooks/') &&

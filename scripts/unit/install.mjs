@@ -18,18 +18,29 @@ export default async function run() {
       }
     };
 
-    writeFileSync(join(repo, 'CLAUDE.local.md'), '# Notes\n\nSomething the user wrote.\n');
+    const notes = '# Notes\n\nSomething the user wrote.\n';
+    writeFileSync(join(repo, 'CLAUDE.local.md'), notes);
 
     install(dist, 'project', repo);
     install(dist, 'project', repo);
 
-    const guidance = readFileSync(join(repo, 'CLAUDE.local.md'), 'utf8');
-    check('install writes standing memory instructions', guidance.includes('`search`'));
     check(
-      'installing twice does not duplicate them',
-      guidance.split('claude-db:start').length - 1 === 1,
+      'install leaves the existing CLAUDE.local.md byte for byte as it was',
+      readFileSync(join(repo, 'CLAUDE.local.md'), 'utf8') === notes,
     );
-    check("the user's own notes are left alone", guidance.includes('Something the user wrote.'));
+
+    const fresh = mkdtempSync(join(tmpdir(), 'install-fresh-'));
+    install(dist, 'project', fresh);
+    check(
+      'install creates no CLAUDE.local.md when there was none',
+      !existsSync(join(fresh, 'CLAUDE.local.md')),
+    );
+    rmSync(fresh, { recursive: true, force: true });
+
+    writeFileSync(
+      join(repo, 'CLAUDE.local.md'),
+      `${notes}\n<!-- claude-db:start -->\n## Project memory\n<!-- claude-db:end -->\n`,
+    );
 
     check(
       'install writes the scan skill',

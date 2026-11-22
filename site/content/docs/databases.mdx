@@ -20,8 +20,8 @@ overrides the config file when you need a one-off.
 
 <Callout title="Recall does not change with the backend">
   Search is hybrid, keyword plus vector, on all three. Ranking, fusion and token budgeting live
-  above the adapters, so results behave identically no matter which database is plugged in. Only
-  retrieval cost changes.
+  above the adapters, so results are close across databases. Keyword ranking differs per engine, and SQLite and
+  MongoDB vector search scans only the newest rows up to a cap.
 </Callout>
 
 ## Sync two databases
@@ -30,7 +30,7 @@ overrides the config file when you need a one-off.
 claude-db sync "postgres://user:pass@host:5432/memory"
 ```
 
-A two-way merge, so a laptop and a desktop can each keep working offline and reconcile later.
+Adds the rows each side is missing and moves status forward; edits and deletes do not travel.
 `export` and `import` cover the same ground as files when you would rather move a dump by hand.
 
 ## Teams and several machines

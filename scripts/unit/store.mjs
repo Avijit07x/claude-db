@@ -41,6 +41,39 @@ export default async function run() {
       left.join(','),
     );
 
+    const custom = join(home, 'custom-claude');
+    mkdirSync(join(custom, 'projects', 'proj'), { recursive: true });
+    writeFileSync(join(custom, 'projects', 'proj', 'live.jsonl'), '{}\n');
+    rmSync(join(home, '.claude'), { recursive: true, force: true });
+    for (const name of ['live', 'dead']) {
+      writeFileSync(join(home, '.claude-memory', 'cursors', `${name}.offset`), '42');
+    }
+    const sweepWith = (configDir) =>
+      execFileSync(process.execPath, [probe], {
+        env: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: configDir },
+        encoding: 'utf8',
+      });
+    const customRemoved = sweepWith(custom);
+    const customLeft = readdirSync(join(home, '.claude-memory', 'cursors'));
+    check(
+      'with CLAUDE_CONFIG_DIR set, a chat under that folder keeps its cursor',
+      customRemoved === '1' &&
+        customLeft.includes('live.offset') &&
+        !customLeft.includes('dead.offset'),
+      customLeft.join(','),
+    );
+
+    writeFileSync(join(home, '.claude-memory', 'cursors', 'dead.offset'), '42');
+    const notAFolder = join(home, 'not-a-folder');
+    writeFileSync(notAFolder, '');
+    const unreadableRemoved = sweepWith(join(notAFolder, 'inside'));
+    check(
+      'a chat folder that cannot be read sweeps nothing',
+      unreadableRemoved === '0' &&
+        readdirSync(join(home, '.claude-memory', 'cursors')).includes('live.offset'),
+      unreadableRemoved,
+    );
+
     rmSync(home, { recursive: true, force: true });
 
     const cases = [

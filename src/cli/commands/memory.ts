@@ -3,7 +3,7 @@ import { basename } from 'node:path';
 import { createContext } from '../../context.js';
 import { remember } from '../../capture/index.js';
 import { resolveProject } from '../../util/project.js';
-import { toShortId } from '../../util/shortid.js';
+import { assertValidIds, toShortId } from '../../util/shortid.js';
 import { valueOf, withoutFlags } from '../args.js';
 
 export async function cmdSearch(argv: (string | undefined)[]): Promise<void> {
@@ -73,6 +73,7 @@ export async function cmdForget(argv: (string | undefined)[]): Promise<void> {
     process.exit(1);
   }
 
+  assertValidIds(ids);
   const ctx = await createContext();
   try {
     const doomed = await ctx.store.getObservations(ids);

@@ -5,28 +5,34 @@ import type { GraphAnswer } from '../../graph/query/lookup.js';
 import { staleFiles } from '../../graph/query/stale.js';
 import type { MemoryStore } from '../../store/adapter.js';
 import { repoRootFor } from '../../usages/index.js';
-import { DECLARED, isSymbol, isWord, symbolsGreppedIn } from '../grep-symbols.js';
+import { DECLARED, isSymbol, isWord, repoDirectory, symbolsGreppedIn } from '../grep-symbols.js';
 import { graphCachedHere, graphKnownAbsent, noteGraphPresence } from '../graph-presence.js';
 import { refreshGraphInBackground } from '../graph-refresh.js';
 import type { HookRun } from '../run.js';
 import { resolveProject } from '../../util/project.js';
+import { hookEnv } from '../../util/env.js';
 
 const MAX_SYMBOLS = 2;
 const MAX_LINES = 14;
 const TEXT_LINES = 6;
 const EDGE_LIMIT = 20;
 
-function requested(payload: {
-  tool_name?: string;
-  tool_input?: Record<string, unknown>;
-}): string[] {
+function requested(
+  payload: { tool_name?: string; tool_input?: Record<string, unknown>; cwd?: string },
+  project: string,
+): string[] {
   const input = payload.tool_input ?? {};
+  const inRepo = repoDirectory(payload.cwd ?? project, project);
   if (payload.tool_name === 'Grep') {
     const pattern = typeof input['pattern'] === 'string' ? input['pattern'] : '';
+    const path = input['path'];
+    if (input['output_mode'] === 'count') return [];
+    if (typeof path === 'string' && !inRepo(path)) return [];
     return isSymbol(pattern) || isWord(pattern) ? [pattern] : [];
   }
   if (payload.tool_name === 'Bash') {
-    return symbolsGreppedIn(typeof input['command'] === 'string' ? input['command'] : '');
+    const command = typeof input['command'] === 'string' ? input['command'] : '';
+    return symbolsGreppedIn(command, inRepo);
   }
   return [];
 }
@@ -96,14 +102,14 @@ async function answerSymbols(
 }
 
 export default async function preferUsages(run: HookRun): Promise<void> {
-  const mode = run.env['CLAUDE_DB_USAGES_HOOK'] ?? 'deny';
+  const mode = hookEnv()['CLAUDE_DB_USAGES_HOOK'] ?? 'directive';
   if (mode === 'off') return;
 
   const { payload } = run;
-  const symbols = requested(payload).slice(0, MAX_SYMBOLS);
+  const project = resolveProject(payload.cwd);
+  const symbols = requested(payload, project).slice(0, MAX_SYMBOLS);
   if (symbols.length === 0) return;
 
-  const project = resolveProject(payload.cwd);
   if (graphKnownAbsent(project)) return;
   const { named, blocks } = await run.withContext((ctx) => answerSymbols(ctx, project, symbols));
   if (blocks.length === 0) return;
@@ -114,11 +120,7 @@ export default async function preferUsages(run: HookRun): Promise<void> {
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
-          additionalContext:
-            `You are grepping the declared symbol(s) ${names}. Use the \`find_usages\` MCP ` +
-            `tool for symbol lookups — grep cannot tell a call from an import or show the ` +
-            `blast radius. The graph's answer for this search is below; read it instead of ` +
-            `the grep output, and call find_usages directly next time:\n\n${blocks.join('\n\n')}`,
+          additionalContext: `Code graph answer for ${names} (the grep still runs):\n\n${blocks.join('\n\n')}`,
         },
       }),
     );

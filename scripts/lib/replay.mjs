@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import { readTranscript, transcriptsFor } from '../../dist/capture/index.js';
-import { promptCandidates, strictRecall, withCost } from '../../dist/hooks/prompt-recall.js';
+import { promptCandidates, strictRecall } from '../../dist/hooks/prompt-recall.js';
 import { pickMemories } from '../../dist/pick/run.js';
 
 export function replayablePrompts(project, last) {
@@ -73,8 +73,8 @@ export async function replay(
       const shown = new Set();
       for (const item of chat) {
         const result = await recallFor(ctx, project, item, shown, picker);
+        results.set(item, { ...result, shownBefore: new Set(shown) });
         for (const id of result.recall?.ids ?? []) shown.add(id);
-        results.set(item, result);
       }
     }
   });
@@ -94,7 +94,7 @@ export async function replay(
     shownWith.push({ ...item, candidates, shown: recall.ids });
     answered += 1;
     blockChars += recall.block.length;
-    injectedChars += withCost(recall.block).length;
+    injectedChars += recall.block.length;
     for (const id of recall.ids) {
       rows.push({
         id,
@@ -105,5 +105,6 @@ export async function replay(
     }
     if (samples.length < show) samples.push({ prompt: item.prompt, block: recall.block });
   }
-  return { rows, shownWith, samples, answered, outcomes, blockChars, injectedChars };
+  const shownBefore = prompts.map((item) => results.get(item).shownBefore);
+  return { rows, shownWith, samples, answered, outcomes, blockChars, injectedChars, shownBefore };
 }

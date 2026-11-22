@@ -4,6 +4,7 @@ import { partitionIds } from '../../util/shortid.js';
 import { resolve } from 'node:path';
 import { scopeToken } from '../../util/scope.js';
 import { meaningfulTokens } from '../../search/stopwords.js';
+import { hookEnv } from '../../util/env.js';
 
 export function projectClause(
   column: string,
@@ -28,6 +29,10 @@ export function excludeSessionsClause(
   return `${column} NOT IN (${sessions.map(() => '?').join(',')})`;
 }
 
+export function globPrefix(prefix: string): string {
+  return `${prefix.replace(/[*?[]/g, '[$&]')}*`;
+}
+
 export function removeWhere(filter: RemoveFilter): { where: string; params: unknown[] } {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -41,7 +46,7 @@ export function removeWhere(filter: RemoveFilter): { where: string; params: unkn
     }
     for (const prefix of prefixes) {
       alternatives.push('id GLOB ?');
-      params.push(`${prefix}*`);
+      params.push(globPrefix(prefix));
     }
     conditions.push(`(${alternatives.join(' OR ')})`);
   }
@@ -113,7 +118,7 @@ export function toMatchExpression(text: string, project?: ProjectFilter): string
 
 export function toFilePath(uri: string): string {
   if (!uri || uri.trim() === '') {
-    return resolve(process.env['HOME'] ?? '.', '.claude-memory/memory.db');
+    return resolve(hookEnv()['HOME'] ?? '.', '.claude-memory/memory.db');
   }
   const stripped = uri.replace(/^(sqlite|file):\/\//, '');
   return resolve(stripped === '' ? './memory.db' : stripped);

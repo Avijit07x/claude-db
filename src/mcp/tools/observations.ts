@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { RecallContext } from '../../context.js';
 import { z } from 'zod';
+import { observationIdSchema, observationIdsSchema } from './ids.js';
 import { renderFull, renderIndex } from '../render.js';
 
 export function register(server: McpServer, ctx: RecallContext): void {
@@ -12,7 +13,7 @@ export function register(server: McpServer, ctx: RecallContext): void {
       'and you need the session around it — what led to a decision and what came ' +
       'of it. Ids are the short ids search prints.',
     {
-      observation_id: z.string(),
+      observation_id: observationIdSchema,
       before: z.number().int().min(0).max(20).default(5),
       after: z.number().int().min(0).max(20).default(5),
     },
@@ -26,7 +27,7 @@ export function register(server: McpServer, ctx: RecallContext): void {
       'question but is cut off — the snippet is one line, the body is the reasoning. ' +
       'Always batch every id you need into one call rather than calling repeatedly.',
     {
-      ids: z.array(z.string()).min(1).max(25),
+      ids: observationIdsSchema,
       chars: z
         .number()
         .int()

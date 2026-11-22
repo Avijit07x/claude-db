@@ -112,6 +112,35 @@ try {
     around.slice(0, 200),
   );
 
+  const refused = [];
+  for (const bad of ['', '*', '_', 'a', 'zz-not-hex']) {
+    refused.push(await call('get_observations', { ids: [bad] }));
+    refused.push(await call('timeline', { observation_id: bad }));
+  }
+  report(
+    'get_observations and timeline refuse an empty, wildcard or non-hex id',
+    refused.every(
+      (answer) => answer.includes('not an observation id') && !answer.includes('websocket'),
+    ),
+    refused.join(' | ').slice(0, 200),
+  );
+
+  const keptTitles = ['Measured polling cost', 'Chose a websocket', 'Added websocket backoff'];
+  const refusals = [];
+  for (const bad of ['', '*', '_', 'a', 'zz-not-hex']) {
+    refusals.push(await call('forget', { ids: [bad] }));
+  }
+  refusals.push(await call('forget', { ids: [toShortId(after.id), ''] }));
+  const kept = await call('get_observations', {
+    ids: [before, decision, after].map((obs) => toShortId(obs.id)),
+  });
+  report(
+    'forget refuses an empty, wildcard or too short id and deletes nothing',
+    refusals.every((answer) => answer.includes('not an observation id')) &&
+      keptTitles.every((title) => kept.includes(title)),
+    refusals.join(' | ').slice(0, 200),
+  );
+
   const saved = await call('remember', { text: 'Always use pnpm in this repo, never npm' });
   const rule = await call('search', { query: 'which package manager to use pnpm' });
   report(
@@ -127,6 +156,14 @@ try {
     'a forgotten rule is gone',
     Boolean(ruleId) && !gone.includes('Always use pnpm'),
     gone.slice(0, 160),
+  );
+
+  const fullForget = await call('forget', { ids: [after.id] });
+  const afterGone = await call('get_observations', { ids: [toShortId(after.id)] });
+  report(
+    'forget still deletes a row by its full id',
+    fullForget.includes('Forgot 1') && !afterGone.includes('Added websocket backoff'),
+    fullForget,
   );
 
   const everywhere = await call('search', { query: 'order feed websocket', project: '*' });

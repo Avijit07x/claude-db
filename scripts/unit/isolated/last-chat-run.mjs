@@ -1,6 +1,6 @@
 import '../../lib/require-isolated.mjs';
-import { spawnSync } from 'node:child_process';
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -10,6 +10,9 @@ import { factToObservation } from '../../../dist/facts/model.js';
 import { HANDOFF_TAG, passedNote } from '../../../dist/facts/handoff.js';
 import { recentChats, turnLine } from '../../../dist/facts/last-chat.js';
 import { startFacts } from '../../../dist/facts/start.js';
+import { recordActive } from '../../../dist/capture/active.js';
+import { readShown } from '../../../dist/hooks/shown.js';
+import { promptCandidates } from '../../../dist/hooks/prompt-recall.js';
 
 const CLI = new URL('../../../dist/cli/index.js', import.meta.url).pathname;
 const SESSION_START = new URL('../../../dist/hooks/session-start.js', import.meta.url).pathname;
@@ -19,7 +22,7 @@ const now = Date.now();
 mkdirSync(join(homedir(), '.claude-memory'), { recursive: true });
 writeFileSync(
   join(homedir(), '.claude-memory', 'config.json'),
-  JSON.stringify({ distill: { enabled: false }, updates: 'off' }),
+  JSON.stringify({ distill: { enabled: false }, updates: 'off', embeddings: { provider: 'none' } }),
 );
 
 const folder = (name) => {
@@ -160,7 +163,7 @@ try {
   report("another project's newer chat is never taken", open?.sessionId === 'chat-open');
   report(
     'an open chat shows no summary, since it only covers its first turns',
-    open?.summary === null,
+    open?.summary.length === 0,
   );
   const asked = open?.turns.map((row) => row.body.split('\n')[0]) ?? [];
   report(
@@ -196,16 +199,16 @@ try {
   const ended = await lastChat(shop);
   report(
     'an ended chat shows its summary, cut to 300 characters',
-    ended?.summary?.startsWith('Reworked the mail family.') && ended.summary.length <= 301,
-    ended?.summary,
+    ended?.summary[0]?.startsWith('Reworked the mail family.') && ended.summary[0].length <= 301,
+    ended?.summary.join('; '),
   );
 
   await ctx.store.insertObservations([turn(shop, 'chat-open', 'resume and fix', now - 1000)]);
   const resumed = await lastChat(shop);
   report(
     'a chat resumed after it ended counts as open again, so its old summary is not shown',
-    resumed?.summary === null && resumed.at === now - 1000,
-    resumed?.summary,
+    resumed?.summary.length === 0 && resumed.at === now - 1000,
+    resumed?.summary.join('; '),
   );
 
   const unsaved = folder('unsaved');
@@ -213,7 +216,9 @@ try {
   const noRecord = await lastChat(unsaved);
   report(
     'a chat with no session record is still found, with no summary',
-    noRecord?.sessionId === 'chat-x' && noRecord.summary === null && noRecord.turns.length === 1,
+    noRecord?.sessionId === 'chat-x' &&
+      noRecord.summary.length === 0 &&
+      noRecord.turns.length === 1,
   );
 
   const handoff = note(shop, now - 2 * HOUR);
@@ -322,6 +327,245 @@ try {
     !inside.includes('Last chat (') && !inside.includes('older than the last chat'),
     inside,
   );
+
+  {
+    const DAY = 24 * HOUR;
+    const memoryDir = join(homedir(), '.claude-memory');
+    const norm = (text) => text.toLowerCase().replace(/\s+/g, ' ').trim();
+    const bullets = (text) =>
+      text
+        .split('\n')
+        .filter((line) => line.startsWith('- '))
+        .map((line) =>
+          norm(
+            line
+              .replace(/ \([0-9a-f]{8}-[0-9a-f]{4}\)$/, '')
+              .replace(/^- /, '')
+              .replace(
+                /^(Rule|Decided|Dead end|Fact|To do|Not committed|Summary)( \([^)]*\))?: /,
+                '',
+              )
+              .replace(/^asked "[^"]*": /, ''),
+          ),
+        );
+    const printedTwice = (text) =>
+      bullets(text).filter(
+        (core, index, all) =>
+          core.length > 15 &&
+          all.slice(0, index).some((other) => other.includes(core) || core.includes(other)),
+      );
+
+    const repo = (name) => {
+      const path = folder(name);
+      const git = (...args) =>
+        execFileSync('git', ['-C', path, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+          stdio: 'ignore',
+        });
+      git('init', '-q');
+      writeFileSync(join(path, 'timers.txt'), 'one\n');
+      git('add', '.');
+      git('commit', '-q', '-m', 'feat: add timers');
+      writeFileSync(join(path, 'mail.txt'), 'two\n');
+      return path;
+    };
+
+    const runStart = (project, sessionId, source = 'startup') => {
+      const result = spawnSync(process.execPath, ['--no-warnings', SESSION_START], {
+        cwd: project,
+        env: process.env,
+        input: JSON.stringify({ cwd: project, source, session_id: sessionId }),
+        encoding: 'utf8',
+      });
+      try {
+        const out = JSON.parse(result.stdout);
+        return {
+          context: out.hookSpecificOutput?.additionalContext ?? '',
+          system: out.systemMessage ?? '',
+        };
+      } catch {
+        return { context: result.stdout, system: '' };
+      }
+    };
+
+    const MCP_SERVER = new URL('../../../dist/mcp/server.js', import.meta.url).pathname;
+    const WIRING = 'Started wiring the mail family in mail.txt';
+    const POOL = 'Chose one worker pool for mail and the queue';
+    const CAP = 'Went with a retry cap of 3 because the queue already backs off';
+    const openRow = (project, sessionId, title, at) =>
+      turn(project, sessionId, 'wire the mail family', at, {
+        kind: 'pattern',
+        title,
+        status: 'open',
+        files: [join(project, 'mail.txt')],
+      });
+    const chat = (project, id, at, summary) =>
+      ctx.store.upsertSession({
+        id,
+        project,
+        startedAt: at,
+        endedAt: at + 5 * 60_000,
+        ...(summary ? { summary } : {}),
+      });
+
+    const bare = repo('bare');
+    const chatRule = turn(bare, 'bare-Z', 'always use pnpm', now - 10 * DAY, {
+      kind: 'preference',
+      title: 'Always use pnpm and never npm',
+    });
+    await ctx.store.insertObservations([
+      chatRule,
+      turn(bare, 'bare-A', 'add retries', now - 3 * DAY + 1000, { title: CAP }),
+      openRow(bare, 'bare-B', WIRING, now - DAY),
+      turn(bare, 'bare-B', 'why does mail fail', now - DAY + 1000, { title: POOL }),
+      turn(bare, 'bare-B', 'write the docs', now - DAY + 2000, { title: 'Wrote the mail docs' }),
+      turn(bare, 'bare-B', 'fix the cache', now - DAY + 3000, { title: 'Fixed the CI cache' }),
+    ]);
+    await chat(bare, 'bare-Z', now - 10 * DAY);
+    await chat(bare, 'bare-A', now - 3 * DAY, `${CAP} | Fixed the timer that fired twice`);
+    await chat(bare, 'bare-B', now - DAY);
+    const ruleLine = new RegExp(`^- Rule \\([^)]*\\): ${chatRule.title}`, 'm');
+    const blank = runStart(bare, 'new-blank');
+    report(
+      'a project with no facts prints no line twice and has one block',
+      printedTwice(blank.context).length === 0 && !blank.context.includes('<project-memory>'),
+      blank.context,
+    );
+    report(
+      'a project with no facts still shows its chat-caught rule',
+      ruleLine.test(blank.context),
+      blank.context,
+    );
+
+    const once = repo('once');
+    const fact = (key, type, text, scope = 'project') =>
+      factToObservation(
+        { key, type, scope, text, files: [], at: now - 2 * DAY, source: 't' },
+        once,
+      );
+    const ruleRow = turn(once, 'once-A', 'always use pnpm', now - 3 * DAY, {
+      kind: 'preference',
+      title: 'Always use pnpm and never npm',
+    });
+    const stagedOpen = {
+      ...openRow(once, 'once-Z', 'Drafted the invoice export in invoice.txt', now - 9 * DAY),
+      files: [join(once, 'invoice.txt')],
+    };
+    writeFileSync(join(once, 'invoice.txt'), 'draft\n');
+    const manualRule = {
+      ...turn(once, 'manual', 'x', now - HOUR, { kind: 'preference' }),
+      title: 'Never store card numbers in logs',
+      body: 'Never store card numbers in logs',
+      tags: ['manual'],
+    };
+    await ctx.store.insertObservations([
+      ruleRow,
+      turn(once, 'once-A', 'add retries', now - 3 * DAY + 1000, { title: CAP, kind: 'decision' }),
+      turn(once, 'once-A', 'fix timers', now - 3 * DAY + 2000, { title: 'Fixed the timer' }),
+      stagedOpen,
+      openRow(once, 'once-B', WIRING, now - DAY),
+      turn(once, 'once-B', 'why does mail fail', now - DAY + 1000, { title: POOL }),
+      openRow(once, 'once-D', WIRING, now - 20 * 60_000),
+      turn(once, 'once-D', 'sqlite or postgres', now - 19 * 60_000, {
+        kind: 'decision',
+        title: 'Chose SQLite over Postgres for the queue',
+      }),
+      manualRule,
+      note(once, now - HOUR),
+      fact('pnpm', 'rule', 'Use pnpm in this repo.'),
+      fact('terse', 'rule', 'Keep replies short and plain.', 'you'),
+      fact('cap', 'decision', CAP),
+      fact('mail-todo', 'todo', 'Wire the mail family and check the sender domain.'),
+    ]);
+    await chat(
+      once,
+      'once-A',
+      now - 3 * DAY,
+      `${CAP} | Chose a single timer wheel | Moved to UTC | Fixed the timer`,
+    );
+    await chat(once, 'once-B', now - DAY, `${POOL} | ${WIRING}`);
+    recordActive('once-C', once, 'export invoices to csv and email them to finance');
+
+    writeFileSync(
+      join(once, '.mcp.json'),
+      JSON.stringify({ mcpServers: { memory: { command: 'node', args: [MCP_SERVER] } } }),
+    );
+    const first = runStart(once, 'new-facts');
+    report(
+      'a project with facts prints no line twice',
+      printedTwice(first.context).length === 0,
+      `${printedTwice(first.context).join(' || ')}\n${first.context}`,
+    );
+    report(
+      'a chat summary shows only the parts not shown yet, joined with "; "',
+      first.context.includes('- Summary: Chose a single timer wheel; Moved to UTC') &&
+        !first.context.includes(' | '),
+      first.context,
+    );
+    const picksNothingShown = async (project, sessionId, prompt, ids) => {
+      const shown = readShown(sessionId);
+      const request = { prompt, project, sessionId };
+      const fresh = await promptCandidates(ctx, { ...request, shown: new Set() });
+      const picked = await promptCandidates(ctx, { ...request, shown });
+      const wanted = (entries) => ids.every((id) => entries?.some((entry) => entry.id === id));
+      return wanted(fresh?.entries) && !picked?.entries.some((entry) => shown.has(entry.id));
+    };
+    report(
+      'the start marks the open work as shown, and the next prompt picks none of it',
+      readShown('new-facts').has(stagedOpen.id) &&
+        (await picksNothingShown(once, 'new-facts', 'drafted the invoice export draft', [
+          stagedOpen.id,
+        ])),
+      [...readShown('new-facts')].join(','),
+    );
+
+    const compact = runStart(once, 'once-D', 'compact');
+    report(
+      'after a compact no line is printed twice',
+      printedTwice(compact.context).length === 0 &&
+        compact.context.includes('Earlier in this chat:'),
+      `${printedTwice(compact.context).join(' || ')}\n${compact.context}`,
+    );
+
+    const aboutYou = runStart(bare, 'new-you');
+    report(
+      'an about-you fact does not hide the chat-caught rule of a project with no rule facts',
+      aboutYou.context.includes('About you:') && ruleLine.test(aboutYou.context),
+      aboutYou.context,
+    );
+    report(
+      'the start marks a chat-caught rule as shown, and the next prompt picks none of it',
+      readShown('new-you').has(chatRule.id) &&
+        (await picksNothingShown(bare, 'new-you', chatRule.title, [chatRule.id])),
+      [...readShown('new-you')].join(','),
+    );
+
+    report(
+      'the hints for the user are not part of what Claude reads',
+      first.system.includes('claude-db scan') &&
+        !first.context.includes('claude-db scan') &&
+        !first.context.includes('MCP') &&
+        !first.context.includes('memory MCP tools') &&
+        !first.context.includes('full history') &&
+        !first.context.includes('(context ≈'),
+      `${first.system}\n${first.context}`,
+    );
+
+    writeFileSync(
+      join(memoryDir, 'config.json'),
+      JSON.stringify({ distill: { enabled: false }, embeddings: { provider: 'none' } }),
+    );
+    writeFileSync(
+      join(memoryDir, 'update.json'),
+      JSON.stringify({ checkedAt: Date.now(), latest: '99.0.0' }),
+    );
+    const update = runStart(once, 'new-update');
+    rmSync(join(memoryDir, 'update.json'), { force: true });
+    report(
+      'the update notice goes to the user and not to Claude',
+      update.system.includes('99.0.0 is available') && !update.context.includes('is available'),
+      `${update.system}\n${update.context}`,
+    );
+  }
 } finally {
   await ctx.close();
 }
