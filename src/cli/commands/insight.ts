@@ -125,13 +125,21 @@ export async function cmdMerge(argv: (string | undefined)[]): Promise<void> {
     for (const session of await ctx.store.recentSessions(from, 1000)) {
       await ctx.store.upsertSession({ ...session, project: into });
     }
-    const swept = await ctx.store.remove({ project: from });
+    const swept = await ctx.store.remove({ ids: await storedUnder(ctx, from) });
 
     console.log(`Moved ${moved} observation(s) into ${into}.`);
     if (swept > 0) console.log(`Cleaned up ${swept} leftover row(s) under the old path.`);
   } finally {
     await ctx.close();
   }
+}
+
+async function storedUnder(ctx: RecallContext, name: string): Promise<string[]> {
+  const ids: string[] = [];
+  await eachObservation(ctx, { project: name }, (batch) => {
+    for (const obs of batch) if (obs.project === name) ids.push(obs.id);
+  });
+  return ids;
 }
 
 async function listShards(ctx: RecallContext, into: string): Promise<void> {

@@ -12,6 +12,8 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
+import { createStore } from '../../../dist/store/index.js';
+import { projectKey } from '../../../dist/util/project-key.js';
 
 const CLI = new URL('../../../dist/cli/index.js', import.meta.url).pathname;
 const home = homedir();
@@ -212,6 +214,14 @@ report(
   projects.out.includes(`*`) && projects.out.includes(project),
 );
 
+const refused = ['*', '_', 'a'].map((bad) => cli(['forget', bad]));
+report(
+  'forget refuses a wildcard or too short id, says why and deletes nothing',
+  refused.every((run) => run.code === 1 && run.err.includes('not an observation id')) &&
+    cli(['search', 'websocket']).out.includes(decisionId),
+  refused.map((run) => run.err).join(' | '),
+);
+
 const forgot = cli(['forget', decisionId]);
 report(
   'forget deletes by id',
@@ -328,3 +338,39 @@ report(
   unreachable.err,
 );
 report('use without a database explains its usage', cli(['use'], { env: useEnv }).code === 1);
+
+const shopRoot = join(home, 'merge-shop');
+const shopSub = join(shopRoot, 'sub');
+mkdirSync(shopSub, { recursive: true });
+execFileSync('git', ['init', '-q'], { cwd: shopRoot });
+execFileSync('git', ['remote', 'add', 'origin', 'https://github.com/acme/merge-shop.git'], {
+  cwd: shopRoot,
+});
+const shopKey = projectKey(shopRoot);
+const shopRow = (title, where) => ({
+  id: randomUUID(),
+  sessionId: 'earlier-chat',
+  project: where,
+  kind: 'decision',
+  title,
+  body: title,
+  files: [],
+  tags: [],
+  createdAt: Date.now(),
+  status: 'done',
+});
+const shopStore = await createStore(process.env.CLAUDE_DB_URL);
+await shopStore.init();
+await shopStore.insertObservations([
+  shopRow('Kept under the key', shopKey),
+  shopRow('Kept under the repository path', shopRoot),
+  shopRow('Kept under the subfolder path', shopSub),
+]);
+const mergeSub = cli(['merge', shopSub, '--yes'], { cwd: shopRoot });
+const shopRows = (await shopStore.list({})).filter((obs) => obs.title.startsWith('Kept under'));
+await shopStore.close();
+report(
+  'merge of a subfolder keeps every row and leaves nothing under the old path',
+  mergeSub.code === 0 && shopRows.length === 3 && !shopRows.some((obs) => obs.project === shopSub),
+  `${mergeSub.out.trim()} | ${shopRows.map((obs) => obs.project).join(', ')}`,
+);
