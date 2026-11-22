@@ -1,6 +1,6 @@
 # Fix plan
 
-Status: Phases 1 to 3, 4.6 and 4.7 are done and tested, on branch `v0.13.1`. The rest of Phase 4 has its own
+Status: Phases 1 to 3, 4.6 and 4.7 are done and tested, on branch `v0.14`. The rest of Phase 4 has its own
 plans, listed below.
 
 ## Root causes

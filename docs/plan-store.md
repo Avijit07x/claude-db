@@ -10,7 +10,7 @@ The `MemoryStore` interface has about 32 members, written three times. Parity is
 (`scripts/unit/adapters.mjs`), and only SQLite runs locally. Most of the 3,584 lines are dialect, so lifting
 logic above the adapter saves only 70 to 90 lines. A contract test does more than abstraction would.
 
-## Bugs to fix now (v0.13.1)
+## Bugs to fix now
 
 | #   | Bug                                                                                                           | Fix                                                                                   |
 | --- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
