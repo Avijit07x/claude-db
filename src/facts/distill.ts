@@ -4,6 +4,7 @@ import { embedObservations } from '../capture/flush.js';
 import type { HeadlessResult } from '../util/claude-cli.js';
 import { runHeadlessResult } from '../util/claude-cli.js';
 import { formatDay } from '../util/day.js';
+import { keepEnds } from '../util/snippet.js';
 import { recordDistillFailure, recordDistillSuccess, takeDistillCalls } from './budget.js';
 import { FACT_SESSION, factId, factToObservation, youScope } from './model.js';
 import { existingFacts, notedByUser } from './known.js';
@@ -54,13 +55,16 @@ export async function distillSession(
   const rows = (await ctx.store.list({ project, sessionId, limit: SESSION_ROWS })).filter(
     (obs) => obs.status !== 'replaced',
   );
-  const last = rows[rows.length - 1];
-  if (!last) {
-    await markDistilled(ctx, project, sessionId, Date.now());
+  if (rows.length === 0) {
+    await markDistilled(ctx, project, sessionId, Date.now(), 0);
     return { outcome: 'empty', set: 0, retired: 0 };
   }
+  const since = (await ctx.store.getSession(sessionId))?.distilledAt ?? 0;
+  const fresh = rows.filter((obs) => obs.createdAt >= since);
+  const last = fresh[fresh.length - 1];
+  if (!last) return { outcome: 'empty', set: 0, retired: 0 };
   const most = Math.max(1, Math.min(MAX_WINDOWS, ctx.config.distill.dailyLimit));
-  const windows = chatWindows(rows, most);
+  const windows = chatWindows(fresh, most);
   if (!takeDistillCalls(ctx.config.distill.dailyLimit, windows.length)) {
     return { outcome: 'over-budget', set: 0, retired: 0 };
   }
@@ -82,7 +86,14 @@ export async function distillSession(
   recordDistillSuccess();
 
   const startedAt = rows[0]?.createdAt ?? last.createdAt;
-  await markDistilled(ctx, project, sessionId, startedAt, summary.slice(0, 3).join(' | '));
+  await markDistilled(
+    ctx,
+    project,
+    sessionId,
+    startedAt,
+    last.createdAt,
+    summary.slice(0, 3).join(' | '),
+  );
   return { outcome: 'distilled', set, retired };
 }
 
@@ -177,7 +188,7 @@ export function chatWindows(rows: Observation[], most = MAX_WINDOWS): string[] {
   let current: string[] = [];
   let used = 0;
   for (const obs of rows) {
-    const entry = clip(obs.body, ROW_CHARS);
+    const entry = keepEnds(obs.body, ROW_CHARS);
     if (current.length > 0 && used + entry.length > WINDOW_CHARS) {
       windows.push(current);
       current = [];
@@ -195,19 +206,16 @@ async function markDistilled(
   project: string,
   sessionId: string,
   startedAt: number,
+  distilledAt: number,
   summary = '',
 ): Promise<void> {
   await ctx.store.upsertSession({
     id: sessionId,
     project,
     startedAt,
-    distilledAt: Date.now(),
+    distilledAt,
     ...(summary ? { summary } : {}),
   });
-}
-
-function clip(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
 export async function factCounts(

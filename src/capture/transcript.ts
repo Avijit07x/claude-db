@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import { isRelayedMessage } from '../util/prompt.js';
 import { claudeProjectsDir } from '../util/claude-dir.js';
 import { resolveProject } from '../util/project.js';
+import { extractText, extractToolCalls, usesTools } from './content-blocks.js';
 
 export interface Turn {
   prompt: string;
   reasoning: string;
+  reply: string;
   files: string[];
   commands: string[];
   timestamp: number;
@@ -94,15 +96,26 @@ function groupIntoTurns(entries: { entry: RawEntry; offset: number }[]): Turn[] 
       if (!text || entry.isCompactSummary || isSyntheticPrompt(text)) continue;
 
       if (current) turns.push(current);
-      current = { prompt: text, reasoning: '', files: [], commands: [], timestamp, offset };
+      current = {
+        prompt: text,
+        reasoning: '',
+        reply: '',
+        files: [],
+        commands: [],
+        timestamp,
+        offset,
+      };
       continue;
     }
 
     if (entry.type === 'assistant' && current) {
-      const text = extractText(entry.message?.content);
+      const content = entry.message?.content;
+      const text = extractText(content);
       if (text) current.reasoning = current.reasoning ? `${current.reasoning}\n${text}` : text;
+      if (usesTools(content)) current.reply = '';
+      else if (text) current.reply = current.reply ? `${current.reply}\n${text}` : text;
 
-      for (const call of extractToolCalls(entry.message?.content)) {
+      for (const call of extractToolCalls(content)) {
         if (call.file) current.files.push(call.file);
         if (call.command) current.commands.push(call.command);
       }
@@ -111,41 +124,6 @@ function groupIntoTurns(entries: { entry: RawEntry; offset: number }[]): Turn[] 
 
   if (current) turns.push(current);
   return turns;
-}
-
-function extractText(content: unknown): string {
-  if (typeof content === 'string') return content.trim();
-  if (!Array.isArray(content)) return '';
-
-  return content
-    .filter(
-      (block): block is { type: string; text: string } =>
-        typeof block === 'object' && block !== null && (block as { type?: string }).type === 'text',
-    )
-    .map((block) => block.text)
-    .join('\n')
-    .trim();
-}
-
-function extractToolCalls(content: unknown): { file?: string; command?: string }[] {
-  if (!Array.isArray(content)) return [];
-
-  const calls: { file?: string; command?: string }[] = [];
-  for (const block of content) {
-    if (typeof block !== 'object' || block === null) continue;
-    const typed = block as { type?: string; name?: string; input?: Record<string, unknown> };
-    if (typed.type !== 'tool_use') continue;
-
-    const input = typed.input ?? {};
-    if (typed.name === 'Write' || typed.name === 'Edit' || typed.name === 'MultiEdit') {
-      const file = input['file_path'];
-      if (typeof file === 'string') calls.push({ file });
-    } else if (typed.name === 'Bash') {
-      const command = input['command'];
-      if (typeof command === 'string') calls.push({ command });
-    }
-  }
-  return calls;
 }
 
 export function isSyntheticPrompt(text: string): boolean {

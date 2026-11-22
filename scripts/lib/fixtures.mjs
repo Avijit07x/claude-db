@@ -14,6 +14,7 @@ const config = ConfigSchema.parse({});
 const turn = (over = {}) => ({
   prompt: 'store the api key somewhere',
   reasoning: 'Wrote the client. <private>my ssn is 123</private> Key is "sk-abcdefghijklmnopqrst".',
+  reply: '',
   files: ['/p/src/auth.ts'],
   commands: [],
   timestamp: now,

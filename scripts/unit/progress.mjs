@@ -25,14 +25,14 @@ async function otherClonesStayOpen() {
   await raw.init();
   const store = withProjectScope(raw, createScopeResolver({ store: raw, remote: 'origin' }));
 
-  const row = (id, project) => ({
+  const row = (id, project, files = [join(project, 'f.ts')]) => ({
     id,
     sessionId: 's1',
     project,
     kind: 'decision',
     title: id,
     body: id,
-    files: [join(project, 'f.ts')],
+    files,
     tags: [],
     createdAt: Date.now(),
     status: 'open',
@@ -44,11 +44,17 @@ async function otherClonesStayOpen() {
     (await openWork(store, repoA)).length,
   );
 
+  const note = join(dir, 'notes', 'n.md');
+  await store.insertObservations([
+    row('outside-a', repoA, [note]),
+    row('mixed-a', repoA, [join(repoA, 'f.ts'), note]),
+  ]);
+
   const closed = await closeLandedWork(store, repoA);
   const stillOpen = (await openWork(store, repoA)).map((o) => o.id);
   check(
     'a flush in one clone closes its own landed work and leaves the other clone open',
-    closed === 1 && stillOpen.join() === 'in-b',
+    closed === 3 && stillOpen.join() === 'in-b',
     `${closed} closed, open: ${stillOpen.join()}`,
   );
 
@@ -57,8 +63,50 @@ async function otherClonesStayOpen() {
   for (const repo of clones) rmSync(repo, { recursive: true, force: true });
 }
 
+async function workOutsideTheRepoCloses() {
+  const { repo, git } = newRepo('progress-outside-');
+  writeFileSync(join(repo, 'f.ts'), 'export const f = 1;\n');
+  git('add', '-A');
+  git('commit', '-qm', 'seed');
+  writeFileSync(join(repo, 'f.ts'), 'export const f = 2;\n');
+
+  const dir = mkdtempSync(join(tmpdir(), 'progress-outside-db-'));
+  const store = await createStore(join(dir, 'memory.db'));
+  await store.init();
+  const note = join(dir, 'memory', 'note.md');
+  const row = (id, files) => ({
+    id,
+    sessionId: 's1',
+    project: repo,
+    kind: 'context',
+    title: id,
+    body: id,
+    files,
+    tags: [],
+    createdAt: Date.now(),
+    status: 'open',
+  });
+  await store.insertObservations([
+    row('outside-only', [note]),
+    row('outside-and-dirty', [note, join(repo, 'f.ts')]),
+  ]);
+
+  const closed = await closeLandedWork(store, repo);
+  const stillOpen = (await openWork(store, repo)).map((o) => o.id);
+  check(
+    "this folder's work that only touched files outside it is closed, and dirty work stays open",
+    closed === 1 && stillOpen.join() === 'outside-and-dirty',
+    `${closed} closed, open: ${stillOpen.join()}`,
+  );
+
+  await store.close();
+  rmSync(dir, { recursive: true, force: true });
+  rmSync(repo, { recursive: true, force: true });
+}
+
 export default async function run() {
   await otherClonesStayOpen();
+  await workOutsideTheRepoCloses();
   const { repo, git } = newRepo('progress-');
   mkdirSync(join(repo, 'src'));
   writeFileSync(join(repo, 'src', 'a.ts'), 'export const a = 1;\n');

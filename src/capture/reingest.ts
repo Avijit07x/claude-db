@@ -5,7 +5,7 @@ import { flushSession, resetCursor } from './flush.js';
 import { readTranscript, transcriptsFor } from './transcript.js';
 import { observationsFromTurns } from './turn-extractor.js';
 
-export const REINGEST_VERSION = 1;
+export const REINGEST_VERSION = 2;
 
 const SESSION_ROWS = 10_000;
 

@@ -134,7 +134,7 @@ function withFinalReply(turns: Turn[], finalReply: string): Turn[] {
   const last = turns.at(-1);
   if (!last || !reply || last.reasoning.includes(reply)) return turns;
   const reasoning = last.reasoning ? `${last.reasoning}\n${reply}` : reply;
-  return [...turns.slice(0, -1), { ...last, reasoning }];
+  return [...turns.slice(0, -1), { ...last, reasoning, reply }];
 }
 
 export function summarize(observations: Observation[], previous?: string): string {

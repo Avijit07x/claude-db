@@ -147,6 +147,43 @@ try {
   await ctx.close();
 }
 
+const resumed = '/p/resumed';
+const again = await open(30);
+try {
+  const turnAt = (hours) => now - hours * HOUR;
+  for (const [text, hours] of [
+    ['Asked: first question\n\nAnswer one.', 5],
+    ['Asked: second question\n\nAnswer two.', 4],
+  ]) {
+    await chat(again, resumed, 'chat-r', text, turnAt(hours));
+  }
+  await distillSession(again, resumed, 'chat-r', reply([]));
+  const first = await again.store.getSession('chat-r');
+  report(
+    'a distilled chat remembers the time of its last distilled turn',
+    first?.distilledAt === turnAt(4),
+    String(first?.distilledAt),
+  );
+
+  await chat(again, resumed, 'chat-r', 'Asked: third question\n\nAnswer three.', turnAt(1));
+  await distillSession(again, resumed, 'chat-r', reply([]));
+  report(
+    'distilling it again reads its last distilled turn and the new ones, not the old ones',
+    lastPrompt.includes('third question') &&
+      lastPrompt.includes('second question') &&
+      !lastPrompt.includes('first question'),
+    lastPrompt.slice(-200),
+  );
+  const second = await again.store.getSession('chat-r');
+  report(
+    'the chat keeps its start time',
+    second?.startedAt === turnAt(5) && second?.distilledAt === turnAt(1),
+    `${second?.startedAt} ${second?.distilledAt}`,
+  );
+} finally {
+  await again.close();
+}
+
 const usedSoFar = distillUsage().used;
 const capped = await open(usedSoFar);
 try {
@@ -194,14 +231,17 @@ try {
   const before = distillUsage().used;
   const tight = await open(before + 1);
   try {
+    await tight.store.insertObservations(
+      turns.map((turn) => ({ ...turn, id: randomUUID(), sessionId: 'chat-big-fresh' })),
+    );
     await tight.store.upsertSession({
-      id: 'chat-big',
+      id: 'chat-big-fresh',
       project: big,
       startedAt: now - DAY,
       summary: 'x',
     });
     let calls = 0;
-    const over = await distillSession(tight, big, 'chat-big', async () => {
+    const over = await distillSession(tight, big, 'chat-big-fresh', async () => {
       calls += 1;
       return { ok: true, stdout: '' };
     });

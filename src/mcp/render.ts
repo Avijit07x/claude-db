@@ -27,6 +27,7 @@ function echoesTitle(snippet: string, title: string): boolean {
 }
 
 export function renderFull(obs: Observation, chars: number): string {
+  const body = withoutTitle(obs);
   return [
     `id: ${toShortId(obs.id)}`,
     `kind: ${obs.kind}`,
@@ -35,9 +36,13 @@ export function renderFull(obs: Observation, chars: number): string {
     obs.files.length > 0 ? `files: ${obs.files.join(', ')}` : null,
     '',
     obs.title,
-    '',
-    clipBody(obs.body, chars),
+    ...(body ? ['', clipBody(body, chars)] : []),
   ]
     .filter((line) => line !== null)
     .join('\n');
+}
+
+function withoutTitle(obs: Observation): string {
+  const [first, ...rest] = obs.body.split('\n\n');
+  return first?.trim() === obs.title.trim() ? rest.join('\n\n') : obs.body;
 }

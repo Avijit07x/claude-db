@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.14.1
+
+### Fixed
+
+- **Facts keep what a turn concluded.** Saving a long turn and reading it for facts kept only its start, so a
+  fix could be remembered as its problem and a later change of plan was missed. Both now keep the request and
+  the end.
+- **A chat is turned into facts from where it was left.** Each time a chat ended, all of it was read again, and
+  its early parts could come back as facts about plans that had since changed.
+- **Work outside the project is no longer listed as "Not committed".** A turn that only edited files elsewhere,
+  such as notes in another folder, stayed on that list for good. Rows already stuck close on the next save.
+- **`get_observations` prints a fact's text once.**
+- **A turn is titled by what it concluded.** Its title used to come from its first step, so a turn that ended
+  fixed could be titled with the failure it fixed, and it was called a dead end for the same reason. Title and
+  kind now come from the final reply, and a title cut short ends in "...".
+- **Turns saved before this release are saved again once**, in the background at the next chat start, so their
+  titles, kinds and open status follow the new rules. Facts are not touched.
+
 ## 0.14.0
 
 ### Added
