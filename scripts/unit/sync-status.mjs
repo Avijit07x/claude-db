@@ -78,7 +78,18 @@ export default async function run() {
       dry.trim(),
     );
 
-    cli(['sync', remote, '--yes']);
+    check(
+      'a dry run says what sync does and does not carry',
+      /adds rows .* moves status forward\. Edits and deletes do not travel/.test(dry),
+      dry.trim(),
+    );
+
+    const applied = cli(['sync', remote, '--yes']);
+    check(
+      'the result says the same',
+      /adds rows .* moves status forward\. Edits and deletes do not travel/.test(applied),
+      applied.trim(),
+    );
     const there = await statuses(remote, Object.values(ids));
     const here = await statuses(local, Object.values(ids));
     check('a row replaced here is replaced there too', there.aaaa === 'replaced');

@@ -151,6 +151,32 @@ export default async function run({ store, project, expected }, check) {
       (await store.scannedFiles(project)).length === 0,
   );
 
+  const named = (dstName) => ({
+    id: `edge-${dstName}`,
+    project,
+    srcId: '',
+    srcName: 'caller',
+    dstId: '',
+    dstName,
+    relation: 'calls',
+    confidence: 'EXTRACTED',
+    score: 1,
+    file: 'src/named.ts',
+    line: 1,
+  });
+  const names = ['Pay.get_user', 'Pay.getXuser', 'Pay.get_User', 'get_user', 'Pay.get_users'];
+  await store.upsertGraph({ symbols: [], edges: names.map(named), files: [] });
+  const matched = await store.findEdges({ project, dstName: 'get_user' });
+  check(
+    'graph: a target name matches exactly, or after a dot, and ignores case and wildcards',
+    matched
+      .map((edge) => edge.dstName)
+      .sort()
+      .join() === 'Pay.get_user,get_user',
+    matched.map((edge) => edge.dstName).join(),
+  );
+  await store.removeGraph(project);
+
   if (expected !== 'postgres') return;
 
   const bulk = Array.from({ length: 1200 }, (_, i) => ({

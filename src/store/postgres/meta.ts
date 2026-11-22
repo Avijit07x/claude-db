@@ -61,6 +61,11 @@ export async function readVectorDims(pool: Pool): Promise<number | null> {
   return dims > 0 ? dims : null;
 }
 
+export async function hasVectorExtension(pool: Pool): Promise<boolean> {
+  const res = await pool.query("SELECT 1 AS found FROM pg_extension WHERE extname = 'vector'");
+  return res.rows.length > 0;
+}
+
 export async function tryEnableVector(pool: Pool): Promise<boolean> {
   try {
     await pool.query('CREATE EXTENSION IF NOT EXISTS vector');

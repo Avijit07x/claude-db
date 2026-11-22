@@ -41,7 +41,9 @@ export class PostgresStore implements MemoryStore {
 
   async init(): Promise<void> {
     const meta = await this.readMeta();
-    if (meta?.version === SCHEMA_VERSION) {
+    const cachedOff = meta?.version === SCHEMA_VERSION && !meta.vectorEnabled;
+    const installed = cachedOff && (await metaOps.hasVectorExtension(this.pool));
+    if (meta?.version === SCHEMA_VERSION && !installed) {
       this.vectorEnabled = meta.vectorEnabled;
       this.vectorDims = meta.vectorDims;
       return;

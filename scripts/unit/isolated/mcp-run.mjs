@@ -112,6 +112,19 @@ try {
     around.slice(0, 200),
   );
 
+  const refused = [];
+  for (const bad of ['', '*', '_', 'a', 'zz-not-hex']) {
+    refused.push(await call('get_observations', { ids: [bad] }));
+    refused.push(await call('timeline', { observation_id: bad }));
+  }
+  report(
+    'get_observations and timeline refuse an empty, wildcard or non-hex id',
+    refused.every(
+      (answer) => answer.includes('not an observation id') && !answer.includes('websocket'),
+    ),
+    refused.join(' | ').slice(0, 200),
+  );
+
   const keptTitles = ['Measured polling cost', 'Chose a websocket', 'Added websocket backoff'];
   const refusals = [];
   for (const bad of ['', '*', '_', 'a', 'zz-not-hex']) {

@@ -87,6 +87,16 @@ export default async function run({ store, project, now, sessionId }, check) {
     );
 
     await store.markReplaced(['status-open']);
+    check(
+      'closing a replaced row changes nothing',
+      (await store.closeObservations(['status-open'])) === 0,
+    );
+    const [stillReplaced] = await store.getObservations(['status-open']);
+    check(
+      'a replaced row stays replaced',
+      stillReplaced?.status === 'replaced',
+      stillReplaced?.status,
+    );
     await store.insertObservations([{ ...openObs, status: 'done' }]);
     const [revived] = await store.getObservations(['status-open']);
     check(

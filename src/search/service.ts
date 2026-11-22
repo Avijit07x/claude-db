@@ -12,7 +12,8 @@ export class SearchService {
   ) {}
 
   async search(query: SearchQuery): Promise<ObservationIndexEntry[]> {
-    if (meaningfulTokens(query.text).length === 0) return [];
+    const keywordText = meaningfulTokens(query.text).join(' ');
+    if (keywordText === '') return [];
 
     const wide: SearchQuery = {
       ...query,
@@ -21,14 +22,14 @@ export class SearchService {
     };
 
     const embedded = this.embed(wide.text);
-    const keyword = await this.store.searchKeyword(wide).catch(() => []);
+    const keyword = await this.store.searchKeyword({ ...wide, text: keywordText }).catch(() => []);
     const vector = await this.vectorSearch(wide, await embedded);
 
     const fused = fuse(
       [keyword, vector].filter((r) => r.length > 0),
       query.limit,
     );
-    return applyRecencyBoost(fused, Date.now());
+    return applyRecencyBoost(fused, query.until ?? Date.now());
   }
 
   private async embed(text: string): Promise<{ embedder: Embedder; embedding: number[] } | null> {

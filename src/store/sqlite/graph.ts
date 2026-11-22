@@ -143,8 +143,9 @@ export async function findEdges(db: DatabaseSync, filter: EdgeFilter): Promise<C
   }
   let where = sides.length > 0 ? ` AND (${sides.join(' OR ')})` : '';
   if (filter.dstName !== undefined) {
-    where += ' AND (dst_name = ? OR dst_name LIKE ?)';
-    params.push(filter.dstName, `%.${filter.dstName}`);
+    const suffix = `.${filter.dstName}`;
+    where += ' AND (dst_name = ? OR substr(dst_name, -length(?)) = ?)';
+    params.push(filter.dstName, suffix, suffix);
   }
   params.push(filter.limit ?? 2000);
 

@@ -226,8 +226,8 @@ the backend, and `CLAUDE_DB_URL` overrides the config file.
 
 Search is hybrid, keyword plus vector, on all three backends. Ranking, fusion
 and token budgeting live in `src/search` rather than in the adapters, so recall
-behaves identically no matter which database is plugged in; only retrieval cost
-changes. Memory is partitioned by project path, so one database serves every
+stays the same across databases, though keyword ranking differs per engine and
+SQLite and MongoDB vector search scans only the newest rows up to a cap. Memory is partitioned by project path, so one database serves every
 repo you work in.
 
 MongoDB Atlas can index vector search instead of scanning brute-force, but

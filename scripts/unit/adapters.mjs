@@ -5,6 +5,8 @@ import { sessionMatch } from '../../dist/store/mongo/filters.js';
 import { excludeSessionsClause } from '../../dist/store/postgres/filters.js';
 import { count, getObservations, list } from '../../dist/store/postgres/observations.js';
 import { findEdges, scannedFiles, symbolNames } from '../../dist/store/postgres/graph.js';
+import { PostgresStore } from '../../dist/store/postgres/index.js';
+import { SCHEMA_VERSION } from '../../dist/store/postgres/schema.js';
 import { createStore } from '../../dist/store/index.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -111,6 +113,7 @@ export default async function run() {
   );
 
   await leanReads(same);
+  await vectorRecheck();
   await sqliteScopes();
 }
 
@@ -268,4 +271,38 @@ async function sqliteScopes() {
     await store.close();
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+async function vectorRecheck() {
+  const initWith = async (extensionRows) => {
+    const seen = [];
+    const answer = (sql) => {
+      if (/FROM claude_db_meta/.test(sql)) {
+        return [{ version: SCHEMA_VERSION, vector_enabled: false, vector_dims: null }];
+      }
+      if (/FROM pg_extension/.test(sql)) return extensionRows;
+      return [{ expr: 'tags' }];
+    };
+    const query = async (sql, values) => {
+      seen.push({ sql, values });
+      return { rows: answer(sql), rowCount: 0 };
+    };
+    const store = new PostgresStore({ query, connect: async () => ({ query, release() {} }) });
+    await store.init();
+    return { store, seen };
+  };
+
+  const installed = await initWith([{ found: 1 }]);
+  const written = installed.seen.find((q) => /INSERT INTO claude_db_meta/.test(q.sql));
+  check(
+    'postgres notices pgvector installed after it was cached as off',
+    written?.values[1] === true,
+    String(written?.values[1]),
+  );
+
+  const absent = await initWith([]);
+  check(
+    'postgres keeps the cached off flag when pgvector is still missing',
+    !absent.seen.some((q) => /CREATE EXTENSION|INSERT INTO claude_db_meta/.test(q.sql)),
+  );
 }

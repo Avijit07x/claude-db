@@ -40,7 +40,7 @@ export function withProjectScope(inner: MemoryStore, resolver: ScopeResolver): M
       const keyed = await Promise.all(
         observations.map(async (obs) => ({ ...obs, project: await keyOf(obs.project) })),
       );
-      return inner.insertObservations(keyed);
+      return inner.insertObservations([...new Map(keyed.map((obs) => [obs.id, obs])).values()]);
     },
 
     async upsertSession(session: Session): Promise<void> {

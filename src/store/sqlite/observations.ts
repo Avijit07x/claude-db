@@ -214,13 +214,10 @@ export async function inventory(db: DatabaseSync): Promise<string[]> {
 export async function closeObservations(db: DatabaseSync, ids: string[]): Promise<number> {
   if (ids.length === 0) return 0;
   const holes = ids.map(() => '?').join(',');
-  const row = db
-    .prepare(`SELECT COUNT(*) AS n FROM observations WHERE status = 'open' AND id IN (${holes})`)
-    .get(...(ids as never[])) as { n: number } | undefined;
-  db.prepare(`UPDATE observations SET status = 'done' WHERE id IN (${holes})`).run(
-    ...(ids as never[]),
-  );
-  return row?.n ?? 0;
+  const result = db
+    .prepare(`UPDATE observations SET status = 'done' WHERE status = 'open' AND id IN (${holes})`)
+    .run(...(ids as never[]));
+  return Number(result.changes);
 }
 
 export async function markReplaced(db: DatabaseSync, ids: string[]): Promise<number> {

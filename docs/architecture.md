@@ -623,7 +623,8 @@ desktop see the same memory, and a second worktree sees the first one's notes.
 ## 14. Databases and sync
 
 **What it does.** Memory lives in one database: SQLite by default, or Postgres or MongoDB to share it across
-machines and teammates. All three give the same results.
+machines and teammates. Ranking and fusion are shared, but keyword ranking differs per engine (FTS5, tsvector,
+`$text`), and SQLite and MongoDB vector search scans the newest rows up to a cap.
 
 **When it runs.** Always. You choose the database once.
 
@@ -637,7 +638,9 @@ machines and teammates. All three give the same results.
 | ------------------------- | --------------------------------------------------- |
 | `use <url>`               | Switch database, after checking it answers          |
 | `export`, `import <file>` | Back up to JSONL, or load a backup (safe to repeat) |
-| `sync <url>`              | Two-way merge with another database                 |
+| `sync <url>`              | Copy missing rows both ways and move status forward |
+
+`sync` adds rows the other side lacks and moves status forward. Edits to an existing row and deletes do not travel.
 
 ---
 
@@ -683,7 +686,7 @@ and to use `find_usages` for symbols.
 |            | `languages`                               | How each language is read                                          |
 |            | `usages [--mode m] <symbol>`              | Ask the graph or `git grep`                                        |
 | Data       | `use <url>`                               | Switch database, after checking it answers                         |
-|            | `export`, `import <file>`, `sync <url>`   | Back up, restore, or two-way merge                                 |
+|            | `export`, `import <file>`, `sync <url>`   | Back up, restore, or copy missing rows both ways                   |
 |            | `merge [<old-path>]`                      | Move memory from an old folder path onto this project              |
 |            | `reembed`, `redact`, `flush`, `seed`      | Recompute vectors, re-clean secrets, re-read chats, fill from git  |
 |            | `prune --older-than <days>`, `reset`      | Delete old or all memory (a dry run without `--yes`)               |
