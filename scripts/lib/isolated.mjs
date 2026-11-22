@@ -9,7 +9,10 @@ export function report(label, ok, detail = '') {
 }
 
 const REAL_FOLDER_VARIABLES = ['CLAUDE_CONFIG_DIR', 'CLAUDE_DB_GRAMMARS'];
-const CLEANUP = { recursive: true, force: true, maxRetries: 5, retryDelay: 200 };
+const REMOVE_FOR_MS = 30_000;
+const RETRY_MS = 200;
+
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 function isolatedEnv(home) {
   const env = { ...process.env };
@@ -22,7 +25,25 @@ function isolatedEnv(home) {
   };
 }
 
+function removeHome(home, name) {
+  const deadline = Date.now() + REMOVE_FOR_MS;
+  for (;;) {
+    try {
+      rmSync(home, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (error.code !== 'ENOTEMPTY') throw error;
+      if (Date.now() > deadline) {
+        check(`${name} had its temp home removed`, false, home);
+        return;
+      }
+      sleep(RETRY_MS);
+    }
+  }
+}
+
 export function runIsolated(script) {
+  const name = script.split('/').pop();
   const home = mkdtempSync(join(tmpdir(), 'isolated-home-'));
   try {
     const result = spawnSync(process.execPath, ['--no-warnings', script], {
@@ -36,11 +57,11 @@ export function runIsolated(script) {
       check(label, ok, detail);
     }
     check(
-      `${script.split('/').pop()} ran to the end`,
+      `${name} ran to the end`,
       result.status === 0,
       result.stderr.trim().split('\n').slice(-2).join(' | '),
     );
   } finally {
-    rmSync(home, CLEANUP);
+    removeHome(home, name);
   }
 }
