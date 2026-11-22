@@ -29,12 +29,8 @@ A turn is also saved as soon as Claude finishes the reply, in the background, so
 another chat sees it without waiting for your next prompt. The save at the next
 prompt stays as the backup, for a reply you interrupted.
 
-Install also writes a short standing instruction into `CLAUDE.local.md` (or
-`~/.claude/CLAUDE.md` for a machine-wide install), telling Claude to search
-memory before asking you to re-explain something. Hook output is context the
-agent may or may not act on; a memory file is a rule for the whole session,
-which is what makes recall the default rather than something you have to ask
-for. `claude-db uninstall` takes the block back out.
+The MCP server's own instructions tell Claude to search memory before asking
+you to re-explain something. Install does not write to `CLAUDE.md`.
 
 **What gets saved.** One observation per turn, and only if that turn edited a
 file or ran a real command. Questions, `grep`, and "ok" are skipped. A busy day
@@ -153,8 +149,7 @@ database unfinished would be worse than saying nothing.
 
 ## Staying current
 
-`claude-db install` copies two things to disk: the `/cdb-scan` skill, and a
-standing instruction block in `CLAUDE.local.md`. Claude Code only reads skills
+`claude-db install` copies the skills to disk. Claude Code only reads skills
 from `~/.claude/skills/`, so a copy has to exist there, but a copy drifts as
 soon as the package updates.
 

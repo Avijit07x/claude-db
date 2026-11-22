@@ -4,7 +4,7 @@ import { installSkills, removeSkills } from './skills.js';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { readJson, writeJson, writeJsonOrRemove } from './files.js';
-import { removeInstructions, writeInstructions } from './instructions.js';
+import { removeInstructions } from './instructions.js';
 import { toPosix } from '../util/paths.js';
 
 interface HookMatcher {
@@ -99,7 +99,6 @@ export function install(distDir: string, scope: Scope, project: string): Install
   writeJson(path, settings);
 
   const server = resolve(distDir, 'mcp', 'server.js');
-  writeInstructions(instructionsPathFor(scope, project));
   const skills = installSkills(distDir, scope, project);
 
   if (scope === 'global' && registerViaCli(server)) return { settingsPath: path, skills };

@@ -654,9 +654,8 @@ The MCP server is a small helper that Claude Code starts. Claude calls these too
 | `forget`           | Deletes notes by id, or clears one chat's summary      | Removing a wrong or private note       |
 | `find_usages`      | Who uses a symbol: `usages`, `explain`, `path`, `text` | Before editing, renaming or deleting   |
 
-A standing instruction block in `CLAUDE.local.md` tells Claude to search memory before asking you to explain a
-past decision, and to use `find_usages` for symbols. Hook output is context Claude may skip; a rule in the
-instruction file holds for the whole chat.
+The MCP server's own instructions tell Claude to search memory before asking you to explain a past decision,
+and to use `find_usages` for symbols.
 
 ---
 
@@ -825,16 +824,14 @@ run. `claude-db doctor` shows which `claude` was found and from where.
 | ------------------------------------------------- | ----------------------------- | ------------------------- |
 | The six hooks                                     | `.claude/settings.local.json` | `~/.claude/settings.json` |
 | The MCP server                                    | `.mcp.json`                   | `~/.claude.json`          |
-| The standing instruction block                    | `CLAUDE.local.md`             | `~/.claude/CLAUDE.md`     |
 | The `/cdb-scan`, `/catchup` and `/handoff` skills | `.claude/skills/`             | `~/.claude/skills/`       |
 
 **Staying current.** The hooks point at the installed package, so they always run the newest code. At each chat
-start, claude-db adds any hook a newer version brought, and rewrites the skills and the instruction block when
-they differ from what shipped. So `npm i -g claude-db` alone is enough. A `/catchup` or `/handoff` skill of your
+start, claude-db adds any hook a newer version brought, and rewrites the skills when they differ
+from what shipped, and removes the instruction block older versions wrote into `CLAUDE.local.md` or `CLAUDE.md`. So `npm i -g claude-db` alone is enough. A `/catchup` or `/handoff` skill of your
 own with the same name is kept, and anything `uninstall` removed stays removed.
 
-**Uninstall.** `claude-db uninstall [--project]` removes the hooks, the server, the instruction block and the
-skills, and leaves your memory as it is.
+**Uninstall.** `claude-db uninstall [--project]` removes the hooks, the server and the skills, and leaves your memory as it is.
 
 **First days.** A fresh install has no history. Run `claude-db scan` and the `/cdb-scan` skill so search has
 something to find. Facts and picks become useful after a few chats.

@@ -90,3 +90,13 @@ report(
   settled && caughtUp.includes('src/b.ts:4') && !caughtUp.includes('changed since'),
   caughtUp,
 );
+
+write('src/b.ts', "import { widgetFactory } from './a';\nexport const made = widgetFactory();\n");
+const scripted = execFileSync(process.execPath, ['--no-warnings', startHook], {
+  cwd: repo,
+  input: JSON.stringify({ cwd: repo, hook_event_name: 'SessionStart', session_id: 's2' }),
+  env: { ...process.env, CLAUDE_DB_CAPTURE: 'off' },
+  encoding: 'utf8',
+});
+report('session start with capture off prints no start block', scripted === '', scripted);
+report('and starts no graph scan', !existsSync(lock));

@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sweepCursorsDaily } from '../../capture/index.js';
+import { loadConfig } from '../../config/index.js';
 import { distillNotice } from '../../facts/notice.js';
 import { recentWorkBlock, startFacts } from '../../facts/start.js';
 import { startBackgroundWork } from '../background.js';
@@ -73,10 +74,10 @@ export default async function sessionStart(run: HookRun): Promise<void> {
   const project = resolveProject(payload.cwd);
 
   refreshInstalledQuietly(project);
+  if (capturingDisabled(loadConfig().capture.scripted, run.env)) return;
 
   await run.withContext(async (ctx) => {
-    const capturing = !capturingDisabled(ctx.config.capture.scripted, run.env);
-    if (capturing) startBackgroundWork(project, ctx.config.database);
+    startBackgroundWork(project, ctx.config.database);
 
     const earlier =
       payload.source === 'compact' && payload.session_id
@@ -113,7 +114,7 @@ export default async function sessionStart(run: HookRun): Promise<void> {
     if (update) parts.push(update);
 
     const body = parts.join('\n');
-    const notice = capturing ? await distillNotice(ctx, project) : null;
+    const notice = await distillNotice(ctx, project);
     emitSessionStart(
       `${body}\n(context ≈ ${Math.round(body.length / 4)} tokens)\n`,
       notice,

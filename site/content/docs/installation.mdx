@@ -36,7 +36,7 @@ Hooks and the MCP server load only when Claude Code starts. A session that is al
 </Step>
 </Steps>
 
-Add `.mcp.json` and `CLAUDE.local.md` to your `.gitignore`. They hold paths and rules that are personal to your machine.
+Add `.mcp.json` to your `.gitignore`. It holds a path that is personal to your machine.
 
 ## What install adds
 
@@ -44,7 +44,6 @@ Add `.mcp.json` and `CLAUDE.local.md` to your `.gitignore`. They hold paths and 
 | ----------------------------- | ----------------------------------------------------------------- |
 | `.claude/settings.local.json` | The hooks that capture and recall                                 |
 | `.mcp.json`                   | The server that gives Claude the six [MCP tools](/docs/mcp-tools) |
-| `CLAUDE.local.md`             | A standing instruction to search memory before asking you         |
 | `.claude/skills/`             | The [skills](/docs/skills): `/cdb-scan`, `/catchup`, `/handoff`   |
 
 A machine-wide install writes the same things under `~/.claude/` and `~/.claude.json` instead. Memory is always one database for the whole machine, filed by project.
@@ -74,4 +73,4 @@ Restart Claude Code. Your memory is kept.
 claude-db uninstall --project
 ```
 
-This removes the hooks, the MCP entry, the instructions and the skills. Your memory is left on disk, so reinstalling picks up where you stopped. To delete the memory itself, see [Privacy](/docs/privacy).
+This removes the hooks, the MCP entry and the skills. Your memory is left on disk, so reinstalling picks up where you stopped. To delete the memory itself, see [Privacy](/docs/privacy).

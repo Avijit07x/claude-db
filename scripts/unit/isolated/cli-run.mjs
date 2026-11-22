@@ -84,9 +84,9 @@ report(
   hookFiles.join(',') || installed.err,
 );
 report(
-  'install registers the MCP server and writes the guidance',
+  'install registers the MCP server and leaves CLAUDE.local.md alone',
   Boolean(readJson(join(project, '.mcp.json')).mcpServers?.memory) &&
-    readFileSync(join(project, 'CLAUDE.local.md'), 'utf8').includes('claude-db:start'),
+    !existsSync(join(project, 'CLAUDE.local.md')),
 );
 report(
   'install warns that .mcp.json should not be committed when nothing ignores it',
@@ -140,6 +140,10 @@ report(
     .join(' | '),
 );
 
+writeFileSync(
+  join(project, 'CLAUDE.local.md'),
+  '<!-- claude-db:start -->\nold block\n<!-- claude-db:end -->\n',
+);
 const removed = cli(['uninstall', '--project']);
 report(
   'uninstall removes the hooks, the server and the guidance',

@@ -20,7 +20,7 @@ claude-db install --project
 Then restart Claude Code. Hooks and the MCP server load only when Claude Code starts.
 
 - Use `claude-db install` instead to switch it on for every project on this machine.
-- Keep `.mcp.json` and `CLAUDE.local.md` out of git. They hold personal paths and rules.
+- Keep `.mcp.json` out of git. It holds a personal path.
 
 ## 3. Check it works
 
