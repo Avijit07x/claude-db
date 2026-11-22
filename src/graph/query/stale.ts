@@ -22,9 +22,19 @@ function changedSinceScan(root: string, entry: ScannedFile): boolean {
   }
 }
 
-export function staleFiles(root: string, stored: ScannedFile[]): string[] {
+function scannedByOtherScanner(root: string, stored: ScannedFile[]): boolean {
+  for (const entry of stored) {
+    try {
+      return hashOf(readFileSync(join(root, entry.path))) !== entry.hash;
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
+function changedFiles(root: string, current: string[], stored: ScannedFile[]): string[] {
   const known = new Map(stored.map((entry) => [entry.path, entry]));
-  const current = sourceFiles(root);
   const stale: string[] = [];
   for (const path of current) {
     const entry = known.get(path);
@@ -33,4 +43,11 @@ export function staleFiles(root: string, stored: ScannedFile[]): string[] {
   const present = new Set(current);
   for (const path of known.keys()) if (!present.has(path)) stale.push(path);
   return stale;
+}
+
+export function staleFiles(root: string, stored: ScannedFile[]): string[] {
+  const current = sourceFiles(root);
+  const changed = changedFiles(root, current, stored);
+  if (changed.length === 0 && scannedByOtherScanner(root, stored)) return current;
+  return changed;
 }

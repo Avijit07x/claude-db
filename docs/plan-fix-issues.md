@@ -49,13 +49,8 @@ Postgres and MongoDB suites were not run.
 ## Open from this round
 
 - `getObservations` with `''` still reads every row. It is read-only, and some test fixtures use non-hex ids.
-- `claude-db scan --path` still takes its root from the path.
 - A `find_usages` `path` filter runs after a 1,000-edge fetch, so a symbol with more edges can show a partial
   folder answer.
-- The grep hook's stale note checks mtimes only, so it misses a scanner upgrade. `find_usages` and the CLI do
-  rescan.
-- `bench-tokens.mjs` and `private-overlap.mjs` still hard-code `~/.claude/projects`.
-- `scripts/lib/isolated.mjs` passes a `CLAUDE_CONFIG_DIR` from the shell into the isolated tests.
 - Decide whether `search` and `find_usages` should be loaded upfront (`anthropic/alwaysLoad` in the tool's
   `_meta`, per the Claude Code MCP docs).
 - Test Claude Code's Code Mode (`CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`) in one real chat. Done when we know

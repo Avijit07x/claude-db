@@ -106,6 +106,12 @@ async function upgrade() {
       ...scan,
       files: scan.files.map((f) => ({ ...f, hash: `older-${f.hash}`, scannedAt: later })),
     });
+    const stale = staleFiles(repo, await store.scannedFiles(repo));
+    check(
+      'a graph scanned under an older scanner key is reported stale for the grep hook note',
+      stale.join(',') === 'a.ts',
+      stale.join(','),
+    );
     await refreshGraph(store, repo, repo);
     const stored = new Map((await store.scannedFiles(repo)).map((f) => [f.path, f.hash]));
     const now = currentHashes(repo);

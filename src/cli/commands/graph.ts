@@ -66,9 +66,8 @@ async function runRefresh(root: string, project: string): Promise<void> {
 }
 
 export async function cmdScan(argv: (string | undefined)[]): Promise<void> {
-  const path = valueOf(argv, '--path');
-  const root = repoRootFor(path ?? process.cwd());
-  const project = resolveProject(undefined);
+  const project = resolveProject(valueOf(argv, '--path'));
+  const root = repoRootFor(project);
   if (!argv.includes('--background')) {
     await runScan(root, project, argv.includes('--force'));
     return;

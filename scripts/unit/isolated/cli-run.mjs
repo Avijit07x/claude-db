@@ -31,6 +31,11 @@ chmodSync(fakeClaude, 0o755);
 const baseEnv = { ...process.env, CLAUDE_CODE_EXECPATH: fakeClaude };
 delete baseEnv.CLAUDE_CODE_ENTRYPOINT;
 delete baseEnv.CLAUDE_DB_CAPTURE;
+report(
+  'an isolated run inherits no variable that points at a real user folder',
+  !process.env.CLAUDE_CONFIG_DIR && !process.env.CLAUDE_DB_GRAMMARS,
+  `${process.env.CLAUDE_CONFIG_DIR} ${process.env.CLAUDE_DB_GRAMMARS}`,
+);
 
 function cli(args, { env = baseEnv, cwd = project } = {}) {
   const run = spawnSync(process.execPath, ['--no-warnings', CLI, ...args], {

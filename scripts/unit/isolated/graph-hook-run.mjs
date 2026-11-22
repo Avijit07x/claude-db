@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { report } from '../../lib/isolated.mjs';
+import { createContext } from '../../../dist/context.js';
 import { scopeToken } from '../../../dist/util/scope.js';
 
 const dist = new URL('../../../dist/', import.meta.url).pathname;
@@ -162,3 +163,43 @@ const scripted = execFileSync(process.execPath, ['--no-warnings', startHook], {
 });
 report('session start with capture off prints no start block', scripted === '', scripted);
 report('and starts no graph scan', !existsSync(lock));
+
+const scanPath = (path) =>
+  execFileSync(process.execPath, ['--no-warnings', cli, 'scan', '--path', path], {
+    cwd: repo,
+    stdio: 'ignore',
+  });
+const storedFiles = async (store, project) =>
+  (await store.scannedFiles(project)).map((file) => file.path);
+
+const other = join(homedir(), 'other');
+mkdirSync(join(other, 'src'), { recursive: true });
+writeFileSync(join(other, 'src', 'z.ts'), 'export const zed = 1;\n');
+execFileSync('git', ['init', '-q'], { cwd: other });
+
+const ctx = await createContext();
+try {
+  scanPath(join(repo, 'src'));
+  const inside = await storedFiles(ctx.store, repo);
+  report(
+    'scan --path inside the repo scans the whole repo project',
+    inside.includes('src/a.ts') && inside.includes('src/b.ts'),
+    inside.join(' '),
+  );
+
+  scanPath(other);
+  const current = await storedFiles(ctx.store, repo);
+  const elsewhere = await storedFiles(ctx.store, realpathSync(other));
+  report(
+    'scan --path in another repo writes no graph rows under the current project',
+    !current.includes('src/z.ts') && current.includes('src/a.ts'),
+    current.join(' '),
+  );
+  report(
+    'and the other repo is scanned under its own project',
+    elsewhere.includes('src/z.ts'),
+    elsewhere.join(' '),
+  );
+} finally {
+  await ctx.close();
+}
