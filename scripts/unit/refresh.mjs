@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { install } from '../../dist/cli/install.js';
+import { readText } from '../../dist/cli/files.js';
 import { refreshInstalled } from '../../dist/cli/refresh.js';
 import { instructionsPathFor, skillPathFor } from '../../dist/cli/paths.js';
 
@@ -38,7 +39,7 @@ async function checks() {
 
   const oldBlock = '<!-- claude-db:start -->\nOLD TEXT FROM 0.4\n<!-- claude-db:end -->';
   const userText = 'my own notes, written by hand\n';
-  check('install wrote no instruction block', !existsSync(instructions));
+  check('install wrote no instruction block', readText(instructions) === '');
 
   writeFileSync(instructions, `${userText}\n${oldBlock}\n`);
   const afterBlock = refreshInstalled(dist, repo);
