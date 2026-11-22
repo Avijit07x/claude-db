@@ -9,6 +9,7 @@ import {
   formatText,
   saveScan,
   scanRepository,
+  usagesAnswer,
 } from '../../dist/graph/index.js';
 import { unlinkedText } from '../../dist/graph/query/text.js';
 import { createStore } from '../../dist/store/index.js';
@@ -95,6 +96,43 @@ function guessedCalls() {
   );
 }
 
+async function scopedUsages(store, repo) {
+  const ask = (path) =>
+    usagesAnswer({ store, project: repo, mode: 'usages', symbol: 'readJson', limit: 50, path });
+  const narrowed = await ask(join(repo, 'src', 'x.ts'));
+  check(
+    'a path narrows the graph answer to that file, text matches included',
+    narrowed.includes('src/x.ts:5') &&
+      !narrowed.includes('src/y.ts') &&
+      !narrowed.includes('README.md'),
+    narrowed,
+  );
+  const folder = await ask(join(repo, 'src'));
+  check(
+    'a folder keeps the files under it',
+    folder.includes('src/x.ts:5') && folder.includes('src/y.ts:5') && !folder.includes('README.md'),
+    folder,
+  );
+
+  const { repo: other, git } = newRepo('graph-answer-other-');
+  writeFileSync(join(other, 'o.ts'), 'export function otherOnly() {\n  return 1;\n}\n');
+  git('add', '-A');
+  git('-c', 'user.email=a@b.c', '-c', 'user.name=a', 'commit', '-qm', 'seed');
+  const rows = async () =>
+    (await store.findSymbols({ project: repo, limit: 1000 })).map((row) => row.file).sort();
+  const before = await rows();
+  const refused = await ask(join(other, 'o.ts')).then(
+    () => 'answered',
+    (error) => error.message,
+  );
+  check(
+    'a path in another repository is refused and changes no graph rows',
+    refused.includes('is outside the project') && (await rows()).join() === before.join(),
+    `${refused} | ${before.join()} -> ${(await rows()).join()}`,
+  );
+  rmSync(other, { recursive: true, force: true });
+}
+
 export default async function run() {
   guessedCalls();
   const repo = seed();
@@ -145,6 +183,8 @@ export default async function run() {
       member.includes('Member of: Widget') && member.includes('Referenced by (0):'),
       member,
     );
+
+    await scopedUsages(store, repo);
 
     const outside = mkdtempSync(join(tmpdir(), 'graph-answer-plain-'));
     const failed = formatText(unlinkedText(outside, 'readJson', [], [])).join('\n');

@@ -575,13 +575,13 @@ importing files under `Imported by`. In Java and Kotlin, `x.method()` goes to th
 [adding-a-language.md](./adding-a-language.md).
 
 **The grep helper.** When Claude runs `grep`, `rg` or the Grep tool for a code symbol the graph knows,
-`prefer-usages.js` answers from the graph instead: at most 2 symbols, 14 lines each, then up to 6 text matches the
+`prefer-usages.js` adds the graph's answer: at most 2 symbols, 14 lines each, then up to 6 text matches the
 graph could not link. A grep for plain text, or for a name the graph does not know, runs as normal.
 
 | `CLAUDE_DB_USAGES_HOOK` | What happens                                               |
 | ----------------------- | ---------------------------------------------------------- |
-| `deny` (default)        | The grep is blocked, and the graph answer is shown instead |
-| `directive`             | The grep runs, and the graph answer is added as context    |
+| `directive` (default)   | The grep runs, and the graph answer is added as context    |
+| `deny`                  | The grep is blocked, and the graph answer is shown instead |
 | `off`                   | The hook does nothing                                      |
 
 **The `/cdb-scan` skill.** After a scan, it writes five notes about the project: stack, layout, conventions,

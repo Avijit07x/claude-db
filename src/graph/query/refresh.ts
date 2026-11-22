@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { MemoryStore } from '../../store/adapter.js';
-import { currentHashes, saveScan, scanRepository } from '../scan/index.js';
+import type { ScannedFile } from '../../types.js';
+import { currentHashes, hashOf, saveScan, scanRepository } from '../scan/index.js';
 import { staleFiles } from './stale.js';
 
 function changesOnDisk(
@@ -12,13 +15,25 @@ function changesOnDisk(
   return null;
 }
 
+function scannedByOtherScanner(root: string, scanned: ScannedFile[]): boolean {
+  for (const entry of scanned) {
+    try {
+      return hashOf(readFileSync(join(root, entry.path))) !== entry.hash;
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
 export async function refreshGraph(
   store: MemoryStore,
   root: string,
   project: string,
 ): Promise<string[]> {
   const scanned = await store.scannedFiles(project);
-  if (scanned.length > 0 && staleFiles(root, scanned).length === 0) return [];
+  const upToDate = staleFiles(root, scanned).length === 0 && !scannedByOtherScanner(root, scanned);
+  if (scanned.length > 0 && upToDate) return [];
   const stored = new Map(scanned.map((file) => [file.path, file.hash]));
   const hashes = changesOnDisk(root, stored);
   if (!hashes) return [];

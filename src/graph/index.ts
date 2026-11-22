@@ -12,4 +12,5 @@ export {
   queryGraph,
   refreshGraph,
   suggestFor,
+  usagesAnswer,
 } from './query/index.js';

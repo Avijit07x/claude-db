@@ -29,21 +29,23 @@ git('add', '.');
 git('commit', '-qm', 'seed');
 execFileSync(process.execPath, ['--no-warnings', cli, 'scan'], { cwd: repo, stdio: 'ignore' });
 
-const runHook = (script, payload) =>
+const runHook = (script, payload, env = {}) =>
   execFileSync(process.execPath, ['--no-warnings', script], {
     cwd: repo,
+    env: { ...process.env, ...env },
     input: JSON.stringify({ cwd: repo, ...payload }),
     encoding: 'utf8',
   });
 
-function grepAnswer() {
-  const out = runHook(grepHook, {
-    hook_event_name: 'PreToolUse',
-    tool_name: 'Grep',
-    tool_input: { pattern: 'widgetFactory' },
-  });
-  return JSON.parse(out).hookSpecificOutput?.permissionDecisionReason ?? '';
-}
+const grepPayload = {
+  hook_event_name: 'PreToolUse',
+  tool_name: 'Grep',
+  tool_input: { pattern: 'widgetFactory' },
+};
+
+const output = (out) => (out ? JSON.parse(out).hookSpecificOutput : {});
+
+const grepAnswer = () => output(runHook(grepHook, grepPayload)).additionalContext ?? '';
 
 const lock = join(homedir(), '.claude-memory', 'graph-refresh', `${scopeToken(repo)}.lock`);
 
@@ -89,6 +91,66 @@ report(
   'after session start the graph catches up through the background refresh',
   settled && caughtUp.includes('src/b.ts:4') && !caughtUp.includes('changed since'),
   caughtUp,
+);
+
+const blocked = output(runHook(grepHook, grepPayload, { CLAUDE_DB_USAGES_HOOK: 'deny' }));
+report(
+  'CLAUDE_DB_USAGES_HOOK=deny still blocks the grep and shows the answer',
+  blocked.permissionDecision === 'deny' && blocked.permissionDecisionReason.includes('src/b.ts'),
+  JSON.stringify(blocked),
+);
+
+const bash = (command) => ({
+  hook_event_name: 'PreToolUse',
+  tool_name: 'Bash',
+  tool_input: { command },
+});
+const grepTool = (input) => ({
+  hook_event_name: 'PreToolUse',
+  tool_name: 'Grep',
+  tool_input: { pattern: 'widgetFactory', ...input },
+});
+
+const QUIET = [
+  bash('grep -rn widgetFactory README.md'),
+  bash('grep -c widgetFactory src/a.ts'),
+  bash('grep -rn widgetFactory src | wc -l'),
+  bash('grep -rn widgetFactory /tmp'),
+  bash('grep -n widgetFactory /var/log/app.log'),
+  bash('git grep -n widgetFactory HEAD~1'),
+  grepTool({ output_mode: 'count' }),
+  grepTool({ path: 'README.md' }),
+  grepTool({ path: '/tmp' }),
+];
+const ANSWERED = [
+  bash('grep -rn widgetFactory src'),
+  bash('grep -rln widgetFactory .'),
+  grepTool({}),
+  grepTool({ path: 'src', output_mode: 'files_with_matches' }),
+];
+for (const [name, env] of [
+  ['default', {}],
+  ['deny', { CLAUDE_DB_USAGES_HOOK: 'deny' }],
+]) {
+  for (const payload of QUIET) {
+    const out = runHook(grepHook, payload, env);
+    report(`${name}: quiet for ${JSON.stringify(payload.tool_input)}`, out === '', out);
+  }
+  for (const payload of ANSWERED) {
+    const answer = output(runHook(grepHook, payload, env));
+    const text = answer.additionalContext ?? answer.permissionDecisionReason ?? '';
+    report(
+      `${name}: answers ${JSON.stringify(payload.tool_input)}`,
+      text.includes('src/b.ts'),
+      text,
+    );
+  }
+}
+const header = grepAnswer().split('\n')[0];
+report(
+  'the context starts with one short line',
+  header === 'Code graph answer for `widgetFactory` (the grep still runs):',
+  header,
 );
 
 write('src/b.ts', "import { widgetFactory } from './a';\nexport const made = widgetFactory();\n");

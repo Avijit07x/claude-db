@@ -4,14 +4,13 @@ import { findUsages, formatUsages, repoRootFor } from '../../usages/index.js';
 import {
   NO_GRAPH,
   NO_GRAPH_FOR_PATH,
-  answerQuery,
-  formatGraph,
   hasGraph,
   languageNames,
   refreshGraph,
   saveScan,
   scanRepository,
   suggestFor,
+  usagesAnswer,
 } from '../../graph/index.js';
 import type { ScanResult } from '../../graph/scan/index.js';
 import { PLATFORM } from '../../graph/grammars.js';
@@ -152,16 +151,16 @@ async function graphAnswer(store: MemoryStore, input: UsagesInput): Promise<stri
     if (input.mode === 'path') fail(NO_GRAPH_FOR_PATH);
     return `${NO_GRAPH}\n${await textAnswer(store, input)}`;
   }
-  const root = repoRootFor(input.path ?? process.cwd());
   const mode = input.mode === 'text' ? 'usages' : input.mode;
-  const answer = await answerQuery({
+  return usagesAnswer({
     store,
-    root,
     project,
-    query: { mode, symbol, ...(target ? { target } : {}), limit: input.limit },
-    refresh: true,
+    mode,
+    symbol,
+    target,
+    limit: input.limit,
+    path: input.path,
   });
-  return formatGraph(answer, root);
 }
 
 export async function cmdUsages(argv: (string | undefined)[]): Promise<void> {

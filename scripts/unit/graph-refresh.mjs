@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { check } from '../lib/check.mjs';
 import { newRepo } from '../lib/repo.mjs';
-import { queryGraph, refreshGraph, saveScan, scanRepository } from '../../dist/graph/index.js';
+import {
+  currentHashes,
+  queryGraph,
+  refreshGraph,
+  saveScan,
+  scanRepository,
+} from '../../dist/graph/index.js';
 import { createStore } from '../../dist/store/index.js';
 import { staleFiles } from '../../dist/graph/query/stale.js';
 
@@ -87,8 +93,40 @@ async function staleness() {
   }
 }
 
+async function upgrade() {
+  const { repo, git } = newRepo('graph-upgrade-');
+  writeFileSync(join(repo, 'a.ts'), 'export function one() {\n  return 1;\n}\n');
+  git('add', '-A');
+  git('-c', 'user.email=a@b.c', '-c', 'user.name=a', 'commit', '-qm', 'seed');
+  const { store, done } = await openStore();
+  try {
+    const later = Date.now() + LATER_MS;
+    const scan = await scanRepository({ root: repo, project: repo });
+    await saveScan(store, repo, {
+      ...scan,
+      files: scan.files.map((f) => ({ ...f, hash: `older-${f.hash}`, scannedAt: later })),
+    });
+    await refreshGraph(store, repo, repo);
+    const stored = new Map((await store.scannedFiles(repo)).map((f) => [f.path, f.hash]));
+    const now = currentHashes(repo);
+    check(
+      'a graph scanned under an older scanner key is rescanned even when no file changed',
+      stored.size === 1 && stored.get('a.ts') === now.get('a.ts'),
+      JSON.stringify([...stored]),
+    );
+    check(
+      'and the next refresh has nothing to do',
+      (await refreshGraph(store, repo, repo)).length === 0,
+    );
+  } finally {
+    await done();
+    rmSync(repo, { recursive: true, force: true });
+  }
+}
+
 export default async function run() {
   await staleness();
+  await upgrade();
   const { repo, git } = newRepo('graph-refresh-');
   writeFileSync(join(repo, 'a.ts'), 'export function foo() {\n  return 1;\n}\n');
   writeFileSync(
@@ -160,6 +198,12 @@ export default async function run() {
         !afterDelete.symbols.some((symbol) => symbol.includes('|a.ts|')) &&
         sameList(afterDelete.edges, (await storedAfterFullScan(repo)).edges),
       afterDelete.symbols.join(' '),
+    );
+    const leftover = staleFiles(repo, await store.scannedFiles(repo));
+    check(
+      'a deleted tracked file is not stale again once the graph dropped it',
+      leftover.length === 0,
+      leftover.join(','),
     );
     check(
       'an unrelated file keeps its rows',
