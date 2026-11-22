@@ -9,6 +9,7 @@ export function report(label, ok, detail = '') {
 }
 
 const REAL_FOLDER_VARIABLES = ['CLAUDE_CONFIG_DIR', 'CLAUDE_DB_GRAMMARS'];
+const CLEANUP = { recursive: true, force: true, maxRetries: 5, retryDelay: 200 };
 
 function isolatedEnv(home) {
   const env = { ...process.env };
@@ -40,6 +41,6 @@ export function runIsolated(script) {
       result.stderr.trim().split('\n').slice(-2).join(' | '),
     );
   } finally {
-    rmSync(home, { recursive: true, force: true });
+    rmSync(home, CLEANUP);
   }
 }
