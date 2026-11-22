@@ -73,8 +73,8 @@ export async function replay(
       const shown = new Set();
       for (const item of chat) {
         const result = await recallFor(ctx, project, item, shown, picker);
+        results.set(item, { ...result, shownBefore: new Set(shown) });
         for (const id of result.recall?.ids ?? []) shown.add(id);
-        results.set(item, result);
       }
     }
   });
@@ -105,5 +105,6 @@ export async function replay(
     }
     if (samples.length < show) samples.push({ prompt: item.prompt, block: recall.block });
   }
-  return { rows, shownWith, samples, answered, outcomes, blockChars, injectedChars };
+  const shownBefore = prompts.map((item) => results.get(item).shownBefore);
+  return { rows, shownWith, samples, answered, outcomes, blockChars, injectedChars, shownBefore };
 }
