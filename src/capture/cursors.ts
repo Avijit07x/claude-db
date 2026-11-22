@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { CONFIG_DIR } from '../config/index.js';
 import { sessionIdsOnDisk } from './transcript.js';
@@ -42,9 +42,11 @@ export function clearCursor(sessionId: string): void {
 
 export function sweepCursorsDaily(now = Date.now()): number {
   const marker = join(CONFIG_DIR, 'cursors', '.swept');
+  let lastSweep = 0;
   try {
-    if (now - statSync(marker).mtimeMs < SWEEP_EVERY_MS) return 0;
+    lastSweep = Number(readFileSync(marker, 'utf8')) || 0;
   } catch {}
+  if (now - lastSweep < SWEEP_EVERY_MS) return 0;
   try {
     mkdirSync(dirname(marker), { recursive: true });
     writeFileSync(marker, String(now), 'utf8');
