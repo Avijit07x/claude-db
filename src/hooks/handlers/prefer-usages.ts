@@ -10,6 +10,7 @@ import { graphCachedHere, graphKnownAbsent, noteGraphPresence } from '../graph-p
 import { refreshGraphInBackground } from '../graph-refresh.js';
 import type { HookRun } from '../run.js';
 import { resolveProject } from '../../util/project.js';
+import { hookEnv } from '../../util/env.js';
 
 const MAX_SYMBOLS = 2;
 const MAX_LINES = 14;
@@ -101,7 +102,7 @@ async function answerSymbols(
 }
 
 export default async function preferUsages(run: HookRun): Promise<void> {
-  const mode = run.env['CLAUDE_DB_USAGES_HOOK'] ?? 'directive';
+  const mode = hookEnv()['CLAUDE_DB_USAGES_HOOK'] ?? 'directive';
   if (mode === 'off') return;
 
   const { payload } = run;

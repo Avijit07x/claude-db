@@ -5,6 +5,7 @@ import { isAbsolute } from 'node:path';
 import type { Observation, ObservationKind } from '../types.js';
 import { currentAuthor, observationId } from '../capture/identity.js';
 import { redact } from '../capture/redact.js';
+import { SCOPE_TTL_MS } from '../store/project-resolver.js';
 import { scopeToken } from '../util/scope.js';
 
 export const FACT_SESSION = 'facts';
@@ -44,28 +45,31 @@ const LABELS: Record<FactType, string> = {
   fact: 'Fact',
 };
 
-const you = new Map<string, string>();
+const you = new Map<string, { at: number; scope: string }>();
 
 function folderOf(project: string | undefined): string {
   if (project && isAbsolute(project) && existsSync(project)) return project;
   return homedir();
 }
 
-export function youScope(project?: string): string {
-  const folder = folderOf(project);
-  let scope = you.get(folder);
-  if (scope === undefined) {
-    let email = '';
-    try {
-      email = execFileSync('git', ['config', '--get', 'user.email'], {
-        cwd: folder,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-    } catch {}
-    scope = `@you:${email || currentAuthor() || 'unknown'}`;
-    you.set(folder, scope);
+function gitEmail(folder: string): string {
+  try {
+    return execFileSync('git', ['config', '--get', 'user.email'], {
+      cwd: folder,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return '';
   }
+}
+
+export function youScope(project?: string, now: () => number = Date.now): string {
+  const folder = folderOf(project);
+  const cached = you.get(folder);
+  if (cached && now() - cached.at < SCOPE_TTL_MS) return cached.scope;
+  const scope = `@you:${gitEmail(folder) || currentAuthor() || 'unknown'}`;
+  you.set(folder, { at: now(), scope });
   return scope;
 }
 

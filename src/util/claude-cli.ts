@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { claudeBinary } from './claude-binary.js';
+import { hookEnv } from './env.js';
 
 const MAX_BUFFER = 1024 * 1024;
 const REASON_CHARS = 120;
@@ -114,7 +115,7 @@ function call(
         {
           timeout: timeoutMs,
           maxBuffer: MAX_BUFFER,
-          env: { ...process.env, ...env, CLAUDE_DB_CAPTURE: 'off' },
+          env: { ...hookEnv(), ...env, CLAUDE_DB_CAPTURE: 'off' },
         },
         (error, stdout, stderr) => {
           if (!error) {

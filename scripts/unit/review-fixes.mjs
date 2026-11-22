@@ -14,6 +14,9 @@ import { symbolsGreppedIn } from '../../dist/hooks/grep-symbols.js';
 import { redact } from '../../dist/capture/redact.js';
 import { findUsages } from '../../dist/usages/find.js';
 import { embedderWithDeadline } from '../../dist/context.js';
+import { LocalEmbedder } from '../../dist/embed/local.js';
+
+const TRANSFORMERS = '@xenova/transformers';
 
 const ts = languageFor('a.ts');
 const parse = (path, source, spec = ts) => extractFile({ path, spec, source, hash: 'h' }, '/p');
@@ -338,5 +341,50 @@ export default async function run() {
     await new Promise((settle) => setImmediate(settle));
     const third = await get();
     check('a load that lands after the deadline is used by later calls', third === real);
+  }
+  {
+    let clock = 0;
+    let attempts = 0;
+    const real = { id: 'real', dimensions: 3, embed: async () => [] };
+    const get = embedderWithDeadline(
+      async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('offline');
+        return real;
+      },
+      0,
+      () => clock,
+    );
+    const failed = await get();
+    clock = 10;
+    const soon = await get();
+    check(
+      'a failed embedder load is not tried again within a minute, even with no deadline',
+      failed.dimensions === 0 && soon.dimensions === 0 && attempts === 1,
+      `attempts ${attempts}`,
+    );
+    clock = 60_000;
+    const later = await get();
+    check(
+      'a failed embedder load is retried after a minute',
+      later === real,
+      `attempts ${attempts}`,
+    );
+  }
+  if (
+    !(await import(TRANSFORMERS).then(
+      () => true,
+      () => false,
+    ))
+  ) {
+    const local = new LocalEmbedder();
+    const failed = await local.embed(['probe']).then(
+      () => false,
+      () => true,
+    );
+    check(
+      'a failed local model load is forgotten so the next call tries again',
+      failed && local.pipelinePromise === null,
+    );
   }
 }

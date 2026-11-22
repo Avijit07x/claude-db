@@ -58,20 +58,14 @@ export default async function sessionStart(run: HookRun): Promise<void> {
   const project = resolveProject(payload.cwd);
 
   refreshInstalledQuietly(project);
-  if (capturingDisabled(loadConfig().capture.scripted, run.env)) return;
+  if (capturingDisabled(loadConfig().capture.scripted)) return;
 
   await run.withContext(async (ctx) => {
     startBackgroundWork(project, ctx.config.database);
 
     const earlier =
       payload.source === 'compact' && payload.session_id
-        ? await recoverAfterCompact(
-            ctx,
-            project,
-            payload.session_id,
-            payload.transcript_path,
-            run.env,
-          )
+        ? await recoverAfterCompact(ctx, project, payload.session_id, payload.transcript_path)
         : null;
     const restored = earlier?.ids ?? new Set<string>();
 

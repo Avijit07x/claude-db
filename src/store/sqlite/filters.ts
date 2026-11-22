@@ -4,6 +4,7 @@ import { partitionIds } from '../../util/shortid.js';
 import { resolve } from 'node:path';
 import { scopeToken } from '../../util/scope.js';
 import { meaningfulTokens } from '../../search/stopwords.js';
+import { hookEnv } from '../../util/env.js';
 
 export function projectClause(
   column: string,
@@ -117,7 +118,7 @@ export function toMatchExpression(text: string, project?: ProjectFilter): string
 
 export function toFilePath(uri: string): string {
   if (!uri || uri.trim() === '') {
-    return resolve(process.env['HOME'] ?? '.', '.claude-memory/memory.db');
+    return resolve(hookEnv()['HOME'] ?? '.', '.claude-memory/memory.db');
   }
   const stripped = uri.replace(/^(sqlite|file):\/\//, '');
   return resolve(stripped === '' ? './memory.db' : stripped);

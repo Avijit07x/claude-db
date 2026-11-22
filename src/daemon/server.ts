@@ -9,10 +9,11 @@ import type { RecallContext } from '../context.js';
 import { parsePayload } from '../hooks/payload.js';
 import type { HookRun } from '../hooks/run.js';
 import { isHookName, loadHandler } from '../hooks/run.js';
-import { withWorkerEnv } from '../hooks/detached.js';
+import { withHookEnv } from '../util/env.js';
 import { silenceSqliteWarning } from '../util/warnings.js';
 import type { DaemonReply, DaemonRequest } from './paths.js';
 import { buildId, socketPath } from './paths.js';
+import { clearDaemonPid, writeDaemonPid } from './pid.js';
 import { STARTING_PREFIX } from './client.js';
 
 silenceSqliteWarning();
@@ -21,6 +22,7 @@ const BUILD = buildId();
 const SOCKET = socketPath();
 const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
 const RETIRE_AFTER_MS = 30_000;
+const ACK_LINE = `${JSON.stringify({ kind: 'ack' })}\n`;
 
 let current: { stamp: number; ctx: Promise<RecallContext> } | null = null;
 let running = 0;
@@ -100,14 +102,13 @@ async function answer(request: DaemonRequest): Promise<DaemonReply> {
   const out: string[] = [];
   const run: HookRun = {
     payload: parsePayload(request.raw),
-    env: request.env,
     write: (text) => out.push(text),
     withContext: async (work) => work(await context()),
     inDaemon: track,
   };
   try {
     const handle = await loadHandler(request.hook);
-    await withWorkerEnv(request.workerEnv, () => handle(run));
+    await withHookEnv(request.env, () => handle(run));
   } catch (error) {
     log(`${request.hook} failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -127,11 +128,10 @@ function parseRequest(line: string): DaemonRequest | null {
     return null;
   }
   if (typeof parsed !== 'object' || parsed === null) return null;
-  const { build, hook, raw, env, workerEnv } = parsed as Record<string, unknown>;
+  const { build, hook, raw, env } = parsed as Record<string, unknown>;
   if (typeof build !== 'string' || typeof hook !== 'string' || typeof raw !== 'string') return null;
   if (!isStringMap(env)) return null;
-  if (workerEnv !== undefined && !isStringMap(workerEnv)) return null;
-  return { build, hook, raw, env, ...(workerEnv ? { workerEnv } : {}) };
+  return { build, hook, raw, env };
 }
 
 function serve(socket: Socket): void {
@@ -157,6 +157,7 @@ function serve(socket: Socket): void {
       socket.destroy();
       return;
     }
+    socket.write(ACK_LINE);
     void answer(request)
       .then((reply) => socket.end(`${JSON.stringify(reply)}\n`))
       .catch((error: unknown) => {
@@ -177,6 +178,7 @@ async function shutdown(reason: string): Promise<void> {
   clearTimeout(idleTimer);
   server?.close();
   await Promise.allSettled([...pending]);
+  clearDaemonPid(process.pid);
   if (current) await current.ctx.then((ctx) => ctx.close()).catch(() => undefined);
   process.exit(0);
 }
@@ -215,6 +217,7 @@ async function start(): Promise<void> {
   });
   server.listen(SOCKET, () => {
     if (process.platform !== 'win32') chmodSync(SOCKET, 0o600);
+    writeDaemonPid();
     clearStartMarkers();
     log(`listening on ${SOCKET}`);
     touch();

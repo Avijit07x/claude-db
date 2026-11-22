@@ -1,8 +1,9 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { hookEnv } from './env.js';
 
 export function claudeConfigDir(): string {
-  const custom = process.env['CLAUDE_CONFIG_DIR'];
+  const custom = hookEnv()['CLAUDE_CONFIG_DIR'];
   return custom ? custom : join(homedir(), '.claude');
 }
 

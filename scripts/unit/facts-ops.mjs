@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -93,6 +94,28 @@ export default async function run() {
       'a fact about the user belongs to the user, not the project',
       mine.project === youScope() && youScope().startsWith('@you:'),
     );
+  }
+
+  {
+    const repo = mkdtempSync(join(tmpdir(), 'you-'));
+    const git = (...args) => execFileSync('git', ['-C', repo, ...args], { stdio: 'ignore' });
+    git('init', '-q');
+    git('config', 'user.email', 'first@example.test');
+    const first = youScope(repo, () => 0);
+    git('config', 'user.email', 'second@example.test');
+    const soon = youScope(repo, () => 1000);
+    const later = youScope(repo, () => 61_000);
+    check(
+      'the git email is kept for a minute',
+      first === '@you:first@example.test' && soon === first,
+      `${first} then ${soon}`,
+    );
+    check(
+      'a changed git email is seen after a minute',
+      later === '@you:second@example.test',
+      later,
+    );
+    rmSync(repo, { recursive: true, force: true });
   }
 
   {

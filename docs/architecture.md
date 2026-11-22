@@ -126,9 +126,10 @@ Every hook catches its own errors and exits with success. A broken memory never 
 to one long-lived process over a socket in the data folder (`daemon.sock`, readable only by you), and
 print what it sends back. That process keeps the database connection, the embedding model and the loaded
 code, and saves finished turns itself instead of starting a worker. A hook that finds no daemon does its
-own work as before and starts one for the next hook. The daemon exits after `daemon.idleMinutes` with
-nothing to do, and a hook from a newer install replaces it. `CLAUDE_DB_URL` or `CLAUDE_DB_GRAPH_CACHE` in a
-hook's environment keeps that hook in its own process.
+own work as before and starts one for the next hook. A daemon that does not acknowledge a request within
+2 s is treated as stuck: the hook stops it, starts a new one, and does its own work. The daemon exits after
+`daemon.idleMinutes` with nothing to do, and a hook from a newer install replaces it. `CLAUDE_DB_URL` or
+`CLAUDE_DB_GRAPH_CACHE` in a hook's environment keeps that hook in its own process.
 
 ---
 

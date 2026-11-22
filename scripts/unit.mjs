@@ -69,6 +69,7 @@ import grammars from './unit/grammars.mjs';
 import graphAnswer from './unit/graph-answer.mjs';
 import view from './unit/view.mjs';
 import summarize from './unit/summarize.mjs';
+import lintRules from './unit/lint-rules.mjs';
 import { report } from './lib/check.mjs';
 
 const graphCache = mkdtempSync(join(tmpdir(), 'unit-graph-cache-'));
@@ -96,6 +97,7 @@ await grammars();
 await graphAnswer();
 await view();
 await summarize();
+await lintRules();
 await preferUsages();
 await capture();
 await classify();

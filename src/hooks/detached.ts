@@ -1,9 +1,9 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawn } from 'node:child_process';
 import { appendFileSync, closeSync, mkdirSync, openSync, renameSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_DIR } from '../config/dir.js';
+import { hookEnv } from '../util/env.js';
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CLI = resolve(DIST, 'cli', 'index.js');
@@ -11,12 +11,6 @@ export const PICK_WORKER = resolve(DIST, 'pick', 'worker.js');
 export const TURN_WORKER = resolve(DIST, 'hooks', 'turn-save.js');
 
 const LOG_LIMIT = 1024 * 1024;
-
-const workerEnvs = new AsyncLocalStorage<NodeJS.ProcessEnv>();
-
-export function withWorkerEnv<T>(env: NodeJS.ProcessEnv | undefined, work: () => T): T {
-  return env ? workerEnvs.run(env, work) : work();
-}
 
 export const backgroundLog = (): string => join(CONFIG_DIR, 'logs', 'background.log');
 
@@ -51,7 +45,7 @@ export function runDetached(
   try {
     spawn(process.execPath, [script, ...args], {
       cwd,
-      env: workerEnvs.getStore() ?? process.env,
+      env: hookEnv(),
       detached: true,
       stdio: ['ignore', log, log],
     })

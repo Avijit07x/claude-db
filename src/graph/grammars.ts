@@ -2,6 +2,7 @@ import { statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { CONFIG_DIR } from '../config/dir.js';
+import { hookEnv } from '../util/env.js';
 
 export interface Grammar {
   readonly libraryPath: string;
@@ -16,7 +17,7 @@ export const PLATFORM_PACKAGE = `claude-db-grammars-${PLATFORM}`;
 const loaded = new Map<string, Grammar | null>();
 
 export const grammarHome = (): string =>
-  process.env.CLAUDE_DB_GRAMMARS ?? join(CONFIG_DIR, 'grammars');
+  hookEnv()['CLAUDE_DB_GRAMMARS'] ?? join(CONFIG_DIR, 'grammars');
 
 const places = (): Load[] => [
   createRequire(import.meta.url),

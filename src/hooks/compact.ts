@@ -5,6 +5,7 @@ import { toShortId } from '../util/shortid.js';
 import { capturingDisabled } from './payload.js';
 import type { HookEnv } from './payload.js';
 import { forgetShown } from './shown.js';
+import { hookEnv } from '../util/env.js';
 
 const MAX_LINES = 8;
 const SCANNED = 200;
@@ -26,7 +27,7 @@ export async function recoverAfterCompact(
   project: string,
   sessionId: string,
   transcriptPath: string | undefined,
-  env: HookEnv = process.env,
+  env: HookEnv = hookEnv(),
 ): Promise<EarlierInChat | null> {
   forgetShown(sessionId);
   if (!capturingDisabled(ctx.config.capture.scripted, env)) {

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hookEnv } from '../../util/env.js';
 import { clearActive, sweepActive } from '../../capture/active.js';
 import {
   aiSummary,
@@ -22,7 +23,7 @@ import { dropTurnSave, sweepTurnSaves } from '../turn-job.js';
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'cli', 'index.js');
 
 export default async function sessionEnd(run: HookRun): Promise<void> {
-  if (capturingDisabled(loadConfig().capture.scripted, run.env)) return;
+  if (capturingDisabled(loadConfig().capture.scripted)) return;
   const { payload } = run;
   const sessionId = payload.session_id;
   if (!sessionId) return;
@@ -64,6 +65,7 @@ export default async function sessionEnd(run: HookRun): Promise<void> {
 
     if (ctx.config.updates !== 'off' && isDue(readState())) {
       spawn(process.execPath, [CLI, 'update', '--quiet'], {
+        env: hookEnv(),
         detached: true,
         stdio: 'ignore',
       }).unref();

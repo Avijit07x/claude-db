@@ -8,7 +8,7 @@ import { saveQueuedTurn } from '../save-turn.js';
 import { queueTurnSave } from '../turn-job.js';
 
 export default function turnEnd(run: HookRun): Promise<void> {
-  if (!capturingDisabled(loadConfig().capture.scripted, run.env)) queue(run);
+  if (!capturingDisabled(loadConfig().capture.scripted)) queue(run);
   return Promise.resolve();
 }
 

@@ -11,7 +11,7 @@ import type { HookRun } from '../run.js';
 import { markShown, readShown } from '../shown.js';
 
 export default async function userPrompt(run: HookRun): Promise<void> {
-  if (capturingDisabled(loadConfig().capture.scripted, run.env)) return;
+  if (capturingDisabled(loadConfig().capture.scripted)) return;
   const { payload } = run;
   const sessionId = payload.session_id;
   if (!sessionId) return;

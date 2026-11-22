@@ -1,4 +1,5 @@
 import { rememberClaudeBinary } from '../util/claude-binary.js';
+import { hookEnv } from '../util/env.js';
 
 export interface HookPayload {
   session_id?: string;
@@ -23,7 +24,7 @@ export const writeStdout: Write = (text) => {
   process.stdout.write(text);
 };
 
-export function capturingDisabled(scripted: boolean, env: HookEnv = process.env): boolean {
+export function capturingDisabled(scripted: boolean, env: HookEnv = hookEnv()): boolean {
   if (env['CLAUDE_DB_CAPTURE'] === 'off') return true;
   return env['CLAUDE_CODE_ENTRYPOINT'] === 'sdk-cli' && !scripted;
 }

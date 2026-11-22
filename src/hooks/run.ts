@@ -1,9 +1,8 @@
 import type { RecallContext } from '../context.js';
-import type { HookEnv, HookPayload, Write } from './payload.js';
+import type { HookPayload, Write } from './payload.js';
 
 export interface HookRun {
   payload: HookPayload;
-  env: HookEnv;
   write: Write;
   withContext: <T>(work: (ctx: RecallContext) => Promise<T>) => Promise<T>;
   inDaemon: (task: () => Promise<void>) => boolean;

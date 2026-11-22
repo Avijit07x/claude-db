@@ -23,7 +23,7 @@ export interface ScopeResolver {
   resolve(value: string): Promise<ProjectScope>;
 }
 
-const SCOPE_TTL_MS = 60_000;
+export const SCOPE_TTL_MS = 60_000;
 
 export function isExistingFolder(value: string): boolean {
   if (!isAbsolute(value)) return false;
