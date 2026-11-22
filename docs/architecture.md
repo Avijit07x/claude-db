@@ -474,8 +474,6 @@ A request pushed out of these 5 lines stays in memory: search finds it, and each
 | A not-finished request shows for 2 hours at most                 | An interrupted reply fires no hook, so nothing else can clear it |
 | Files in `~/.claude-memory/active/` older than a day are deleted | A crashed chat leaves nothing behind                             |
 
-Every case, with examples, is in [improve-last-chat.md](./improve-last-chat.md).
-
 ---
 
 ## 10. After `/compact`
@@ -571,8 +569,7 @@ installs, a language is read by pattern.
 **Imports.** In TypeScript, JavaScript, Python, Go, Rust, Java and Kotlin, an imported name is bound to the symbol
 in the module it came from, so two symbols with one name in different modules stay apart, and `usages` lists the
 importing files under `Imported by`. In Java and Kotlin, `x.method()` goes to the method of the declared type of
-`x`. A name from outside the repository is never matched to a symbol inside it. The design is in
-[plan-code-graph.md](./plan-code-graph.md), and adding a language is in
+`x`. A name from outside the repository is never matched to a symbol inside it. Adding a language is in
 [adding-a-language.md](./adding-a-language.md).
 
 **The grep helper.** When Claude runs `grep`, `rg` or the Grep tool for a code symbol the graph knows,
