@@ -4,7 +4,13 @@ import type { ProjectSummary } from '../adapter.js';
 import { foreignNames, isWholeScope } from '../adapter.js';
 import type { Row } from './rows.js';
 import { toObservation } from './rows.js';
-import { TAG_PREDICATE, excludeSessionsClause, projectClause, removeWhere } from './filters.js';
+import {
+  TAG_PREDICATE,
+  excludeSessionsClause,
+  globPrefix,
+  projectClause,
+  removeWhere,
+} from './filters.js';
 import { partitionIds } from '../../util/shortid.js';
 import { packVector } from '../../util/vector.js';
 import { scopeToken } from '../../util/scope.js';
@@ -70,7 +76,7 @@ export async function getObservations(db: DatabaseSync, ids: string[]): Promise<
   }
   for (const prefix of prefixes) {
     clauses.push('id GLOB ?');
-    params.push(`${prefix}*`);
+    params.push(globPrefix(prefix));
   }
 
   const rows = db

@@ -28,6 +28,10 @@ export function excludeSessionsClause(
   return `${column} NOT IN (${sessions.map(() => '?').join(',')})`;
 }
 
+export function globPrefix(prefix: string): string {
+  return `${prefix.replace(/[*?[]/g, '[$&]')}*`;
+}
+
 export function removeWhere(filter: RemoveFilter): { where: string; params: unknown[] } {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -41,7 +45,7 @@ export function removeWhere(filter: RemoveFilter): { where: string; params: unkn
     }
     for (const prefix of prefixes) {
       alternatives.push('id GLOB ?');
-      params.push(`${prefix}*`);
+      params.push(globPrefix(prefix));
     }
     conditions.push(`(${alternatives.join(' OR ')})`);
   }

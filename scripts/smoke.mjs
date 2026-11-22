@@ -95,6 +95,7 @@ import projectLinks from './smoke/project-links.mjs';
 import projectLists from './smoke/project-lists.mjs';
 import scopedStore from './smoke/scoped-store.mjs';
 import sessions from './smoke/sessions.mjs';
+import contract from './smoke/contract.mjs';
 
 await retrieval(ctx, check);
 await sessions(ctx, check);
@@ -106,6 +107,7 @@ await graph(ctx, check);
 await projectLinks(ctx, check);
 await projectLists(ctx, check);
 await scopedStore(ctx, check);
+await contract(ctx, check);
 
 await store.remove({ project });
 await store.close();
