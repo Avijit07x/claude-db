@@ -54,6 +54,10 @@ Postgres and MongoDB suites were not run.
   folder answer. Accepted: it is rare.
 - `search` and `find_usages` stay deferred by Claude Code's tool search, not loaded upfront. That costs fewer
   tokens, the hooks deliver most memory, and the server instructions name the tools.
+- An empty id still matches every row at the store level. The MCP schema and the scoped `remove` refuse it,
+  so no caller can send one.
+- SQLite and MongoDB return embeddings from `list` without `vectors: true`, and Postgres does not. It costs
+  memory only.
 - Test Claude Code's Code Mode (`CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1`) in one real chat. Done when we know
   whether the `<memory>` pick and the grep hook's context still arrive. Both depend on `PreToolUse`, and the
   docs do not say whether it fires for tool calls made from code. Needs the owner.
@@ -63,9 +67,9 @@ Postgres and MongoDB suites were not run.
 | #   | Item                     | Plan                          | Status                                                     |
 | --- | ------------------------ | ----------------------------- | ---------------------------------------------------------- |
 | 4.1 | Daemon                   | `docs/plan-daemon.md`         | Researched. Recommend keep and fix its causes; owner decides |
-| 4.2 | Search ranking           | `docs/plan-search-ranking.md` | Recency fix done. The bench is in progress; the decision needs the owner's run |
+| 4.2 | Search ranking           | `docs/plan-search-ranking.md` | Recency fix and bench done. The decision needs the owner's run |
 | 4.3 | Flush with no lock       | `docs/plan-flush.md`          | Done on v0.14 (a96ae12)                                    |
-| 4.4 | Store drift              | `docs/plan-store.md`          | Bugs done (c1b4c95). The contract test is next, in v0.14   |
+| 4.4 | Store drift              | `docs/plan-store.md`          | Done (c1b4c95, 4fb4142)                                    |
 | 4.5 | `sync`                   | `docs/plan-store.md`          | Done (c1b4c95)                                             |
 | 4.6 | Start block, nothing twice | `docs/plan-start-block.md`  | Done (629439b)                                             |
 | 4.7 | `npm test` builds first  | -                             | Done (204bd38)                                             |
