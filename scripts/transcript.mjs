@@ -193,6 +193,176 @@ ck('classified as file-backed work, not a decision', o.kind === 'pattern', o.kin
   );
 }
 
+{
+  const { keepEnds } = await import('../dist/util/snippet.js');
+  const { classifyTurn } = await import('../dist/capture/turn-extractor.js');
+  const long = `Asked: fix the sweep race\n${'Checking the marker now. '.repeat(60)}\nThe fix reads the stored time.`;
+  const kept = keepEnds(long, 900);
+  ck(
+    'a long text keeps its first line and its end, at the same size',
+    kept.startsWith('Asked: fix the sweep race\n') &&
+      kept.endsWith('The fix reads the stored time.') &&
+      kept.length === 900,
+    String(kept.length),
+  );
+  ck('a short text is kept whole', keepEnds('Asked: a\nb', 900) === 'Asked: a\nb');
+
+  const turn = (over) => ({
+    prompt: 'fix the sweep race',
+    reasoning: 'Fixed it.',
+    reply: 'Fixed it.',
+    files: ['/repo/src/cursors.ts'],
+    commands: [],
+    timestamp: Date.now(),
+    offset: 0,
+    ...over,
+  });
+  const [saved] = observationsFromTurns(
+    [
+      turn({
+        reasoning: `${'Checking the marker now. '.repeat(300)}\nThe fix reads the stored time.`,
+      }),
+    ],
+    's1',
+    '/repo',
+    config,
+  );
+  ck(
+    'a long turn keeps its prompt, its outcome and its files',
+    saved.body.startsWith('Asked: fix the sweep race') &&
+      saved.body.includes('The fix reads the stored time.') &&
+      saved.body.includes('Files: '),
+    saved.body.slice(-100),
+  );
+
+  const extract = (files) => observationsFromTurns([turn({ files })], 's1', '/repo', config)[0];
+  const outside = extract(['/home/u/.claude/memory/note.md']);
+  ck(
+    'a turn that only wrote outside the project is not open work',
+    outside.status === 'done',
+    outside.status,
+  );
+  const mixed = extract(['/home/u/.claude/memory/note.md', '/repo/src/a.ts']);
+  ck(
+    'a turn that also wrote inside the project is open work',
+    mixed.status === 'open',
+    mixed.status,
+  );
+
+  const fixed = turn({
+    prompt: 'make CI green',
+    reasoning: 'The quality job failed on lint.\nFixed the import, CI is green.',
+    reply: 'Fixed the import, CI is green.',
+  });
+  ck(
+    'a failure in the narration does not make a fixed turn a dead end',
+    classifyTurn(fixed) !== 'deadend',
+    classifyTurn(fixed),
+  );
+  const titled = observationsFromTurns([fixed], 's1', '/repo', config)[0];
+  ck(
+    'a turn is titled from its final reply, not its first step',
+    titled.title.startsWith('Fixed the import'),
+    titled.title,
+  );
+  const reverted = turn({
+    prompt: 'try a cache',
+    reasoning: 'Added a cache.\nThe cache did not help, so I reverted it.',
+    reply: 'The cache did not help, so I reverted it.',
+  });
+  ck(
+    'a reply that says the approach was reverted is a dead end',
+    classifyTurn(reverted) === 'deadend',
+    classifyTurn(reverted),
+  );
+
+  const reported = turn({
+    prompt: 'verify the release',
+    reasoning: "Checking.\nFound and fixed one bug: the old rule didn't work on linked projects.",
+    reply: "Found and fixed one bug: the old rule didn't work on linked projects.",
+  });
+  ck(
+    'a reply that reports a fixed bug is not a dead end',
+    classifyTurn(reported) !== 'deadend',
+    classifyTurn(reported),
+  );
+  const testFirst = turn({
+    prompt: 'add the tests',
+    reasoning: 'Each new test failed before its change. The full suite passes now.',
+    reply: 'Each new test failed before its change. The full suite passes now.',
+  });
+  ck(
+    'a test that failed before its change does not make a dead end',
+    classifyTurn(testFirst) !== 'deadend',
+    classifyTurn(testFirst),
+  );
+  const undone = turn({
+    prompt: 'fix the cache key',
+    reasoning: "Tried a new key.\nThe fix didn't work, so I reverted it.",
+    reply: "The fix didn't work, so I reverted it.",
+  });
+  ck(
+    'a fix that did not work and was reverted is a dead end',
+    classifyTurn(undone) === 'deadend',
+    classifyTurn(undone),
+  );
+  const bulleted = observationsFromTurns(
+    [turn({ reply: '- **Code:** all five fixes from the plan are committed (b3a9637).' })],
+    's1',
+    '/repo',
+    config,
+  )[0];
+  ck(
+    'a title drops a leading list marker',
+    bulleted.title.startsWith('Code: all five fixes'),
+    bulleted.title,
+  );
+
+  const cut = observationsFromTurns(
+    [
+      turn({
+        reply:
+          'The rejected daemon design, the duplicate, the wrong mtime fact and all four stale to-dos are gone.',
+      }),
+    ],
+    's1',
+    '/repo',
+    config,
+  )[0];
+  ck(
+    'a title cut short says so',
+    cut.title.endsWith('...') && cut.title.startsWith('The rejected daemon design'),
+    cut.title,
+  );
+
+  const replyPath = join(dir, 'reply.jsonl');
+  const replyRows = [
+    { type: 'user', timestamp: at(10), message: { content: 'run the tests' } },
+    {
+      type: 'assistant',
+      timestamp: at(11),
+      message: {
+        content: [
+          { type: 'text', text: 'Running them now.' },
+          { type: 'tool_use', name: 'Read', input: { file_path: '/repo/a.ts' } },
+        ],
+      },
+    },
+    {
+      type: 'assistant',
+      timestamp: at(12),
+      message: { content: [{ type: 'text', text: 'All tests pass.' }] },
+    },
+  ];
+  writeFileSync(replyPath, replyRows.map((row) => JSON.stringify(row)).join('\n') + '\n');
+  const [replied] = readTranscript(replyPath).turns;
+  ck(
+    'a turn keeps the text after its last tool call as its reply',
+    replied?.reply === 'All tests pass.',
+    replied?.reply,
+  );
+}
+
 rmSync(dir, { recursive: true, force: true });
 console.log(f === 0 ? '\nTranscript extraction correct.' : `\n${f} failed.`);
 process.exit(f ? 1 : 0);

@@ -190,6 +190,11 @@ export default async function run() {
     check('a failed run releases its claim', claimReingest(fake));
     finishReingest(fake);
     check('a finished run is never repeated', reingestDone(fake) && !claimReingest(fake));
+    writeFileSync(done, '1');
+    check(
+      'a project rebuilt by 0.14.0 is rebuilt once more with the new rules',
+      !reingestDone(fake) && claimReingest(fake),
+    );
   } finally {
     rmSync(lock, { force: true });
     rmSync(done, { force: true });

@@ -700,6 +700,24 @@ try {
   }
 
   {
+    const w = world('final-reply');
+    await w.seed();
+    w.askOnly('F', 0, 'make CI green');
+    w.reply('F', 0, 'The quality job failed on lint.', 'src/x.ts');
+    const { saved } = await w.stop(
+      'F',
+      'make CI green',
+      'Fixed the import in x.ts, CI is green now.',
+    );
+    const [row] = await ctx.store.list({ project: w.project, sessionId: 'F', limit: 5 });
+    report(
+      'a final reply that only the Stop hook has still decides the kind and the title',
+      saved && row?.kind !== 'deadend' && row?.title.startsWith('Fixed the import'),
+      `${row?.kind}: ${row?.title}`,
+    );
+  }
+
+  {
     const w = world('headless');
     await w.seed();
     w.askOnly('A', 0, 'add a headless feature to the queue', { CLAUDE_CODE_ENTRYPOINT: 'sdk-cli' });

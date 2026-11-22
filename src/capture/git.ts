@@ -63,6 +63,7 @@ function toObservation(record: string, project: string): Observation | null {
     kind: classifyTurn({
       prompt: subject,
       reasoning: body,
+      reply: body,
       files,
       commands: [],
       timestamp,

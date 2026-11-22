@@ -1,10 +1,13 @@
 import type { Config } from '../config/index.js';
 import type { Observation, ObservationKind } from '../types.js';
 import { classifyCommand } from './command.js';
+import { isInside } from '../util/paths.js';
 import { isSearchable, readablePrompt } from '../util/prompt.js';
+import { keepEnds } from '../util/snippet.js';
 import { currentAuthor, observationId } from './identity.js';
 import { redact } from './redact.js';
 import type { Turn } from './transcript.js';
+import { answers, buildTitle, shortPath } from './turn-title.js';
 
 const ASKED_CHARS = 120;
 
@@ -38,7 +41,12 @@ export function observationsFromTurns(
 }
 
 function withoutPrivate(turn: Turn): Turn {
-  return { ...turn, prompt: stripPrivate(turn.prompt), reasoning: stripPrivate(turn.reasoning) };
+  return {
+    ...turn,
+    prompt: stripPrivate(turn.prompt),
+    reasoning: stripPrivate(turn.reasoning),
+    reply: stripPrivate(turn.reply),
+  };
 }
 
 function isSubstantive(turn: Turn, config: Config): boolean {
@@ -46,11 +54,6 @@ function isSubstantive(turn: Turn, config: Config): boolean {
   const commands = turn.commands.filter((command) => classifyCommand(command) !== null);
   if (files.length > 0 || commands.length > 0) return true;
   return isSearchable(turn.prompt) && answers(turn.reasoning);
-}
-
-function answers(reasoning: string): boolean {
-  const scored = scoreSentences(stripMarkdown(redact(reasoning)));
-  return scored.length >= 2 && scored.some(([, score]) => score > 0);
 }
 
 function buildObservation(
@@ -66,7 +69,7 @@ function buildObservation(
     .filter((c): c is NonNullable<typeof c> => c !== null);
 
   const body = redact(
-    truncate(
+    keepEnds(
       [
         `Asked: ${turn.prompt}`,
         '',
@@ -88,7 +91,7 @@ function buildObservation(
     sessionId,
     project,
     ...(author ? { author } : {}),
-    status: files.length > 0 ? 'open' : 'done',
+    status: files.some((file) => isInside(file, project)) ? 'open' : 'done',
     kind,
     title: redact(buildTitle(turn, files, kind)),
     body,
@@ -96,85 +99,6 @@ function buildObservation(
     tags: topLevelDirs(files, project),
     createdAt: turn.timestamp,
   };
-}
-
-const ANNOUNCEMENT =
-  /^(now|next|then|first|right|ok|okay|good question|great|sure|perfect|let me|let's|i'?ll|here'?s|two|three|four|before|starting|continuing)\b/i;
-
-const IN_PROGRESS =
-  /^(work|add|fix|runn|updat|writ|build|mak|mov|remov|check|test|switch|wir|tak|go|do|try|look|read|creat|implement|refactor|pull|push|sett)ing\b/i;
-
-const BACKREFERENCE =
-  /^(that'?s|this is|these are|it'?s|there'?s|you'?(ve|re)|we'?(ve|re)|yes\b|no\b|exactly|correct|agreed|fair enough|both\b|either\b|same\b)/i;
-
-function announces(sentence: string): boolean {
-  return (
-    sentence.endsWith(':') ||
-    ANNOUNCEMENT.test(sentence) ||
-    BACKREFERENCE.test(sentence) ||
-    IN_PROGRESS.test(sentence)
-  );
-}
-
-const EVIDENCE = [
-  /[\w-]+\.(ts|tsx|js|jsx|mjs|json|md|sql|py|go|rs|ya?ml|sh|toml|txt|css|html|lock)\b/i,
-  /\b\w{3,}ed\b/i,
-  /\d/,
-];
-
-function reports(sentence: string): number {
-  if (announces(sentence)) return -1;
-  const text = sentence.replace(/\[redacted[^\]]*\]/g, '');
-  return EVIDENCE.some((test) => test.test(text)) ? 1 : 0;
-}
-
-function buildTitle(turn: Turn, files: string[], kind: ObservationKind): string {
-  if (kind === 'preference') {
-    const rule = firstSentence(redact(turn.prompt));
-    if (rule) return headline(rule);
-  }
-
-  const prose = stripMarkdown(redact(turn.reasoning));
-
-  const scored = scoreSentences(prose);
-
-  const best = scored.find(([, score]) => score > 0) ?? scored.find(([, score]) => score === 0);
-  if (best) return headline(best[0]);
-
-  const prompt = firstSentence(redact(turn.prompt));
-  if (prompt) return headline(prompt);
-
-  const opening = firstSentence(prose);
-  if (opening && opening.length >= 15) return headline(opening);
-
-  return files.length > 0 ? `Changed ${shortPath(files[0] ?? '')}` : 'Session work';
-}
-
-function scoreSentences(prose: string): (readonly [string, number])[] {
-  return sentences(prose)
-    .slice(0, 6)
-    .filter((sentence) => sentence.length >= 15)
-    .map((sentence) => [sentence, reports(sentence)] as const);
-}
-
-function sentences(text: string): string[] {
-  return text
-    .split(/(?<=[.!?])\s+|\n+/)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length > 0);
-}
-
-const TITLE_MAX = 80;
-
-function headline(sentence: string): string {
-  if (sentence.length <= TITLE_MAX) return sentence;
-
-  const clause = sentence.slice(0, TITLE_MAX);
-  const cut = Math.max(clause.lastIndexOf(', '), clause.lastIndexOf(' - '));
-  if (cut >= 30) return clause.slice(0, cut);
-
-  const word = clause.lastIndexOf(' ');
-  return `${clause.slice(0, word > 30 ? word : TITLE_MAX)}...`;
 }
 
 export function topLevelDirs(files: string[], project: string): string[] {
@@ -193,7 +117,7 @@ const PREFERENCE_PROMPT_MAX = 600;
 
 export function classifyTurn(turn: Turn): ObservationKind {
   const prompt = turn.prompt.toLowerCase();
-  const text = `${turn.prompt} ${turn.reasoning}`.toLowerCase();
+  const text = `${turn.prompt} ${turn.reply || turn.reasoning}`.toLowerCase();
 
   if (
     prompt.length <= PREFERENCE_PROMPT_MAX &&
@@ -212,35 +136,17 @@ export function classifyTurn(turn: Turn): ObservationKind {
   ) {
     return 'decision';
   }
-  if (/\b(didn'?t work|failed|reverted|abandoned|dead ?end|gave up|doesn'?t scale)\b/.test(text)) {
+  const outcome = (turn.reply || turn.reasoning).toLowerCase();
+  if (
+    /\b(didn'?t work|reverted|abandoned|dead ?end|gave up|doesn'?t scale)\b/.test(text) &&
+    !/\b(fixed|fixes)\b/.test(outcome)
+  ) {
     return 'deadend';
   }
   if (/\b(fix(ed)?|bug|broken|regression|error|crash)\b/.test(text)) return 'bugfix';
   return turn.files.length > 0 ? 'pattern' : 'context';
 }
 
-function firstSentence(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed.length === 0) return '';
-  const match = /^(.+?)(?:[.!?](?:\s|$)|\n)/s.exec(trimmed);
-  return (match?.[1] ?? trimmed.split('\n')[0] ?? '').trim();
-}
-
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/[*`#]/g, '')
-    .trim();
-}
-
-function shortPath(path: string): string {
-  return path.split('/').filter(Boolean).slice(-2).join('/');
-}
-
 function isExcluded(file: string, patterns: string[]): boolean {
   return patterns.some((pattern) => file.includes(pattern));
-}
-
-function truncate(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max)}\n... [truncated]`;
 }

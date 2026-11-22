@@ -8,8 +8,20 @@ import { factId, factToObservation, youScope } from '../../dist/facts/model.js';
 import { importClaudeMemory, memoryFact, parseMemoryFile } from '../../dist/facts/claude-memory.js';
 import { NoopEmbedder } from '../../dist/embed/index.js';
 import { handoffBodyLines } from '../../dist/facts/handoff.js';
+import { chatWindows } from '../../dist/facts/distill.js';
 
 export default async function run() {
+  {
+    const body = `Asked: fix alert 12\n${'Checking the marker. '.repeat(60)}\nThe fix: read the time stored in the marker.`;
+    const [window] = chatWindows([{ body }]);
+    check(
+      "a distill window keeps a long turn's prompt and its outcome",
+      window.startsWith('Asked: fix alert 12') &&
+        window.includes('The fix: read the time stored in the marker.'),
+      window.slice(-80),
+    );
+  }
+
   {
     const ops = parseOps(
       [

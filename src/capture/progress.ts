@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { join, sep } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import type { MemoryStore } from '../store/adapter.js';
 import type { Observation } from '../types.js';
+import { isInside } from '../util/paths.js';
 
 const MAX_BUFFER = 16 * 1024 * 1024;
 const OPEN_LIMIT = 500;
@@ -31,11 +32,15 @@ function uncommittedFiles(project: string): Set<string> | null {
   }
 }
 
-const isInside = (file: string, folder: string): boolean => file.startsWith(folder + sep);
-
 export async function closeLandedWork(store: MemoryStore, project: string): Promise<number> {
   const dirty = uncommittedFiles(project);
   if (!dirty) return 0;
+
+  const clones = (await store.projectScope(project)).filter(
+    (name) => isAbsolute(name) && name !== project,
+  );
+  const inAnotherClone = (file: string) =>
+    !isInside(file, project) && clones.some((clone) => isInside(file, clone));
 
   const landed: string[] = [];
   let after: number | undefined;
@@ -53,8 +58,10 @@ export async function closeLandedWork(store: MemoryStore, project: string): Prom
     if (batch.length === 0) break;
 
     for (const obs of batch) {
-      const mine = obs.files.every((file) => isInside(file, project));
-      if (mine && obs.files.every((file) => !dirty.has(file))) landed.push(obs.id);
+      if (obs.files.some(inAnotherClone)) continue;
+      if (obs.files.every((file) => !isInside(file, project) || !dirty.has(file))) {
+        landed.push(obs.id);
+      }
     }
 
     const last = batch[batch.length - 1];

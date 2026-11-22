@@ -55,6 +55,29 @@ export default async function run() {
       2000,
     );
     check('layer 3 bounds the body it returns', full.includes('7000 more characters'));
+
+    const fact = renderFull(
+      row({
+        files: [],
+        title: 'Timers fire after 1.1s.',
+        body: 'Timers fire after 1.1s.\n\nWhy: They fired too early.\n\nFrom a chat on Nov 22 (abcd1234).',
+      }),
+      2000,
+    );
+    check(
+      'a fact prints its text once',
+      fact.split('Timers fire after 1.1s.').length === 2 &&
+        fact.includes('Why: They fired too early.'),
+      JSON.stringify(fact),
+    );
+    const turnRow = renderFull(
+      row({ title: 'Built the icon', body: 'Asked: add an icon\n\nBuilt it.', files: [] }),
+      2000,
+    );
+    check(
+      'a turn row prints its title and its whole body',
+      turnRow.includes('Built the icon\n\nAsked: add an icon'),
+    );
     check(
       'layer 3 keeps the metadata header',
       full.includes('who: ada') && full.includes('files: /p/a.ts'),
