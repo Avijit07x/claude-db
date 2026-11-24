@@ -16,6 +16,14 @@ export async function createStore(uri: string): Promise<MemoryStore> {
       const { PostgresStore } = await import('./postgres/index.js');
       return PostgresStore.create(uri);
     }
+    case 'libsql':
+    case 'http':
+    case 'https':
+    case 'ws':
+    case 'wss': {
+      const { LibsqlStore } = await import('./libsql/index.js');
+      return LibsqlStore.create(uri);
+    }
     case 'sqlite':
     case 'file':
     case '': {
@@ -25,7 +33,7 @@ export async function createStore(uri: string): Promise<MemoryStore> {
     default:
       throw new Error(
         `Unsupported database scheme "${scheme}". ` +
-          `Use mongodb://, postgres://, or a sqlite file path.`,
+          `Use mongodb://, postgres://, libsql:// (Turso), or a sqlite file path.`,
       );
   }
 }
