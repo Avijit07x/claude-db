@@ -7,8 +7,9 @@ import type { Client } from './driver.js';
 const MISSING_TABLE = /no such table/i;
 
 export function databaseId(uri: string): string {
+  const end = uri.search(/[?#]/);
   return createHash('sha256')
-    .update(uri.replace(/[?#].*$/, ''))
+    .update(end === -1 ? uri : uri.slice(0, end))
     .digest('hex')
     .slice(0, 16);
 }
