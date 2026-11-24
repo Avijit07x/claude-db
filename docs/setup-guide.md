@@ -76,6 +76,16 @@ claude-db use "postgres://user:pass@host:5432/memory"
 For MongoDB, install `mongodb` and use a `mongodb+srv://` address. Clones of one repository share
 memory by git remote, so every machine must run 0.11.0 or newer.
 
+For Turso, or any libSQL server, install `@libsql/client` and put the database token in the URL:
+
+```bash
+npm install -g @libsql/client
+claude-db use "libsql://<db>-<org>.turso.io?authToken=<token>"
+```
+
+Make the database with libSQL, the default. A Turso database made with `--tursodb`, or with concurrent
+writes turned on, runs the newer engine, which has no FTS5 full-text search; `use` stops and says so.
+
 On a remote database each hook pays to start node, open a connection and load the embedding model before
 it does any work, about a second in all. `claude-db daemon on` keeps one process warm that the hooks hand
 their work to, so the next hooks skip that cost. It stops after 15 idle minutes (`daemon.idleMinutes`)
@@ -94,7 +104,8 @@ Then restart Claude Code. Memory is kept.
 - **Nothing recorded:** restart Claude Code, and check that `install` ran in this repository.
 - **Memory rarely shows up:** run the head start steps, and run `claude-db pick` to see if picking
   is off or at its limit.
-- **`doctor` shows `reachable: no`:** for Postgres or MongoDB, install the driver (`pg` or `mongodb`).
+- **`doctor` shows `reachable: no`:** for Postgres, MongoDB or Turso, install the driver (`pg`,
+  `mongodb` or `@libsql/client`).
 - **Remove it:** `claude-db uninstall --project`. Your memory is kept.
 
 Commands are in the [README](../README.md) and `claude-db --help`. Every setting is listed in

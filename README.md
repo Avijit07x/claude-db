@@ -29,8 +29,8 @@ gives Claude the right part of it at the right time.
 - **Maps your code.** Who defines, calls or imports a symbol is answered in one
   call, instead of grep and reading files. It follows imports in TypeScript,
   JavaScript, Python, Go, Rust, Java and Kotlin.
-- **Keeps it yours.** SQLite on your machine by default, or Postgres or MongoDB
-  to share across machines. No cloud, no subscription.
+- **Keeps it yours.** SQLite on your machine by default, or Postgres, MongoDB
+  or Turso to share across machines. No cloud, no subscription.
 
 ## Install
 
@@ -57,7 +57,7 @@ Then load what already exists with `claude-db flush` and `claude-db scan`. The
 | `/cdb-scan`           | Maps an existing codebase into memory             |
 | `claude-db status`    | Shows whether it is wired up and what it recorded |
 | `claude-db doctor`    | Checks the setup, and finds what is wrong         |
-| `claude-db use <url>` | Switches to Postgres or MongoDB (`pg`/`mongodb`)  |
+| `claude-db use <url>` | Switches to Postgres, MongoDB or Turso            |
 
 `cdb` is a shorter alias. Every command is in the
 [CLI reference](https://claude-db.vercel.app/docs/cli).

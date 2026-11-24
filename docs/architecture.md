@@ -25,7 +25,7 @@ and [releasing.md](./releasing.md) covers a release.
 | 11  | [Handoff and catchup](#11-handoff-and-catchup)                   | A note for the next chat, and "where did I stop?"                |
 | 12  | [Code graph and `find_usages`](#12-code-graph-and-find_usages)   | "Who uses this?" in one call                                     |
 | 13  | [One project, many folders](#13-one-project-many-folders)        | One repository is one project, in any folder and on any machine  |
-| 14  | [Databases and sync](#14-databases-and-sync)                     | SQLite by default, Postgres or MongoDB to share                  |
+| 14  | [Databases and sync](#14-databases-and-sync)                     | SQLite by default, Postgres, MongoDB or Turso to share           |
 |     | **Reference**                                                    |                                                                  |
 | 15  | [MCP tools](#15-mcp-tools)                                       | The six tools Claude can call                                    |
 | 16  | [Commands](#16-commands)                                         | Every `claude-db` command                                        |
@@ -89,11 +89,11 @@ none of it. It also works out "what calls what" from scratch, by grepping and re
  │  capture · search · picks · facts · start block · code graph · redaction              │
  └──────────────────────────────────────────┬────────────────────────────────────────────┘
                                             │ one adapter interface
-                      ┌─────────────────────┼─────────────────────┐
-                      ▼                     ▼                     ▼
-               SQLite (default)          Postgres              MongoDB
-              ~/.claude-memory/        shared across         shared across
-                  memory.db              machines              machines
+            ┌─────────────────────┬─────────┴───────────┬─────────────────────┐
+            ▼                     ▼                     ▼                     ▼
+     SQLite (default)          Postgres              MongoDB         Turso (libSQL)
+    ~/.claude-memory/        shared across         shared across         shared across
+        memory.db              machines              machines              machines
 
  Claude can ASK at any time, through the MCP server:
    search · get_observations · timeline · remember · forget · find_usages
@@ -263,7 +263,7 @@ A search returns one short line per hit. The full text comes from `get_observati
 | `embeddings.provider` | auto    | The built-in 256-number embedder, or a local 384-number model when installed |
 
 Installing `@xenova/transformers` switches to the local model, and `claude-db reembed` recomputes old rows.
-Ranking lives in `src/search`, not in the database adapters, so SQLite, Postgres and MongoDB give the same
+Ranking lives in `src/search`, not in the database adapters, so SQLite, Postgres, MongoDB and Turso give the same
 results.
 
 ---
@@ -620,15 +620,17 @@ desktop see the same memory, and a second worktree sees the first one's notes.
 
 ## 14. Databases and sync
 
-**What it does.** Memory lives in one database: SQLite by default, or Postgres or MongoDB to share it across
-machines and teammates. Ranking and fusion are shared, but keyword ranking differs per engine (FTS5, tsvector,
-`$text`), and SQLite and MongoDB vector search scans the newest rows up to a cap.
+**What it does.** Memory lives in one database: SQLite by default, or Postgres, MongoDB or Turso to share it
+across machines and teammates. Ranking and fusion are shared, but keyword ranking differs per engine (FTS5,
+tsvector, `$text`), and SQLite, MongoDB and Turso vector search scans the newest rows up to a cap. Turso
+ranks those rows inside the database and sends back only the top ones, so a search downloads no vectors.
 
 **When it runs.** Always. You choose the database once.
 
 ```
  claude-db use postgres://user:pass@host:5432/memory      checks it answers, then switches
  claude-db use mongodb+srv://user:pass@cluster/memory
+ claude-db use "libsql://<db>-<org>.turso.io?authToken=<token>"
  CLAUDE_DB_URL=...                                         overrides config.json for one shell
 ```
 
@@ -852,7 +854,7 @@ src/
  ├── pick/       the pick prompt, run, worker and pending files
  ├── graph/      parser, languages, scan, imports per language, queries, refresh
  ├── usages/     the live git grep mode
- ├── store/      one adapter interface + sqlite/, postgres/, mongo/
+ ├── store/      one adapter interface + sqlite/, postgres/, mongo/, libsql/
  ├── embed/      the built-in embedder and the optional local model
  ├── mcp/        the MCP server and its six tools
  ├── cli/        the claude-db command and its subcommands
@@ -872,7 +874,7 @@ function, so the output format lives in one place.
   no leftover markers. Then ESLint, then a scan of tests and docs for tokens, key prefixes and personal paths.
 - **Tests that touch real data** run in an isolated temporary home. A guard stops them if they ever point at your
   real home folder.
-- **The store tests** run against SQLite locally, and against Postgres and MongoDB in CI.
+- **The store tests** run against SQLite locally, and against Postgres, MongoDB and a libSQL server in CI.
 - **CI** runs on Ubuntu and macOS, plus CodeQL.
 - **Releasing** follows [releasing.md](./releasing.md): a branch and a pull request, green CI, then an annotated
   tag that runs the publish workflow.
@@ -895,7 +897,7 @@ function, so the output format lives in one place.
 | Check it is installed and working        | `claude-db status`, `claude-db doctor`          |
 | See why picks or facts stopped           | `claude-db status` (the `paused` line says why) |
 | Build facts from waiting chats now       | `claude-db distill --backfill`                  |
-| Share memory across machines             | `claude-db use <postgres or mongo url>`         |
+| Share memory across machines             | `claude-db use <postgres, mongo or libsql url>` |
 | Move memory after a repo moved folders   | `claude-db merge <old-path>`                    |
 | Back up, or move to a new machine        | `claude-db export`, then `import`               |
 | Map a project that already exists        | `claude-db scan`, then the `/cdb-scan` skill    |
