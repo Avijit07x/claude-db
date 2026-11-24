@@ -40,7 +40,10 @@ export async function flushSession(
     return { observations: 0, summary: null, lastReply };
   }
 
-  const previous = rebuild ? null : await ctx.store.getSession(sessionId);
+  const [previous] = await Promise.all([
+    rebuild ? null : ctx.store.getSession(sessionId),
+    embedObservations(ctx, changed),
+  ]);
   const summary = summarize(observations, previous?.summary);
   await ctx.store.upsertSession({
     id: sessionId,
@@ -49,7 +52,6 @@ export async function flushSession(
     summary,
   });
 
-  await embedObservations(ctx, changed);
   await ctx.store.insertObservations(changed);
   await closeLandedWork(ctx.store, project);
   writeCursor(sessionId, read.nextOffset);

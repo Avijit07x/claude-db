@@ -37,11 +37,18 @@ export async function startFacts(
       await ctx.store.list({ project: owner, sessionId, newest: true, limit, bodies: false })
     ).filter(visible);
 
-  const you = onePerKey(await list(youScope(project), FACT_SESSION, 50));
-  const facts = onePerKey(await list(project, FACT_SESSION, 300));
-  const handoff = await newestHandoff(ctx, project);
+  const [youRows, factRows, handoff, manualRows, open, recent] = await Promise.all([
+    list(youScope(project), FACT_SESSION, 50),
+    list(project, FACT_SESSION, 300),
+    newestHandoff(ctx, project),
+    list(project, MANUAL_SESSION, 20),
+    openWork(ctx.store, project),
+    recentWork(ctx, project, current),
+  ]);
+  const you = onePerKey(youRows);
+  const facts = onePerKey(factRows);
   const shownHandoff = handoff && visible(handoff) ? handoff : null;
-  const manual = (await list(project, MANUAL_SESSION, 20)).filter((obs) => obs.id !== handoff?.id);
+  const manual = manualRows.filter((obs) => obs.id !== handoff?.id);
   const chatRules = await chatRulesFor(ctx, project, [...facts, ...manual], visible);
 
   const rank = (obs: Observation) => {
@@ -52,10 +59,7 @@ export async function startFacts(
     (a, b) => rank(a) - rank(b) || b.createdAt - a.createdAt,
   );
   const todos = facts.filter((obs) => factType(obs) === 'todo').slice(0, TODOS);
-  const uncommitted = (await openWork(ctx.store, project))
-    .filter((obs) => !hidden.has(obs.id))
-    .slice(0, UNCOMMITTED);
-  const recent = await recentWork(ctx, project, current);
+  const uncommitted = open.filter((obs) => !hidden.has(obs.id)).slice(0, UNCOMMITTED);
   const factEntry = (obs: Observation) => entry(factLine(obs), obs.id, obs.title);
 
   const sections: Section[] = [
@@ -109,8 +113,11 @@ async function recentWork(
   project: string,
   current: string | undefined,
 ): Promise<RecentWork> {
-  const unfinished = activeRequests(await ctx.store.projectScope(project), current);
-  const chats = await recentChats(ctx, project, current);
+  const [scope, chats] = await Promise.all([
+    ctx.store.projectScope(project),
+    recentChats(ctx, project, current),
+  ]);
+  const unfinished = activeRequests(scope, current);
   return { unfinished, chats, latest: latestRequestAt(chats, unfinished) };
 }
 
