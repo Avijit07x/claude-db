@@ -20,15 +20,18 @@ export default async function run(
     { ...revised, title: 'Quorbit cache warmer finished', body: 'second pass' },
   ]);
 
+  const orphanSql = `SELECT count(*) AS n FROM observations_fts WHERE observations_fts MATCH '"zerplix"'`;
+  let orphans = null;
   if (expected === 'sqlite') {
     const { DatabaseSync } = await import('node:sqlite');
     const raw = new DatabaseSync(uri);
-    const orphans = raw
-      .prepare(
-        `SELECT count(*) AS n FROM observations_fts WHERE observations_fts MATCH '"zerplix"'`,
-      )
-      .get().n;
+    orphans = raw.prepare(orphanSql).get().n;
     raw.close();
+  }
+  if (expected === 'libsql') {
+    orphans = Number((await store.client.execute({ sql: orphanSql, args: [] })).rows[0].n);
+  }
+  if (orphans !== null) {
     check(
       're-ingest leaves no orphan rows in the fts index',
       orphans === 0,
@@ -42,16 +45,23 @@ export default async function run(
     (await store.inventory()).join(','),
   );
 
-  if (expected === 'sqlite') {
-    const { DatabaseSync } = await import('node:sqlite');
-    const raw = new DatabaseSync(uri);
-    raw.exec('CREATE TABLE IF NOT EXISTS orders (id TEXT)');
-    raw.close();
+  if (expected === 'sqlite' || expected === 'libsql') {
+    if (expected === 'sqlite') {
+      const { DatabaseSync } = await import('node:sqlite');
+      const raw = new DatabaseSync(uri);
+      raw.exec('CREATE TABLE IF NOT EXISTS orders (id TEXT)');
+      raw.close();
+    } else {
+      await store.client.execute({ sql: 'CREATE TABLE IF NOT EXISTS orders (id TEXT)', args: [] });
+    }
     check(
       'inventory reports a table that is not ours',
       (await store.inventory()).includes('orders'),
       (await store.inventory()).join(','),
     );
+    if (expected === 'libsql') {
+      await store.client.execute({ sql: 'DROP TABLE orders', args: [] });
+    }
   }
 
   const current = await search.search({ text: 'quorbit', project, limit: 5 });
