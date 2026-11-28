@@ -88,7 +88,7 @@ jobs:
           --health-timeout 5s
           --health-retries 12
       libsql:
-        image: ghcr.io/tursodatabase/libsql-server:latest
+        image: ghcr.io/tursodatabase/libsql-server:d6c75af
         ports:
           - 8080:8080
       mongo:

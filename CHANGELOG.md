@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.15.0
+
+### Added
+
+- **Turso, or any libSQL server, can hold memory.** Install `@libsql/client` and run
+  `claude-db use "libsql://<db>-<org>.turso.io?authToken=<token>"`. It keeps the schema and keyword ranking of
+  the default SQLite store, ranks vector search inside the database, and sends each write as one request. A
+  database made with Turso's newer engine has no full-text search, and `use` says so.
+
+### Changed
+
+- **A chat starts faster on a remote database.** The reads for the start block, and keyword and vector search,
+  run at the same time instead of one after another. SQLite works as before.
+
+By @alok-debnath (#45, #46).
+
 ## 0.14.1
 
 ### Fixed

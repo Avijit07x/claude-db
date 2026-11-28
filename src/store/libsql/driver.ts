@@ -53,8 +53,8 @@ const ONE_REQUEST_BYTES = 32 * 1024 * 1024;
 
 function bytes(statement: Statement): number {
   return statement.args.reduce<number>(
-    (total, arg) => total + (typeof arg === 'string' ? arg.length : 16),
-    statement.sql.length,
+    (total, arg) => total + (typeof arg === 'string' ? Buffer.byteLength(arg) : 16),
+    Buffer.byteLength(statement.sql),
   );
 }
 

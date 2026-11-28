@@ -38,8 +38,8 @@ const TILES: Tile[] = [
     detail: (
       <>
         Your database. <code className={TAG}>SQLite</code> by default with zero setup, or point it
-        at <code className={TAG}>Postgres</code> or <code className={TAG}>Mongo</code> to sync
-        across machines.
+        at <code className={TAG}>Postgres</code>, <code className={TAG}>Mongo</code> or{' '}
+        <code className={TAG}>Turso</code> to sync across machines.
       </>
     ),
   },
