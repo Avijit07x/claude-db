@@ -41,7 +41,7 @@ export const DOCS: DocMeta[] = [
   {
     slug: 'databases',
     title: 'Databases',
-    description: 'SQLite by default. Point it at Postgres or Mongo to sync across machines.',
+    description: 'SQLite by default. Point it at Postgres, Mongo or Turso to sync across machines.',
     group: 'Guides',
   },
   {
