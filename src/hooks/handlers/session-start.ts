@@ -63,23 +63,26 @@ export default async function sessionStart(run: HookRun): Promise<void> {
   await run.withContext(async (ctx) => {
     startBackgroundWork(project, ctx.config.database);
 
-    const earlier =
-      payload.source === 'compact' && payload.session_id
-        ? await recoverAfterCompact(ctx, project, payload.session_id, payload.transcript_path)
-        : null;
-    const restored = earlier?.ids ?? new Set<string>();
-
-    const facts = await startFacts(ctx, project, restored, payload.session_id, earlier?.titles);
+    const startBlock = async () => {
+      const earlier =
+        payload.source === 'compact' && payload.session_id
+          ? await recoverAfterCompact(ctx, project, payload.session_id, payload.transcript_path)
+          : null;
+      const restored = earlier?.ids ?? new Set<string>();
+      const facts = await startFacts(ctx, project, restored, payload.session_id, earlier?.titles);
+      return { earlier, facts };
+    };
+    const [{ earlier, facts }, scannedRows, distill] = await Promise.all([
+      startBlock(),
+      ctx.store.scannedFiles(project, 1),
+      distillNotice(ctx, project),
+    ]);
     if (facts && payload.session_id) markShown(payload.session_id, [...facts.ids]);
 
-    const scanned = (await ctx.store.scannedFiles(project, 1)).length > 0;
+    const scanned = scannedRows.length > 0;
     noteGraphPresence(project, scanned);
     const update = ctx.config.updates === 'off' ? null : updateNotice();
-    const notice = [
-      await distillNotice(ctx, project),
-      !scanned && isGitRepo(project) ? SCAN_HINT : null,
-      update,
-    ]
+    const notice = [distill, !scanned && isGitRepo(project) ? SCAN_HINT : null, update]
       .filter(Boolean)
       .join('\n');
 

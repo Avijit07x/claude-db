@@ -33,9 +33,10 @@ export class SearchService {
       maxScanCandidates: query.maxScanCandidates ?? this.maxScanCandidates,
     };
 
-    const embedded = this.embed(wide.text);
-    const keyword = await this.store.searchKeyword({ ...wide, text: keywordText }).catch(() => []);
-    const vector = await this.vectorSearch(wide, await embedded);
+    const [keyword, vector] = await Promise.all([
+      this.store.searchKeyword({ ...wide, text: keywordText }).catch(() => []),
+      this.embed(wide.text).then((embedded) => this.vectorSearch(wide, embedded)),
+    ]);
 
     const fused = fuse(
       [keyword, vector].filter((r) => r.length > 0),
