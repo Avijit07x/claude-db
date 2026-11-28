@@ -183,12 +183,18 @@ export async function backfill(
   return { distilled, facts, remaining: 0, stopped: 'done' };
 }
 
+function withoutCommands(body: string): string {
+  const at = body.lastIndexOf('\nRan: ');
+  return at < 0 || body.includes('\n', at + 1) ? body : body.slice(0, at);
+}
+
 export function chatWindows(rows: Observation[], most = MAX_WINDOWS): string[] {
+  const room = Math.max(ROW_CHARS, Math.floor(WINDOW_CHARS / rows.length) - SEPARATOR.length);
   const windows: string[][] = [];
   let current: string[] = [];
   let used = 0;
   for (const obs of rows) {
-    const entry = keepEnds(obs.body, ROW_CHARS);
+    const entry = obs.body.length <= room ? obs.body : keepEnds(withoutCommands(obs.body), room);
     if (current.length > 0 && used + entry.length > WINDOW_CHARS) {
       windows.push(current);
       current = [];
