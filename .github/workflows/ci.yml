@@ -87,6 +87,10 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+      libsql:
+        image: ghcr.io/tursodatabase/libsql-server:latest
+        ports:
+          - 8080:8080
       mongo:
         image: mongo:7
         ports:
@@ -109,10 +113,15 @@ jobs:
       - run: npm run build
 
       - name: Install the optional drivers
-        run: npm install --no-save pg mongodb
+        run: npm install --no-save pg mongodb @libsql/client
 
       - name: Postgres
         run: node scripts/smoke.mjs "postgres://postgres:postgres@localhost:5432/postgres"
 
       - name: MongoDB
         run: node scripts/smoke.mjs "mongodb://localhost:27017/claude_db_ci"
+
+      - name: libSQL (Turso)
+        run: |
+          for i in $(seq 1 30); do curl -sf http://localhost:8080/health && break; sleep 1; done
+          node scripts/smoke.mjs "http://localhost:8080"

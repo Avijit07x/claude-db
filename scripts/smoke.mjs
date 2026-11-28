@@ -8,7 +8,13 @@ import { NoopEmbedder } from '../dist/embed/index.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'recall-smoke-'));
 const uri = process.argv[2] ?? join(dir, 'memory.db');
-const expected = /^mongodb/.test(uri) ? 'mongodb' : /^postgres/.test(uri) ? 'postgres' : 'sqlite';
+const expected = /^mongodb/.test(uri)
+  ? 'mongodb'
+  : /^postgres/.test(uri)
+    ? 'postgres'
+    : /^(libsql|https?|wss?):/.test(uri)
+      ? 'libsql'
+      : 'sqlite';
 const project = '/tmp/demo-project';
 let failures = 0;
 
@@ -96,6 +102,7 @@ import projectLists from './smoke/project-lists.mjs';
 import scopedStore from './smoke/scoped-store.mjs';
 import sessions from './smoke/sessions.mjs';
 import contract from './smoke/contract.mjs';
+import libsql from './smoke/libsql.mjs';
 
 await retrieval(ctx, check);
 await sessions(ctx, check);
@@ -108,6 +115,7 @@ await projectLinks(ctx, check);
 await projectLists(ctx, check);
 await scopedStore(ctx, check);
 await contract(ctx, check);
+await libsql(ctx, check);
 
 await store.remove({ project });
 await store.close();

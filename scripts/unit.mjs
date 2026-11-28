@@ -25,6 +25,7 @@ import graphQuery from './unit/graph-query.mjs';
 import progress from './unit/progress.mjs';
 import refresh from './unit/refresh.mjs';
 import adapters from './unit/adapters.mjs';
+import libsql from './unit/libsql.mjs';
 import shown from './unit/shown.mjs';
 import injectDefaults from './unit/inject-defaults.mjs';
 import promptRecall from './unit/prompt-recall.mjs';
@@ -144,6 +145,7 @@ await factsOps();
 await facts();
 await fixtures();
 await adapters();
+await libsql();
 
 rmSync(graphCache, { recursive: true, force: true });
 report('unit');

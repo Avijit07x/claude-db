@@ -47,6 +47,7 @@ export function usage(): void {
 Connection strings:
   mongodb+srv://user:pass@cluster.mongodb.net/memory
   postgres://user:pass@host:5432/memory
+  libsql://<db>-<org>.turso.io?authToken=<token>   (Turso, or any libSQL server)
   /path/to/memory.db                          (SQLite, default)
 
 Or set CLAUDE_DB_URL in the environment to override config.json.`);

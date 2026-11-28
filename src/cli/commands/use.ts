@@ -27,7 +27,7 @@ export async function cmdUse(argv: (string | undefined)[]): Promise<void> {
       await store.close();
     }
   } catch (error) {
-    console.error(`Could not reach that database: ${describe(error)}`);
+    console.error(`Could not reach that database: ${describe(error, uri)}`);
     if (!force) {
       console.error('\nNothing was changed; memory still uses the previous database.');
       console.error('Re-run with --force to save it anyway.');
@@ -83,7 +83,7 @@ async function warnAboutStranding(previous: string, uri: string): Promise<void> 
   console.log('  claude-db use <this url>         && claude-db import memory.jsonl');
 }
 
-function describe(error: unknown): string {
+function describe(error: unknown, uri: string): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/ENOTFOUND|EAI_AGAIN/.test(message)) {
     return `${message}\n(that host does not resolve — check the name, or whether the service still exists)`;
@@ -97,6 +97,12 @@ function describe(error: unknown): string {
       `${message}\n(managed Postgres signs with its own CA, which node does not trust by ` +
       `default —\n append &sslmode=no-verify to the URL, or point &sslrootcert= at the CA ` +
       `file\n the provider gives you)`
+    );
+  }
+  if (/^(libsql|https?|wss?):/i.test(uri) && /HTTP status 40[01]\b/.test(message)) {
+    return (
+      `${message}\n(Turso needs a database token in the URL: ?authToken=<token>. ` +
+      `Make one with\n turso db tokens create <db>, or in the dashboard)`
     );
   }
   return message;
