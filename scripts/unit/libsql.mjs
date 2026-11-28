@@ -210,6 +210,22 @@ async function graph() {
     `${big.seen.requests.length} requests`,
   );
 
+  const wide = symbols.slice(0, 3000).map((symbol) => ({
+    ...symbol,
+    signature: '漢'.repeat(4000),
+  }));
+  const utf8 = fakeClient();
+  await new LibsqlStore(utf8.client).replaceGraph('/p', null, {
+    symbols: wide,
+    edges: [],
+    files: [],
+  });
+  check(
+    'libsql: a graph over the limit in UTF-8 bytes is split, even when its text is shorter',
+    utf8.seen.requests.length > 1,
+    `${utf8.seen.requests.length} requests`,
+  );
+
   const edges = fakeClient();
   await new LibsqlStore(edges.client).findEdges({
     project: '/p',
