@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.15.1
+
+### Fixed
+
+- **A to-do that got done is retired.** Turning a chat into facts cut each turn down to its request and its
+  last lines, which are usually the commands it ran. The work that finished a to-do was never read, so the
+  to-do stayed at the start of every chat. A turn is now read whole when the chat fits, and a turn that is
+  still cut keeps its last reply instead of its commands.
+- **A one-time instruction is no longer saved as a rule.** Telling Claude how to do one task, such as "don't
+  comment, merge it", could become a lasting rule about you, shown in every project. A rule is now only how
+  you want work done from now on.
+
 ## 0.15.0
 
 ### Added

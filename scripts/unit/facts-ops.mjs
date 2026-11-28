@@ -23,6 +23,37 @@ export default async function run() {
   }
 
   {
+    const turn = (n) => ({
+      body:
+        `Asked: step ${n}\n${`Working on step ${n}. `.repeat(140)}\nStep ${n} is done.\n` +
+        `\nFiles: src/s${n}.ts\nRan: ${'Build: npm run build; '.repeat(40)}`,
+    });
+    const few = [1, 2, 3].map(turn);
+    const fewWindows = chatWindows(few);
+    check(
+      'a distill window keeps a few long turns whole',
+      fewWindows.length === 1 && few.every((t) => fewWindows[0].includes(t.body)),
+      fewWindows.map((w) => w.length).join(','),
+    );
+
+    const manyWindows = chatWindows(Array.from({ length: 60 }, (_, i) => turn(i)));
+    const entries = manyWindows.flatMap((w) => w.split('\n\n---\n\n'));
+    check(
+      'a long chat is still clipped into the same number of windows',
+      manyWindows.length === 2 && entries.length === 60 && entries.every((e) => e.length <= 900),
+      `${manyWindows.length} windows, longest ${Math.max(...entries.map((e) => e.length))}`,
+    );
+    check(
+      'a clipped turn keeps its last reply and its files, not its commands',
+      entries.every(
+        (e, i) =>
+          e.includes(`Step ${i} is done.`) && e.includes('Files: src/s') && !e.includes('Ran: '),
+      ),
+      entries[0]?.slice(-120),
+    );
+  }
+
+  {
     const ops = parseOps(
       [
         'Here are the facts:',
@@ -58,6 +89,10 @@ export default async function run() {
       prompt.includes('timers [decision, project] All timers fire after 1.1s.'),
     );
     check('no noted block when nothing was saved by hand', !prompt.includes('<noted-by-user>'));
+    check(
+      'an instruction for the current task is not saved as a rule',
+      prompt.replace(/\s+/g, ' ').includes('an instruction for the current task is not a rule'),
+    );
     const withNotes = buildDistillPrompt('Asked: fix the timer', [], ['Always use pnpm here']);
     check(
       'rules saved by hand are listed so they are not repeated',
