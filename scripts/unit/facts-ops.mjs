@@ -89,6 +89,10 @@ export default async function run() {
       prompt.includes('timers [decision, project] All timers fire after 1.1s.'),
     );
     check('no noted block when nothing was saved by hand', !prompt.includes('<noted-by-user>'));
+    check(
+      'an instruction for the current task is not saved as a rule',
+      prompt.replace(/\s+/g, ' ').includes('an instruction for the current task is not a rule'),
+    );
     const withNotes = buildDistillPrompt('Asked: fix the timer', [], ['Always use pnpm here']);
     check(
       'rules saved by hand are listed so they are not repeated',
